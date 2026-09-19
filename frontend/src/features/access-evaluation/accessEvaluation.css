@@ -1,0 +1,81 @@
+.evaluacion {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.evaluacion-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  max-width: 60ch;
+}
+
+.evaluacion-formulario,
+.evaluacion-resultado {
+  padding: 1.25rem;
+}
+
+.evaluacion-formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
+  align-items: end;
+}
+
+.evaluacion-veredicto {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.evaluacion-veredicto.concedido span {
+  color: var(--success, #1a7f37);
+}
+
+.evaluacion-veredicto.denegado span {
+  color: var(--danger, #b42318);
+}
+
+.evaluacion-datos {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1rem;
+}
+
+@media (max-width: 600px) {
+  .evaluacion-datos {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evaluacion-datos dt {
+  color: var(--text-muted);
+}
+
+.evaluacion-datos dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.evaluacion-resultado h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.evaluacion-pasos {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.paso-no_evaluado {
+  color: var(--text-muted);
+}
+
+.paso-fallido {
+  font-weight: 600;
+}

@@ -1,0 +1,49 @@
+# Entorno local de desarrollo: SQL Server y la API contenedorizada (plan.md, Target Platform).
+#
+#   docker compose up -d --build
+#
+# Las credenciales por defecto son SOLO para desarrollo local. Para producción ver
+# docker-compose.prod.yml y README.md, que exigen todos los secretos por variable de entorno.
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: eac-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Dev-Password1!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - eac-sqlserver-data:/var/opt/mssql
+    healthcheck:
+      # /health/ready de la API depende de esta instancia (research.md §19)
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: eac-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Development}"
+      # Dentro de la red de compose, SQL Server se alcanza por el nombre del servicio.
+      ConnectionStrings__SqlServer: "Server=sqlserver,1433;Database=${MSSQL_DATABASE:-EnterpriseAccessControl};User Id=sa;Password=${MSSQL_SA_PASSWORD:-Dev-Password1!};TrustServerCertificate=True;Encrypt=True"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-clave-de-firma-solo-para-desarrollo-local-min-32-chars}"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+volumes:
+  eac-sqlserver-data:

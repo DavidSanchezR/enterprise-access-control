@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditoría de cierre de Enterprise Access Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+</style>
+
+</head>
+<body>
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Auditoría de cierre · solo lectura</p>
+    <h1>Enterprise Access Control: ¿está listo para cerrarse?</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>15/09/2026</b></span>
+      <span>Alcance <b>T001–T168, spec, research, data-model, contratos, ux-ui, código, base de datos y despliegue</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Secciones del informe">
+    <p>Secciones</p>
+    <ol>
+      <li><a href="#a"><span>A</span><span>Veredicto</span></a></li>
+      <li><a href="#b"><span>B</span><span>Implementación</span></a></li>
+      <li><a href="#c"><span>C</span><span>Cobertura de requisitos</span></a></li>
+      <li><a href="#d"><span>D</span><span>Contradicciones reales</span></a></li>
+      <li><a href="#e"><span>E</span><span>Riesgos técnicos</span></a></li>
+      <li><a href="#f"><span>F</span><span>Decisiones abiertas</span></a></li>
+      <li><a href="#g"><span>G</span><span>Huecos de producto</span></a></li>
+      <li><a href="#h"><span>H</span><span>Cobertura de pruebas</span></a></li>
+      <li><a href="#i"><span>I</span><span>Despliegue</span></a></li>
+      <li><a href="#j"><span>J</span><span>Cambios recomendados</span></a></li>
+      <li><a href="#k"><span>K</span><span>Veredicto final</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- A -->
+    <section id="a">
+      <div class="section-head"><span class="letter">A</span><h2>Veredicto</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">No cerrado</span>
+          <span class="muted">Suites en verde y núcleo de dominio sólido, pero con bloqueantes de seguridad, alcance y tareas.</span>
+        </div>
+        <ol>
+          <li><strong>Defecto de seguridad crítico, confirmado en ejecución.</strong> Cualquier usuario con alcance no vacío puede administrar todos los usuarios y reemplazar el alcance de cualquiera, incluido el suyo, por cualquier compañía activa. Anula el aislamiento por compañía (Principio I, RF-005).</li>
+          <li><strong>Más defectos de alcance en el histórico de personas.</strong> Hay escrituras y lecturas que no validan la Principal ni la compañía afectada (RF-049, RF-060).</li>
+          <li><strong>RF-067, RF-068, RF-069 y CS-032</strong> son obligatorios en el spec y no existen: ni contrato, ni tareas, ni código.</li>
+          <li><strong>Dos tareas marcadas sin su trabajo completo:</strong> T116 (pantalla Caso A/Caso B) y T019 (índice clúster en 1 de 6 entidades).</li>
+          <li><strong>Contratos incumplidos:</strong> una compañía o unidad INACTIVA no bloquea nuevas asignaciones, y <code>people.yaml</code> declara 409 para esos casos.</li>
+        </ol>
+        <div class="runs" aria-label="Validaciones ejecutadas">
+          <span>Unitarias <b>92/92</b></span>
+          <span>Contrato <b>242/242</b></span>
+          <span>Integración <b>485/485</b></span>
+          <span>Vitest <b>141/141</b></span>
+          <span>E2E <b>3/3</b></span>
+          <span>Migraciones <b>12</b> · cambios de modelo pendientes <b>0</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section id="b">
+      <div class="section-head"><span class="letter">B</span><h2>Estado de implementación</h2></div>
+      <div class="table-wrap">
+        <table class="stories">
+          <thead><tr><th>Área</th><th>Estado</th><th>Evidencia</th></tr></thead>
+          <tbody>
+            <tr><td class="id">US1</td><td class="state"><span class="pill bad">Defecto crítico</span></td><td>Funciona: login, bloqueo, expiración e historial de contraseñas. Falla: <code>UsuarioService</code> no aplica alcance; <code>RequiereCambioPassword</code> solo lo aplica la UI; no hay alta del primer administrador.</td></tr>
+            <tr><td class="id">US2</td><td class="state"><span class="pill warn">Parcial</span></td><td>Funciona: compañías, relaciones y UO aisladas por Principal, sin ciclos. Falla: una compañía o UO INACTIVA no bloquea asignaciones; <code>TipoCompania</code> se puede reclasificar sin validar dependientes.</td></tr>
+            <tr><td class="id">US3</td><td class="state"><span class="pill ok">Completa</span></td><td>Semilla de Perú en migración versionada; RF-032 aplicado a los catálogos maestros.</td></tr>
+            <tr><td class="id">US4</td><td class="state"><span class="pill ok">Completa</span></td><td>Unicidad de documento, búsqueda dentro del alcance, p95 45 ms con 100 000 personas.</td></tr>
+            <tr><td class="id">US5</td><td class="state"><span class="pill warn">Parcial</span></td><td>Backend completo: triggers, contención, cascada, fecha futura, renovación y revalidación. Defectos: alcance (D-2), INACTIVA (D-4), UI incompleta (T116: no se puede crear pertenencia, contexto ni perfil) y fechas mostradas con un día de desfase.</td></tr>
+            <tr><td class="id">US6</td><td class="state"><span class="pill ok">Completa</span></td><td>Árbol de áreas, aislamiento entre Principales, rechazo de ciclos y de movimientos entre árboles.</td></tr>
+            <tr><td class="id">US7</td><td class="state"><span class="pill ok">Completa</span></td><td>Tipos de persona por área, con 404 fuera de alcance y rechazo de maestro inactivo.</td></tr>
+            <tr><td class="id">US8</td><td class="state"><span class="pill ok">Completa</span></td><td>Motor de 14 pasos puro, precedencia, gate de credencial, p95 13 ms, E2E de quickstart §5 y §6.</td></tr>
+            <tr><td class="id">US9</td><td class="state"><span class="pill ok">Completa</span></td><td>Decisión A verificada; asignar, devolver y eliminar; la baja pide confirmación.</td></tr>
+            <tr><td class="id">US10</td><td class="state"><span class="pill warn">Parcial</span></td><td>Estampado automático probado. Las consultas transversales de auditoría, históricos e indicadores (RF-067 a RF-069) no existen.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section id="c">
+      <div class="section-head"><span class="letter">C</span><h2>Cobertura de requisitos</h2></div>
+      <p class="prose muted">Las filas se agrupan solo cuando comparten implementación y pruebas. Las referencias D-n y E remiten a las secciones D y E.</p>
+      <div class="table-wrap">
+        <table class="coverage">
+          <thead><tr><th>Requisito</th><th>Implementado</th><th>Prueba</th><th>Observación</th></tr></thead>
+          <tbody>
+            <tr class="group"><td colspan="4">Requisitos funcionales</td></tr>
+            <tr><td class="id">RF-001, 002</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato</td><td>—</td></tr>
+            <tr><td class="id">RF-003</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, contrato</td><td>Umbrales provisionales (decisión #1)</td></tr>
+            <tr><td class="id">RF-004</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato</td><td>—</td></tr>
+            <tr><td class="id">RF-005</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración (personas, compañías, áreas, UO, permisos, evaluación)</td><td>Usuarios sin alcance (D-1); histórico de persona (D-2)</td></tr>
+            <tr><td class="id">RF-006 a 009</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato, Tree</td><td>—</td></tr>
+            <tr><td class="id">RF-010</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, frontend</td><td>—</td></tr>
+            <tr><td class="id">RF-011</td><td class="state"><span class="pill warn">Solo API</span></td><td>Integración</td><td>Sin pantalla; no rechaza perfiles duplicados solapados (D-9)</td></tr>
+            <tr><td class="id">RF-012</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato, frontend</td><td>—</td></tr>
+            <tr><td class="id">RF-013</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración, contrato</td><td>La UI muestra el UUID cuando no resuelve un nombre</td></tr>
+            <tr><td class="id">RF-014, 015</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración (triggers)</td><td>Ver D-6</td></tr>
+            <tr><td class="id">RF-016</td><td class="state"><span class="pill warn">Parcial</span></td><td>Unitaria, integración</td><td>Normaliza al día UTC, no al de Lima; desfase visual en la UI (E)</td></tr>
+            <tr><td class="id">RF-017</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración</td><td>—</td></tr>
+            <tr><td class="id">RF-018</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración</td><td>Lista credenciales de Principales fuera de alcance (D-2)</td></tr>
+            <tr><td class="id">RF-019 a 022</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, contrato, E2E</td><td>—</td></tr>
+            <tr><td class="id">RF-023 a 025</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, E2E</td><td>—</td></tr>
+            <tr><td class="id">RF-026, 027</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato</td><td>—</td></tr>
+            <tr><td class="id">RF-028, 029, 033</td><td class="state"><span class="pill ok">Sí</span></td><td>Indirecta</td><td>—</td></tr>
+            <tr><td class="id">RF-030</td><td class="state"><span class="pill ok">Sí</span></td><td>Frontend</td><td>Existen pantallas para las entidades que enumera el RF</td></tr>
+            <tr><td class="id">RF-031</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración</td><td>—</td></tr>
+            <tr><td class="id">RF-032</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración (persona, tipos, credencial)</td><td>Compañía o UO INACTIVA no bloquea (D-4)</td></tr>
+            <tr><td class="id">RF-034</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración (endurecimiento)</td><td>Exigir autorización no garantiza el alcance (D-1)</td></tr>
+            <tr><td class="id">RF-035</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, rendimiento</td><td>—</td></tr>
+            <tr><td class="id">RF-036</td><td class="state"><span class="pill ok">Sí</span></td><td>Frontend (accesibilidad)</td><td>—</td></tr>
+            <tr><td class="id">RF-037</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato</td><td>—</td></tr>
+            <tr><td class="id">RF-038</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, E2E</td><td>—</td></tr>
+            <tr><td class="id">RF-039</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración (triggers)</td><td>La cascada puede dejar intervalos invertidos (E)</td></tr>
+            <tr><td class="id">RF-040</td><td class="state"><span class="pill warn">Parcial</span></td><td>Contrato (242)</td><td>Faltan los contratos de RF-067 a RF-069 (D-3)</td></tr>
+            <tr><td class="id">RF-041</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato</td><td>—</td></tr>
+            <tr><td class="id">RF-042</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato, frontend</td><td>Reclasificación sin validar dependientes (E)</td></tr>
+            <tr><td class="id">RF-043 a 048</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, contrato, E2E</td><td>—</td></tr>
+            <tr><td class="id">RF-049</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración</td><td>La asignación de UO no valida el alcance sobre la Principal (D-2)</td></tr>
+            <tr><td class="id">RF-050 a 052</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato, E2E</td><td>—</td></tr>
+            <tr><td class="id">RF-053, 054</td><td class="state"><span class="pill warn">Solo backend</span></td><td>Unitaria, integración, E2E vía API</td><td>No hay pantalla Caso A/Caso B (D-5)</td></tr>
+            <tr><td class="id">RF-055 a 059</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, contrato, E2E</td><td>RF-057 = Decisión A, verificada</td></tr>
+            <tr><td class="id">RF-060</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración</td><td>Los listados de contextos no filtran por Principal (D-2)</td></tr>
+            <tr><td class="id">RF-061 a 065</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración</td><td>Dependientes futuros quedan con fin anterior al inicio (E)</td></tr>
+            <tr><td class="id">RF-066</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración</td><td>—</td></tr>
+            <tr><td class="id">RF-067 a 069</td><td class="state"><span class="pill bad">No</span></td><td>—</td><td>Sin contrato, tarea ni código (D-3)</td></tr>
+            <tr><td class="id">RF-070 a 073</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración, contrato, frontend</td><td>—</td></tr>
+            <tr class="group"><td colspan="4">Criterios de éxito</td></tr>
+            <tr><td class="id">CS-001</td><td class="state"><span class="pill ok">Sí</span></td><td>Sin medición</td><td>No hay prueba de tiempo de login</td></tr>
+            <tr><td class="id">CS-002, 003</td><td class="state"><span class="pill ok">Sí</span></td><td>Rendimiento (p95 45 ms / 13 ms)</td><td>—</td></tr>
+            <tr><td class="id">CS-004</td><td class="state"><span class="pill warn">Parcial</span></td><td>Integración</td><td>Política en el 100 % de endpoints, pero alcance efectivo roto (D-1, D-2)</td></tr>
+            <tr><td class="id">CS-005 a 008</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, contrato, unitaria</td><td>—</td></tr>
+            <tr><td class="id">CS-009</td><td class="state"><span class="pill warn">Parcial</span></td><td>E2E vía API</td><td>No se puede completar desde la UI (D-5)</td></tr>
+            <tr><td class="id">CS-010</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración indirecta</td><td>Sin prueba explícita de dos raíces en la misma Principal</td></tr>
+            <tr><td class="id">CS-011 a 018</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración, E2E §6</td><td>—</td></tr>
+            <tr><td class="id">CS-019, 020</td><td class="state"><span class="pill ok">Backend</span></td><td>Integración</td><td>La UI no permite abrir contextos</td></tr>
+            <tr><td class="id">CS-021</td><td class="state"><span class="pill bad">No</span></td><td>—</td><td>Pantalla Caso B inexistente (D-5)</td></tr>
+            <tr><td class="id">CS-022 a 031</td><td class="state"><span class="pill ok">Sí</span></td><td>Integración (gate de credencial, revalidación, revocación)</td><td>—</td></tr>
+            <tr><td class="id">CS-032</td><td class="state"><span class="pill bad">No</span></td><td>—</td><td>D-3</td></tr>
+            <tr><td class="id">CS-033 a 035</td><td class="state"><span class="pill ok">Sí</span></td><td>Unitaria, integración</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- D -->
+    <section id="d">
+      <div class="section-head"><span class="letter">D</span><h2>Contradicciones reales</h2></div>
+      <div class="findings">
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-1</span><span class="pill bad">Crítica</span></div>
+          <div class="finding-body">
+            <h3>Administración de usuarios sin alcance</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd>RF-005, Principio I, Historia 1 criterio 4, CS-004.</dd>
+              <dt>Código</dt><dd><code>UsuarioService.cs:24</code> lista sin filtro; <code>UsuarioService.cs:179</code> y <code>:217</code> solo validan que la compañía exista y esté activa; <code>CompaniaScopeAuthorizationHandler.cs:39</code> solo exige alcance no vacío.</dd>
+              <dt>Impacto</dt><dd>
+                <ul class="tight">
+                  <li>Un usuario "ajeno" obtuvo en <code>GET /api/usuarios</code> los 6 usuarios del sistema y sus alcances, con ID de compañías fuera del suyo (lectura real contra el entorno E2E).</li>
+                  <li>Con esos ID puede hacer <code>PUT</code> sobre su propio alcance, volver a iniciar sesión y ver cualquier compañía. La escritura no se ejecutó; se deduce directamente del código.</li>
+                  <li>También puede crear usuarios e inactivar o desbloquear a cualquiera.</li>
+                </ul>
+              </dd>
+              <dt>Tipo</dt><dd>Defecto real. Corregirlo exige decidir un modelo de administración que el spec no define (no hay roles).</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-2</span><span class="pill bad">Alta</span></div>
+          <div class="finding-body">
+            <h3>Histórico de persona fuera de alcance</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd>RF-049, RF-060, RF-005.</dd>
+              <dt>Código</dt><dd>
+                <ul class="tight">
+                  <li><code>AsignacionUnidadOrganizativaService.cs:30</code> no valida que la Principal del contexto esté en alcance.</li>
+                  <li><code>ContextoOperativoService.cs:33</code>, <code>CredencialService.cs:58</code> y el listado de UO devuelven datos de Principales fuera de alcance.</li>
+                  <li><code>HistorialPersonaService.cs:108</code> y <code>:158</code> finalizan o renuevan una pertenencia con solo tener alcance sobre alguna compañía del histórico (<code>PersonaService.cs:223</code>).</li>
+                </ul>
+              </dd>
+              <dt>Impacto</dt><dd>Un administrador de la contratista reasigna UO de una Principal ajena o dispara la cascada sobre la pertenencia de otra compañía. Ninguna prueba cubre estos casos.</dd>
+              <dt>Tipo</dt><dd>Defecto real, confirmado por inspección del código.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-3</span><span class="pill bad">Alta</span></div>
+          <div class="finding-body">
+            <h3>RF-067, RF-068, RF-069 y CS-032 sin implementar</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd><code>spec.md:1045-1056</code>, RF-040.</dd>
+              <dt>Código</dt><dd>No existe. <code>tasks.md:1117</code> y plan.md los excluyen de forma explícita por falta de contrato.</dd>
+              <dt>Impacto</dt><dd>Historia 10 y las pantallas de Dashboard, Históricos y Auditoría (ux-ui.md §8, §20, §21) están incompletas; el menú muestra "Dashboard" como pantalla pendiente.</dd>
+              <dt>Tipo</dt><dd>Implementación incompleta respecto del spec; requiere decisión humana (diseñar los contratos o reprogramar formalmente).</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-4</span><span class="pill warn">Media</span></div>
+          <div class="finding-body">
+            <h3>Compañía o UO INACTIVA no bloquean asignaciones</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd>Historia 2 criterio 6; <code>people.yaml:171</code> y <code>:363</code> (409); <code>data-model.md:211</code>, <code>:354</code> y <code>:470</code>.</dd>
+              <dt>Código</dt><dd><code>CrearAsignacionAsync</code> y <code>AsignarAsync</code> (UO) no comprueban <code>Estado</code>; tampoco lo hace el permiso de alcance COMPAÑÍA.</dd>
+              <dt>Impacto</dt><dd>Se aceptan con 201 asignaciones que el contrato declara 409. Sin pruebas.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-5</span><span class="pill warn">Media-alta</span></div>
+          <div class="finding-body">
+            <h3>T116 y pantalla Caso A / Caso B</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd><code>tasks.md:641</code>, Historia 5 "Comportamiento de la pantalla", CS-021, ux-ui.md §13 y §15.</dd>
+              <dt>Código</dt><dd><code>AsignacionUnidadOrganizativa.tsx</code> exige un contexto ya existente y usa un selector plano, no un árbol. <code>useCrearPertenencia</code> y <code>useAbrirContexto</code> están definidos, pero ninguna pantalla los usa. No hay UI de perfiles.</dd>
+              <dt>Impacto</dt><dd>La historia 5 no es operable desde la interfaz, solo por API.</dd>
+              <dt>Tipo</dt><dd>Tarea marcada sin el trabajo.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-6</span><span class="pill neutral">Baja-media</span></div>
+          <div class="finding-body">
+            <h3>Reemplazo de una pertenencia ya vencida</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd><code>data-model.md:372-375</code>: "la anterior no se modifica… con Estado sin cambios".</dd>
+              <dt>Código</dt><dd><code>HistorialPersonaService.cs:79-85</code> marca siempre la previa ACTIVA como FINALIZADA con motivo REEMPLAZO_ASIGNACION.</dd>
+              <dt>Impacto</dt><dd>Motivo administrativo falso en el histórico; no afecta al acceso.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-7</span><span class="pill warn">Media</span></div>
+          <div class="finding-body">
+            <h3>"Finalizar" pertenencia sin confirmación</h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd>ux-ui.md §2 y §15: impacto y confirmación antes de actuar.</dd>
+              <dt>Código</dt><dd><code>PersonaHistorialPage.tsx:124-136</code> ejecuta la cascada con un clic y usa siempre la fecha actual. La prueba "finaliza la pertenencia al confirmarlo" no verifica ninguna confirmación.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-8</span><span class="pill warn">Media</span></div>
+          <div class="finding-body">
+            <h3>T019: índice clúster por <code>CreatedAt</code></h3>
+            <dl class="facts">
+              <dt>Documento</dt><dd>research.md §20 y T019: 6 entidades de histórico.</dd>
+              <dt>Código</dt><dd><code>ConfiguracionExtensions.cs:28</code> solo se aplica en <code>UsuarioConfiguration.cs:54</code> (HistorialContraseña). Confirmado en el snapshot del modelo.</dd>
+              <dt>Impacto</dt><dd>Fragmentación con clave GUID en los 5 históricos de mayor volumen.</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-9</span><span class="pill neutral">Baja</span></div>
+          <div class="finding-body">
+            <h3>Perfiles duplicados</h3>
+            <p><code>data-model.md:340</code> exige rechazar el mismo par <code>(PersonaId, TipoPersonaId)</code> con rangos solapados; <code>EstadoEfectivoService.cs:100</code> no lo hace.</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-tag"><span class="code">D-10</span><span class="pill neutral">Baja</span></div>
+          <div class="finding-body">
+            <h3>Fechas de la relación contratista</h3>
+            <p>data-model.md normaliza a 00:00/23:59; <code>RelacionContratistaPrincipalService.cs:65</code> usa la hora recibida y <code>finalizar</code> fija "ahora".</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="doc-diffs">
+        <h3>Diferencias solo documentales, sin impacto funcional</h3>
+        <ul class="tight">
+          <li><strong>Rutas de tasks.md:</strong> las de T006, T020 y T103–T106 no coinciden con los archivos reales; el trabajo existe, consolidado en otros archivos.</li>
+          <li><strong>research.md:</strong> §7 paso 5 usa <code>SIN_CONTEXTO…</code>, mientras el contrato y el código usan <code>RELACION_CONTRATISTA_PRINCIPAL_VENCIDA</code>. §8 menciona semillas de TipoPersona y TipoCredencial que el spec declara no obligatorias.</li>
+          <li><strong>Contratos:</strong> <code>access-evaluation.yaml</code> incluye 3 motivos que la API nunca devuelve (esos casos son 404); <code>credentials.yaml</code> no declara 404/409 en DELETE y devolver.</li>
+          <li><strong>data-model.md:</strong> cierra la pertenencia previa "a las 23:59 del día anterior"; el código la cierra a las 00:00 del nuevo inicio, que es equivalente.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- E -->
+    <section id="e">
+      <div class="section-head"><span class="letter">E</span><h2>Riesgos técnicos</h2></div>
+      <div class="risk-levels">
+        <div class="risk-level">
+          <div><span class="pill bad">Crítico</span></div>
+          <ul><li>D-1: escalada de alcance.</li></ul>
+        </div>
+        <div class="risk-level">
+          <div><span class="pill bad">Alto</span></div>
+          <ul><li><strong>Falta el filtro global de alcance (<code>HasQueryFilter</code>)</strong> que prescriben research.md §3 y §18. Cada servicio aplica el alcance a mano, y ese es el origen de D-1 y D-2: un olvido no deja rastro.</li></ul>
+        </div>
+        <div class="risk-level">
+          <div><span class="pill warn">Medio</span></div>
+          <ul>
+            <li><strong>Contraseña pendiente de cambio:</strong> <code>RequiereCambioPassword</code> solo lo aplica la UI (<code>RutaProtegida.tsx:29</code>); el token es plenamente operativo por API.</li>
+            <li><strong>Tokens no revocables:</strong> el JWT sigue valiendo tras inactivar al usuario o cambiar su alcance, hasta 60 minutos.</li>
+            <li><strong>Días normalizados en UTC</strong> (<code>Vigencia.cs:19</code>). En Lima, una vigencia empieza a las 19:00 del día anterior y termina a las 18:59 del último día. La UI envía <code>fecha T00:00:00Z</code> y lo muestra con <code>toLocaleDateString()</code>, así que el inicio aparece un día antes. La visualización es un defecto; la zona de normalización es una ambigüedad a decidir.</li>
+            <li><strong>Reclasificación de compañía:</strong> <code>TipoCompania</code> es editable con dependientes (<code>CompaniaService.cs:95</code>); una Principal con áreas y UO puede pasar a CONTRATISTA.</li>
+            <li><strong>Compañía INACTIVA y evaluación:</strong> el motor no mira <code>Compania.Estado</code> (<code>EvaluadorDeAcceso.cs:151</code>). Ver decisión #6 en F.</li>
+            <li><strong>Índice clúster (D-8):</strong> riesgo de fragmentación a la escala de CS-002.</li>
+          </ul>
+        </div>
+        <div class="risk-level">
+          <div><span class="pill neutral">Bajo</span></div>
+          <ul>
+            <li><strong>Intervalos invertidos:</strong> la cascada o la devolución de una asociación que aún no empezó deja <code>FechaHoraFin &lt; FechaHoraInicio</code> (<code>RevocacionService.cs:58</code>). Nunca resulta vigente y no hay CHECK.</li>
+            <li><strong>Sujeto de permiso sin validar:</strong> no se comprueba Principal, estado ni alcance (<code>PermisoAccesoService.cs:258</code>). Inocuo en la evaluación, pero el 400 permite comprobar si un ID existe.</li>
+            <li><strong>Personas sin histórico:</strong> cualquier administrador puede escribir sobre ellas si conoce su ID.</li>
+            <li><strong>Sesión expirada:</strong> un 401 borra la sesión sin notificar al guard (<code>apiClient.ts:73</code>); la redirección espera a la siguiente navegación.</li>
+            <li><strong>UUID visible:</strong> la UI lo muestra como respaldo (RF-013).</li>
+            <li><strong>E2E:</strong> reutiliza los contenedores de desarrollo y deja la API apuntando a la base <code>_E2E</code> (documentado).</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- F -->
+    <section id="f">
+      <div class="section-head"><span class="letter">F</span><h2>Decisiones de negocio abiertas</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Decisión</th><th>Estado</th><th>Observación</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">#1</span> Política de contraseñas</td><td class="state"><span class="pill ok">Abierta</span></td><td>Umbrales configurables marcados como provisionales; sin flujo de recuperación. No se cerró de forma implícita.</td></tr>
+            <tr><td><span class="mono">#3</span> Retención legal</td><td class="state"><span class="pill ok">Abierta</span></td><td>Sin purga ni archivado.</td></tr>
+            <tr><td><span class="mono">#6</span> Cascada por relación o compañía inactiva</td><td class="state"><span class="pill warn">Abierta, con matiz</span></td><td>No hay cascada en ninguno de los dos casos, correcto. Pero <code>spec.md:1283</code> afirma que la compañía INACTIVA queda "protegida por la re-validación dinámica", y el motor no consulta <code>Estado</code>. Esa protección no existe; conviene tenerlo en cuenta al decidir.</td></tr>
+            <tr><td><span class="mono">#7</span> Prioridad de Historia 9</td><td class="state"><span class="pill ok">Abierta</span></td><td>Sigue en P2 en el spec; se implementó por secuenciación técnica, sin prejuzgar la prioridad.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- G -->
+    <section id="g">
+      <div class="section-head"><span class="letter">G</span><h2>Huecos de producto y operación</h2></div>
+      <div class="findings">
+        <article class="finding">
+          <div class="finding-tag"><span class="pill bad">Confirmado</span></div>
+          <div class="finding-body">
+            <h3>Primer administrador</h3>
+            <p>No hay semilla ni endpoint anónimo. En un despliegue limpio verificado, la tabla <code>Usuario</code> quedó con 0 filas. Además, por D-1 no existe el concepto de administrador: cualquier usuario con alcance puede darse cualquier alcance. Requiere decisión.</p>
+          </div>
+        </article>
+        <article class="finding">
+          <div class="finding-tag"><span class="pill warn">Confirmado</span></div>
+          <div class="finding-body">
+            <h3>Alcance al crear compañías</h3>
+            <p><code>CompaniaService.CrearAsync</code> no añade la compañía al alcance de quien la crea. Hoy solo se resuelve con el <code>PUT</code> de alcance sin restricciones de D-1. Requiere decisión.</p>
+          </div>
+        </article>
+        <article class="finding">
+          <div class="finding-tag"><span class="pill neutral">Documental</span></div>
+          <div class="finding-body">
+            <h3><code>CREDENCIAL_REVOCADA</code> en ux-ui.md frente al contrato</h3>
+            <ul class="tight">
+              <li>El spec ya lo resolvió de forma explícita: un único motivo <code>SIN_CREDENCIAL_VIGENTE</code>, con el detalle solo como texto.</li>
+              <li>Contrato, backend y frontend son coherentes entre sí.</li>
+              <li>ux-ui.md (líneas 393 y 491, y §17 con "Motivo CESE_PERTENENCIA" en una credencial, que research.md §23 descarta) quedó desactualizado.</li>
+              <li>No hace falta decisión de negocio; solo actualizar ux-ui.md.</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- H -->
+    <section id="h">
+      <div class="section-head"><span class="letter">H</span><h2>Cobertura de pruebas</h2></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Cubierto con solidez</h3>
+          <ul class="tight">
+            <li><strong>Motor de evaluación:</strong> pasos, precedencia y gate, en unitarias puras e integración.</li>
+            <li><strong>Temporalidad:</strong> triggers contra SQL Server real, contención, cascada (incluida la fecha futura), renovación y revalidación dinámica.</li>
+            <li><strong>Decisión A:</strong> 4 casos de solapamiento y verificación de <code>RowVersion</code>.</li>
+            <li><strong>Aislamiento</strong> de compañías, personas, áreas, UO y permisos.</li>
+            <li><strong>Auditoría</strong> y <strong>rendimiento</strong> (CS-002, CS-003).</li>
+            <li><strong>E2E</strong> de quickstart §5 y §6, con un fallo provocado que confirmó que las aserciones evalúan la respuesta real.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Requisitos importantes sin prueba directa</h3>
+          <ul class="tight">
+            <li>Alcance en administración de usuarios (D-1).</li>
+            <li>Asignación de UO, listados por Principal y finalizar/renovar fuera de alcance (D-2).</li>
+            <li>Compañía o UO INACTIVA en pertenencia, UO y permiso (D-4).</li>
+            <li>Cascada sobre dependientes que aún no empezaron.</li>
+            <li>Normalización de días cerca de la medianoche de Lima y visualización de fechas.</li>
+            <li>Confirmación antes de finalizar una pertenencia.</li>
+            <li>Reclasificación de <code>TipoCompania</code> con dependientes.</li>
+            <li>CS-001, CS-021, CS-032 y RF-067 a RF-069.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="prose muted">Validaciones ejecutadas en la auditoría: compilación del backend con 0 advertencias, unitarias, contrato e integración completas, comprobación de cambios de modelo, lista de migraciones, Vitest, tsc, eslint, prettier, build del frontend, E2E y una lectura de la API E2E que confirmó la fuga del listado de usuarios.</p>
+    </section>
+
+    <!-- I -->
+    <section id="i">
+      <div class="section-head"><span class="letter">I</span><h2>Preparación para el despliegue</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pregunta</th><th>Respuesta</th><th>Motivo</th></tr></thead>
+          <tbody>
+            <tr><td>¿Infraestructura desplegable desde cero?</td><td class="state"><span class="pill ok">Sí</span></td><td>Verificado en un proyecto aislado: sin secretos compose no arranca, se aplicaron las 12 migraciones y <code>/health/ready</code> pasó de 503 a 200.</td></tr>
+            <tr><td>¿Operable desde cero siguiendo README.md?</td><td class="state"><span class="pill bad">No</span></td><td>Hay que insertar el primer usuario a mano en la base (el README lo documenta como hueco abierto) y el proxy inverso solo está descrito como requisitos.</td></tr>
+            <tr><td>¿Listo para producción?</td><td class="state"><span class="pill bad">No</span></td><td>Por D-1 y D-2, cualquier usuario autenticado equivale a un superadministrador.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- J -->
+    <section id="j">
+      <div class="section-head"><span class="letter">J</span><h2>Cambios recomendados</h2></div>
+      <div class="recs">
+        <div class="rec-group">
+          <div class="rec-group-head"><span class="pill bad">Bloqueante</span><span class="note">Debe corregirse antes de considerar el proyecto cerrado</span></div>
+          <ol>
+            <li>Decidir el modelo de administración de usuarios y corregir D-1, con pruebas.</li>
+            <li>Aplicar el alcance en asignación de UO, listados de contextos, UO y credenciales, y finalizar/renovar (D-2), con pruebas.</li>
+            <li>Decidir RF-067 a RF-069 y CS-032: diseñar contratos y tareas, o reprogramarlos formalmente mediante cambio de spec (D-3).</li>
+            <li>Resolver T116 y T019: completarlas o reabrirlas de forma explícita (D-5, D-8).</li>
+            <li>Decidir y documentar el mecanismo de alta del primer administrador.</li>
+          </ol>
+        </div>
+        <div class="rec-group">
+          <div class="rec-group-head"><span class="pill warn">Importante</span><span class="note">Recomendable, no bloquea</span></div>
+          <ol start="6">
+            <li>Validar compañía y UO INACTIVA según los contratos (D-4).</li>
+            <li>Decidir la zona horaria de normalización de días y corregir la visualización de fechas en la UI.</li>
+            <li>Añadir confirmación, impacto y fecha efectiva a "Finalizar pertenencia" (D-7).</li>
+            <li>Decidir si el servidor debe aplicar <code>RequiereCambioPassword</code>.</li>
+            <li>Validar la reclasificación de <code>TipoCompania</code> con dependientes.</li>
+            <li>Decidir el alcance al crear compañías.</li>
+            <li>Aclarar en la decisión #6 el caso de compañía INACTIVA frente a la evaluación.</li>
+            <li>Añadir el filtro global de alcance como segunda línea de defensa (research.md §3).</li>
+            <li>Alinear la documentación: D-6, D-10, research.md §7, 404/409 en contratos, <code>CREDENCIAL_REVOCADA</code> en ux-ui.md y rutas de tasks.md.</li>
+          </ol>
+        </div>
+        <div class="rec-group">
+          <div class="rec-group-head"><span class="pill neutral">Opcional</span><span class="note">Mejora futura</span></div>
+          <ol start="15">
+            <li>Evitar intervalos invertidos, con CHECK o ajuste del cierre.</li>
+            <li>Rechazar perfiles duplicados solapados (D-9).</li>
+            <li>Validar el sujeto de los permisos.</li>
+            <li>Notificar al guard de sesión ante un 401.</li>
+            <li>Medir CS-001.</li>
+            <li>Separar el entorno E2E del compose de desarrollo.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- K -->
+    <section id="k">
+      <div class="section-head"><span class="letter">K</span><h2>Veredicto final</h2></div>
+      <div class="qa">
+        <div class="qa-item"><p class="q">¿El proyecto está realmente terminado?</p><p><span class="answer-lead">No.</span></p></div>
+        <div class="qa-item"><p class="q">¿Hay algún defecto que corregir antes de producción?</p><p><span class="answer-lead">Sí:</span> D-1 (crítico) y D-2, además del alta del primer administrador.</p></div>
+        <div class="qa-item"><p class="q">¿Hay contradicciones entre spec y código?</p><p><span class="answer-lead">Sí:</span> RF-005, RF-049 y RF-060; Historia 2 criterio 6 y RF-032 frente a los contratos; RF-067 a RF-069 y CS-032; CS-021; data-model.md en D-6, D-9 y D-10.</p></div>
+        <div class="qa-item"><p class="q">¿Hay tareas de tasks.md marcadas incorrectamente?</p><p><span class="answer-lead">Sí:</span> T116 (no existe la pantalla Caso A/Caso B) y T019 (índice clúster en 1 de 6 entidades). Las rutas distintas de T006, T020 y T103–T106 son solo documentales.</p></div>
+        <div class="qa-item"><p class="q">¿Las decisiones #1, #3, #6 y #7 siguen abiertas correctamente?</p><p><span class="answer-lead">Sí,</span> ninguna se resolvió de forma implícita. En #6, el spec supone una protección dinámica ante compañía INACTIVA que el código no aplica.</p></div>
+        <div class="qa-item"><p class="q">¿T001–T168 es una implementación completa?</p><p><span class="answer-lead">No.</span> Dos tareas están marcadas sin su trabajo, el plan excluyó RF-067 a RF-069 y quedan defectos de alcance que ninguna tarea obligaba a probar.</p></div>
+        <div class="qa-item"><p class="q">¿Cuál es el siguiente paso recomendado?</p><p>Una sesión de decisiones con negocio sobre el modelo de administración de usuarios, el primer administrador, RF-067 a RF-069, la zona horaria de normalización y la decisión #6. Después, un ciclo de corrección que añada las tareas faltantes sin regenerar tasks.md.</p></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Auditoría en modo solo lectura: no se modificó código, especificación ni tasks.md. Las pruebas E2E añadieron datos a la base temporal <code>EnterpriseAccessControl_E2E</code> y se regeneraron artefactos de compilación y reportes de prueba. Las referencias <code>archivo:línea</code> son relativas a la raíz del repositorio.
+    </footer>
+  </main>
+</div>
+
+</body>
+</html>

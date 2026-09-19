@@ -1,0 +1,124 @@
+.permisos {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.permisos-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  max-width: 60ch;
+}
+
+.permisos-filtros {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.permisos-filtros select {
+  min-width: 14rem;
+  width: auto;
+}
+
+.permisos-vacio {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.permisos-tabla {
+  overflow-x: auto;
+}
+
+.permisos-alcance {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.permisos-bloques {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.permiso-alcances {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.permiso-alcances label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.permiso-vigencia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
+}
+
+.semanal {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-block: 0.75rem;
+}
+
+.semanal-dias {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+}
+
+.semanal-dia {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .semanal-dia {
+    grid-template-columns: 1fr;
+  }
+}
+
+.semanal-nombre {
+  font-weight: 600;
+  padding-top: 0.35rem;
+}
+
+.semanal-franjas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.semanal-franja {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.semanal-franja input {
+  width: auto;
+}
+
+.semanal-sin {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding-top: 0.35rem;
+}
+
+.semanal-quitar,
+.semanal-agregar {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}

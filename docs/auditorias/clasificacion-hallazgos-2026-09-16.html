@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificación de hallazgos y matriz de decisiones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+  /* .prose organiza bloques hermanos; en un parrafo, el grid convertiria cada <code>,
+     <strong> o enlace en una fila propia a todo el ancho. */
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  .index-sep { margin-top: 18px; }
+  .lista-num { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 78ch; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 78ch; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  .fichas { display: grid; border-top: 1px solid var(--border); }
+  .ficha { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px; }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 15px; font-weight: 600; color: var(--primary); }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts, .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .cat { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+    border-radius: 5px; font-size: 12.5px; font-weight: 700; font-family: inherit; padding: 0 6px; letter-spacing: 0.01em; }
+  .cat-a { background: var(--danger-soft); color: var(--danger); }
+  .cat-b { background: var(--success-soft); color: var(--success); }
+  .cat-c { background: var(--info-soft); color: var(--primary); }
+  .cat-d { background: var(--warning-soft); color: var(--warning); }
+  .cat-e { background: var(--neutral-soft); color: var(--neutral); }
+  .cats { display: inline-flex; gap: 4px; }
+  .cat-def { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px 14px; align-items: start; font-size: 14px; }
+  .cat-def > p { margin: 0; max-width: 78ch; }
+  .matriz td.id { font-variant-numeric: tabular-nums; }
+  .matriz td:nth-child(2) { min-width: 150px; }
+  .matriz td:nth-child(3) { min-width: 220px; }
+  .matriz .pill { white-space: nowrap; }
+  .matriz .resp { min-width: 80px; color: var(--muted); font-size: 12.5px; }
+</style>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Resolución posterior al cierre de T001–T168 · Etapa 1</p>
+    <h1>Clasificación de hallazgos y matriz de decisiones</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>16/09/2026</b></span>
+      <span>Base <b>auditoría consolidada del 16/09 y sesión de decisiones</b></span>
+      <span>Estado <b>Sin cambios en código, contratos, especificaciones ni tasks.md</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#categorias"><span>CAT</span><span>Las cinco categorías</span></a></li>
+      <li><a href="#clasificacion"><span>23</span><span>Clasificación de hallazgos</span></a></li>
+      <li><a href="#d1"><span>D1</span><span>Administración de usuarios</span></a></li>
+      <li><a href="#d2"><span>D2</span><span>Primer administrador</span></a></li>
+      <li><a href="#d3"><span>D3</span><span>Aislamiento por alcance</span></a></li>
+      <li><a href="#d4"><span>D4</span><span>Inactivación de Compañía</span></a></li>
+      <li><a href="#d5"><span>D5</span><span>Calendario de vigencias</span></a></li>
+      <li><a href="#d6"><span>D6</span><span>Cambio de TipoCompania</span></a></li>
+      <li><a href="#d7"><span>D7</span><span>T116 y su criterio</span></a></li>
+      <li><a href="#d8"><span>D8</span><span>Consultas transversales</span></a></li>
+      <li><a href="#d9"><span>D9</span><span>Decisiones heredadas</span></a></li>
+      <li><a href="#matriz"><span>✓</span><span>Matriz de decisiones</span></a></li>
+      <li><a href="#sin-espera"><span>▶</span><span>Trabajo que no espera</span></a></li>
+    </ol>
+    <p class="index-sep">Documentos</p>
+    <ol>
+      <li><a href="gate-cierre-etapa1-2026-09-16.html"><span>→</span><span>Gate de cierre</span></a></li>
+      <li><a href="decisiones-etapa1-2026-09-16.html"><span>→</span><span>Decisiones abiertas</span></a></li>
+      <li><a href="especificaciones-baseline.html"><span>→</span><span>Especificaciones</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="categorias">
+      <div class="section-head"><span class="letter">CAT</span><h2>Las cinco categorías</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">Nada se ha modificado</span>
+          <span class="muted">Este documento solo clasifica. No resuelve ninguna decisión de negocio ni elige entre alternativas.</span>
+        </div>
+        <p class="prose"><strong>Precisión sobre la categoría A.</strong> Se usa con el significado de <em>la respuesta debe quedar registrada antes de congelar</em>, no de <em>el trabajo debe estar terminado</em>. En varios casos la respuesta puede ser precisamente «se acepta el comportamiento actual», y eso también cierra el punto.</p>
+        <div class="cat-def">
+          <p><span class="cat cat-a">A</span></p>
+          <p>Debe resolverse antes de congelar el baseline de Etapa 1.</p>
+          <p><span class="cat cat-b">B</span></p>
+          <p>Puede permanecer explícitamente abierto sin bloquear el baseline.</p>
+          <p><span class="cat cat-c">C</span></p>
+          <p>Debe trasladarse formalmente a Etapa 2.</p>
+          <p><span class="cat cat-d">D</span></p>
+          <p>Defecto técnico que debe corregirse en Etapa 1 una vez tomada la decisión correspondiente.</p>
+          <p><span class="cat cat-e">E</span></p>
+          <p>Inconsistencia de documentación, corregible sin cambio de comportamiento.</p>
+        </div>
+        <p class="prose muted">Un hallazgo puede llevar dos marcas: la decisión que lo desbloquea y el trabajo que genera después. La Decisión A sobre credenciales permanece congelada y no se reabre aquí.</p>
+      </div>
+    </section>
+
+    <section id="clasificacion">
+      <div class="section-head"><span class="letter">23</span><h2>Clasificación de los hallazgos abiertos</h2></div>
+      <p class="prose muted">Los 23 hallazgos de la auditoría consolidada del 16/09, con la decisión que los desbloquea y su categoría. El identificador lleva a su ficha en la auditoría; la decisión, a su apartado en esta misma página.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Hallazgo</th><th>Asunto</th><th>Decisión</th><th>Categoría</th><th>Motivo</th></tr></thead>
+          <tbody>
+            <tr id="f-01"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-01">F-01</a></td><td>Administración de usuarios sin alcance</td><td><a href="#d1">D1</a>, <a href="#d2">D2</a></td><td><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-d">D</span></span></td><td>La regla no existe en el spec; una vez definida, la corrección es técnica</td></tr>
+            <tr id="f-02"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-02">F-02</a></td><td>Alcance no aplicado en el histórico</td><td><a href="#d3">D3</a></td><td><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-d">D</span></span></td><td><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#rf-049">RF-049</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#rf-060">RF-060</a> ya la fijan, pero el alcance exacto de la lectura necesita confirmación</td></tr>
+            <tr id="f-03"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-03">F-03</a></td><td>Consultas transversales inexistentes</td><td><a href="#d8">D8</a></td><td><span class="cats"><span class="cat cat-c">C</span><span class="cat cat-a">A</span></span></td><td>Sin especificación suficiente para implementar; hay que fijar formalmente dónde viven</td></tr>
+            <tr id="f-04"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-04">F-04</a></td><td>Pantalla del Caso A y Caso B ausente</td><td><a href="#d7">D7</a></td><td><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-d">D</span><span class="cat cat-c">C</span></span></td><td>El destino es decisión de alcance: corregir o trasladar</td></tr>
+            <tr id="f-05"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-05">F-05</a></td><td>Compañía o unidad INACTIVA no bloquean asignaciones</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td>Contrato y data-model ya lo exigen; no hay decisión pendiente</td></tr>
+            <tr id="f-06"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-06">F-06</a></td><td>Índice clúster en 1 de 6 entidades</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td><code>research.md</code> §20 ya lo fija</td></tr>
+            <tr id="f-07"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-07">F-07</a></td><td>Cambio de contraseña obligatorio solo en la interfaz</td><td><a href="#d9">D9</a></td><td><span class="cats"><span class="cat cat-b">B</span><span class="cat cat-d">D</span></span></td><td>Puede quedar abierta; la corrección depende de si se exige en el servidor</td></tr>
+            <tr id="f-08"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-08">F-08</a></td><td>Día en UTC y desfase de fechas en la interfaz</td><td><a href="#d5">D5</a></td><td><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-d">D</span><span class="cat cat-e">E</span></span></td><td>El desfase visual es técnico puro; el calendario es decisión de negocio</td></tr>
+            <tr id="f-09"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-09">F-09</a></td><td>TipoCompania reclasificable con dependientes</td><td><a href="#d6">D6</a></td><td><span class="cats"><span class="cat cat-b">B</span><span class="cat cat-d">D</span></span></td><td>No hay incidente reproducido; deja un riesgo de invariante</td></tr>
+            <tr id="f-10"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-10">F-10</a></td><td>Finalizar pertenencia sin confirmación ni fecha efectiva</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td><code>ux-ui.md</code> §15 ya especifica el flujo</td></tr>
+            <tr id="f-11"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-11">F-11</a></td><td>Códigos de error sin declarar en los contratos</td><td><span class="muted">—</span></td><td><span class="cat cat-e">E</span></td><td>Documentar lo que el código ya emite</td></tr>
+            <tr id="f-12"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-12">F-12</a></td><td>Intervalos invertidos tras la cascada</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#rf-039">RF-039</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#rf-063">RF-063</a> ya lo prohíben en espíritu</td></tr>
+            <tr id="f-13"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-13">F-13</a></td><td>Sujeto de permiso sin validar</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td>Riesgo aceptable: no afecta a la evaluación de acceso</td></tr>
+            <tr id="f-14"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-14">F-14</a></td><td>Perfiles duplicados solapados no rechazados</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td><code>data-model.md</code> ya lo exige</td></tr>
+            <tr id="f-15"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-15">F-15</a></td><td>Un 401 no notifica al guard de sesión</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td>Defecto menor de interfaz</td></tr>
+            <tr id="f-16"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-16">F-16</a></td><td>La interfaz muestra UUID como respaldo</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#rf-013">RF-013</a> ya lo prohíbe</td></tr>
+            <tr id="f-17"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-17">F-17</a></td><td>Personas sin histórico escribibles</td><td><a href="#d3">D3</a></td><td><span class="cat cat-d">D</span></td><td>Su forma final depende del principio de aislamiento que se adopte</td></tr>
+            <tr id="f-18"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-18">F-18</a></td><td>Rutas obsoletas en tasks.md</td><td><a href="#d7">D7</a></td><td><span class="cat cat-e">E</span></td><td>Documental</td></tr>
+            <tr id="f-19"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-19">F-19</a></td><td>research.md §7 y §8 desalineados</td><td><span class="muted">—</span></td><td><span class="cat cat-e">E</span></td><td>Documental</td></tr>
+            <tr id="f-20"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-20">F-20</a></td><td>Códigos y motivos inalcanzables en contratos</td><td><a href="#d4">D4</a></td><td><span class="cat cat-e">E</span></td><td>Documental; la decisión sobre inactivación puede añadir un motivo nuevo</td></tr>
+            <tr id="f-21"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-21">F-21</a></td><td>data-model.md: cierre y normalización de relación</td><td><a href="#d5">D5</a></td><td><span class="cat cat-e">E</span></td><td>Documental</td></tr>
+            <tr id="f-22"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-22">F-22</a></td><td>Pertenencia vencida marcada como reemplazada</td><td><span class="muted">—</span></td><td><span class="cat cat-d">D</span></td><td>Contradice data-model, con efecto en los datos</td></tr>
+            <tr id="f-23"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23clasificacion&desde=Clasificaci%C3%B3n%20de%20los%20hallazgos%20abiertos#f-23">F-23</a></td><td>ux-ui.md conserva CREDENCIAL_REVOCADA</td><td><span class="muted">—</span></td><td><span class="cat cat-e">E</span></td><td>Documental</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="d1">
+      <div class="section-head"><span class="letter">D1</span><h2>Administración de usuarios</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd><code>UsuariosController</code> solo exige alcance no vacío y <code>UsuarioService</code> no aplica alcance en ninguna de sus siete operaciones. Reproducido en ejecución: listar los 12 usuarios con sus correos y alcances, concederse compañías ajenas, cambiar el alcance de otro usuario, crear usuarios y desbloquear a terceros.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Mixta. El spec <strong>no define roles</strong>, así que la regla que debe aplicarse es decisión de negocio; una vez elegida, escribirla es trabajo técnico.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill bad">Sí</span> Sin ella, el aislamiento que promete el Principio I no existe.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code> con un requisito nuevo o una sesión de clarificación; <code>data-model.md</code> y una migración si aparece un rol; el contrato de usuarios; <code>ux-ui.md</code> en la pantalla de usuarios; <code>README.md</code>; y tareas de corrección.</dd>
+        <dt>Pruebas</dt>
+        <dd>Integración por operación: listar, crear, actualizar, bloquear, desbloquear, leer y reemplazar alcance. Más contrato de usuarios y un caso de aislamiento de extremo a extremo. Hoy no existe ninguna.</dd>
+        <dt>Dependencias</dt>
+        <dd>Determina D2, qué puede hacer el primer administrador, y comparte frontera con D3.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-a">A</span> para la regla · <span class="cat cat-d">D</span> para la corrección</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d1&desde=Administraci%C3%B3n%20de%20usuarios#d1">Alternativas M1 a M4 en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d1&desde=Administraci%C3%B3n%20de%20usuarios#fase-3">Evidencia reproducida en el gate, fase 3</a> · Preguntas <a href="#q-1">1</a>, <a href="#q-2">2</a>, <a href="#q-3">3</a> y <a href="#q-4">4</a></p>
+      </div>
+    </section>
+
+    <section id="d2">
+      <div class="section-head"><span class="letter">D2</span><h2>Bootstrap del primer administrador</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>Una base migrada tiene 0 usuarios y todos los endpoints exigen sesión. El único camino real es insertar filas a mano con hash Identity V3.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisión de negocio sobre el mecanismo; la implementación posterior es técnica.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill bad">Sí</span> si el criterio de baseline incluye «desplegable y operable desde cero». Si se elige formalizar el procedimiento manual, el punto queda cerrado sin escribir código.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code>, <code>README.md</code>, <code>quickstart.md</code>, y una migración si se elige la semilla.</dd>
+        <dt>Pruebas</dt>
+        <dd>Una de despliegue desde cero que ejercite el mecanismo elegido. Hoy la preparación del E2E siembra por su cuenta y no valida nada del producto.</dd>
+        <dt>Dependencias</dt>
+        <dd>Depende de D1, el alcance y los permisos de ese primer usuario, y roza la decisión <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d2&desde=Bootstrap%20del%20primer%20administrador#decision-1">#1</a>, contraseña inicial y su caducidad.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-a">A</span>, con <span class="cat cat-d">D</span> posterior salvo que se elija el procedimiento manual</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d2&desde=Bootstrap%20del%20primer%20administrador#d2">Alternativas B1 a B4 en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d2&desde=Bootstrap%20del%20primer%20administrador#fase-11">Estado de despliegue en el gate, fase 11</a> · Preguntas <a href="#q-5">5</a> y <a href="#q-6">6</a></p>
+      </div>
+    </section>
+
+    <section id="d3">
+      <div class="section-head"><span class="letter">D3</span><h2>Aislamiento por alcance</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>Se mezclan tres nociones: alcance del usuario, alcance histórico de la persona y objeto de la operación. Los servicios del histórico validan la persona, no el objeto: se leen contextos, estado efectivo y credenciales de Principales ajenas, y se <strong>escribe</strong> una unidad organizativa de una Principal fuera de alcance.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Defecto técnico frente a <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#rf-049">RF-049</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#rf-060">RF-060</a>, con un matiz de negocio: cuánta visibilidad conserva quien administra la contratista sobre los contextos de sus trabajadores.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill bad">Sí</span> La escritura fuera de alcance no admite espera.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code> solo si se relaja la regla; los contratos de personas y credenciales por los códigos de los listados; <code>ux-ui.md</code> si cambia lo que se ve en el histórico.</dd>
+        <dt>Pruebas</dt>
+        <dd>Seis de integración, una por endpoint afectado, más una de escritura denegada.</dd>
+        <dt>Dependencias</dt>
+        <dd>Fija la forma de la corrección de <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#f-02">F-02</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#f-17">F-17</a>, y debe ser coherente con D1.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-a">A</span> para la regla · <span class="cat cat-d">D</span> para la corrección</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#d3">Alternativas A1 a A3 en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d3&desde=Aislamiento%20por%20alcance#fase-4">Evidencia reproducida en el gate, fase 4</a> · Pregunta <a href="#q-7">7</a></p>
+      </div>
+    </section>
+
+    <section id="d4">
+      <div class="section-head"><span class="letter">D4</span><h2>Inactivación de Compañía</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd><code>spec.md</code> y <code>research.md</code> §14.5 afirman que la inactivación queda protegida por la re-validación dinámica. El motor nunca consulta el estado de la compañía, así que hoy inactivar una no deniega nada.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisión de negocio pura, la decisión <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d4&desde=Inactivaci%C3%B3n%20de%20Compa%C3%B1%C3%ADa#decision-6">#6</a>, más una inconsistencia documental verificada.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill ok">No</span> la decisión: puede permanecer abierta, como ya está. <span class="pill warn">Sí</span> la corrección del texto: hoy dos documentos afirman algo falso.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code> en la decisión y en los requisitos de revocación; <code>research.md</code> §7 y §14.5; <code>data-model.md</code> solo si se elige la cascada; el contrato de evaluación si aparece un motivo nuevo.</dd>
+        <dt>Pruebas</dt>
+        <dd>Ninguna si se mantiene abierta; del motor si se elige denegar; de cascada e histórico si se elige escribir.</dd>
+        <dt>Dependencias</dt>
+        <dd>Ninguna con el resto. Si añade un motivo de denegación, toca el contrato que también afecta a <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d4&desde=Inactivaci%C3%B3n%20de%20Compa%C3%B1%C3%ADa#f-20">F-20</a>.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-b">B</span> para la decisión · <span class="cat cat-e">E</span> para el texto que hoy es incorrecto</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d4&desde=Inactivaci%C3%B3n%20de%20Compa%C3%B1%C3%ADa#d4">Alternativas en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d4&desde=Inactivaci%C3%B3n%20de%20Compa%C3%B1%C3%ADa#fase-6">Contraste con la especificación en el gate, fase 6</a> · Preguntas <a href="#q-8">8</a> y <a href="#q-9">9</a></p>
+      </div>
+    </section>
+
+    <section id="d5">
+      <div class="section-head"><span class="letter">D5</span><h2>Calendario de vigencias</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>La normalización usa el día <strong>UTC</strong>: en Lima una vigencia empieza a las 19:00 del día anterior y termina a las 18:59 del último día. Además, la interfaz combina medianoche UTC con formato local y muestra el inicio un día antes.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Tres piezas distintas: ambigüedad documental, porque <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d5&desde=Calendario%20de%20vigencias#rf-016">RF-016</a> no dice qué calendario rige; decisión de negocio, cuál se adopta; y defecto técnico independiente, la visualización.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd>El defecto visual <span class="pill ok">no</span>: se corrige sin decisión. La ambigüedad <span class="pill bad">sí</span>, al menos para dejar escrito qué calendario rige.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code> en <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d5&desde=Calendario%20de%20vigencias#rf-016">RF-016</a>, <code>research.md</code> §5, <code>data-model.md</code>, y <code>README.md</code> si la zona horaria pasa a ser operativa.</dd>
+        <dt>Pruebas</dt>
+        <dd>De límites alrededor de la medianoche local, hoy inexistentes: el E2E evita esa franja a propósito.</dd>
+        <dt>Dependencias</dt>
+        <dd>Si cambia el calendario, hay que decidir también qué ocurre con los datos ya grabados.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-a">A</span> para el calendario · <span class="cat cat-d">D</span> para la interfaz · <span class="cat cat-e">E</span> para el texto de <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d5&desde=Calendario%20de%20vigencias#rf-016">RF-016</a></dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d5&desde=Calendario%20de%20vigencias#d5">Alternativas en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d5&desde=Calendario%20de%20vigencias#fase-5">Modelo temporal en el gate, fase 5</a> · Preguntas <a href="#q-10">10</a> y <a href="#q-11">11</a></p>
+      </div>
+    </section>
+
+    <section id="d6">
+      <div class="section-head"><span class="letter">D6</span><h2>Cambio de TipoCompania</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>La actualización asigna el tipo sin comprobar dependientes. La dirección Principal → Contratista puede dejar áreas, árboles de unidades, contextos y credenciales que <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d6&desde=Cambio%20de%20TipoCompania#rf-045">RF-045</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d6&desde=Cambio%20de%20TipoCompania#rf-046">RF-046</a> prohíben. Dos pruebas dependen de que la dirección inversa siga permitida.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisión de negocio sobre qué debe pasar con los dependientes; la validación es técnica.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill ok">No</span> No hay incidente reproducido; es un riesgo de invariante.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code>, <code>data-model.md</code> en las validaciones de Compañía, el contrato de compañías por un 409 nuevo, y <code>ux-ui.md</code> si la pantalla debe advertirlo.</dd>
+        <dt>Pruebas</dt>
+        <dd>De integración por cada tipo de dependiente; hoy ninguna.</dd>
+        <dt>Dependencias</dt>
+        <dd>Ninguna. Conviene revisar que las dos pruebas existentes sigan siendo válidas con la opción elegida.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-b">B</span> para la decisión · <span class="cat cat-d">D</span> para la validación</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d6&desde=Cambio%20de%20TipoCompania#d6">Alternativas en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d6&desde=Cambio%20de%20TipoCompania#fase-6">Invariantes de compañía en el gate, fase 6</a> · Pregunta <a href="#q-12">12</a></p>
+      </div>
+    </section>
+
+    <section id="d7">
+      <div class="section-head"><span class="letter">D7</span><h2>T116 y su criterio de éxito</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>La tarea está marcada y el trabajo no existe: sin selector de Principal, sin árbol para elegir unidad, sin pantalla de perfiles, y con los hooks de crear pertenencia y abrir contexto sin uso. <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d7&desde=T116%20y%20su%20criterio%20de%20%C3%A9xito#us-5">Historia 5</a> solo es operable por API.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisión de alcance, no de negocio de dominio. El trabajo en sí es técnico.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd>El registro <span class="pill bad">sí</span>: hoy <code>tasks.md</code> afirma algo que el repositorio no respalda. La construcción depende de la opción elegida.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>tasks.md</code> en cualquiera de los tres casos; <code>spec.md</code> si el criterio <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d7&desde=T116%20y%20su%20criterio%20de%20%C3%A9xito#cs-021">CS-021</a> se reprograma.</dd>
+        <dt>Pruebas</dt>
+        <dd>De componente y de extremo a extremo por interfaz si se construye; ninguna si se traslada.</dd>
+        <dt>Dependencias</dt>
+        <dd>Si se construye, las pantallas deben respetar la regla que salga de D1 y D3.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-a">A</span> para el destino · luego <span class="cat cat-d">D</span> si se corrige en Etapa 1 o <span class="cat cat-c">C</span> si se traslada · <span class="cat cat-e">E</span> para la ruta obsoleta</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d7&desde=T116%20y%20su%20criterio%20de%20%C3%A9xito#d7">Alternativas en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d7&desde=T116%20y%20su%20criterio%20de%20%C3%A9xito#fase-8">Contraste entre tarea y repositorio en el gate, fase 8</a> · Pregunta <a href="#q-13">13</a></p>
+      </div>
+    </section>
+
+    <section id="d8">
+      <div class="section-head"><span class="letter">D8</span><h2>Consultas transversales y su criterio</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#rf-067">RF-067</a>, <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#rf-068">RF-068</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#rf-069">RF-069</a> describen qué exponer y con qué filtros, pero no la forma del endpoint, la paginación, los límites de rango ni si bastan las columnas de auditoría. No hay contrato, tarea, código, pantalla ni prueba.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisión de alcance más especificación faltante.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill ok">No</span> el código, que no depende de ellos. <span class="pill warn">Sí</span> la frontera entre etapas: hay que decir formalmente dónde viven.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code>, <code>plan.md</code>, un contrato nuevo si se especifican, y <code>ux-ui.md</code>.</dd>
+        <dt>Pruebas</dt>
+        <dd>Ninguna hasta que exista contrato.</dd>
+        <dt>Dependencias</dt>
+        <dd><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#cs-032">CS-032</a> exige respetar el alcance en vistas agregadas, así que hereda lo que se decida en D1 y D3.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-c">C</span>, previa decisión <span class="cat cat-a">A</span> que lo deje registrado</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#d8">Alternativas en la sesión de decisiones</a> · <a href="gate-cierre-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d8&desde=Consultas%20transversales%20y%20su%20criterio#fase-2">Cobertura de requisitos en el gate, fase 2</a> · Pregunta <a href="#q-14">14</a></p>
+      </div>
+    </section>
+
+    <section id="d9">
+      <div class="section-head"><span class="letter">D9</span><h2>Decisiones heredadas</h2></div>
+      <dl class="facts">
+        <dt>Problema</dt>
+        <dd>Tres decisiones abiertas heredadas. La <span class="mono"><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d9&desde=Decisiones%20heredadas#decision-1">#1</a></span> mantiene umbrales de contraseña provisionales y sin flujo de recuperación; la <span class="mono"><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d9&desde=Decisiones%20heredadas#decision-3">#3</a></span> no tiene implementación alguna; la <span class="mono"><a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d9&desde=Decisiones%20heredadas#decision-7">#7</a></span> no tiene efecto técnico.</dd>
+        <dt>Naturaleza</dt>
+        <dd>Decisiones de negocio puras.</dd>
+        <dt>¿Bloquea?</dt>
+        <dd><span class="pill ok">No</span>, ninguna de las tres. Matiz: si D2 fija una contraseña inicial, conviene confirmar al menos longitud y caducidad de la primera.</dd>
+        <dt>Artefactos</dt>
+        <dd><code>spec.md</code> cuando se cierren; <code>README.md</code> en los umbrales de contraseña; nada para la última salvo el registro.</dd>
+        <dt>Pruebas</dt>
+        <dd>Las de política de contraseña ya existen y seguirían el valor configurado.</dd>
+        <dt>Dependencias</dt>
+        <dd>La primera con D2. Las otras dos, ninguna.</dd>
+        <dt>Categoría</dt>
+        <dd><span class="cat cat-b">B</span> las tres</dd>
+      </dl>
+      <div class="doc-diffs">
+        <h3>Enlaces</h3>
+        <p><a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23d9&desde=Decisiones%20heredadas#d9">Detalle en la sesión de decisiones</a> · <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23d9&desde=Decisiones%20heredadas#decisiones">Catálogo de decisiones pendientes</a> · Preguntas <a href="#q-15">15</a> y <a href="#q-16">16</a></p>
+      </div>
+    </section>
+
+    <section id="matriz">
+      <div class="section-head"><span class="letter">✓</span><h2>Matriz de decisiones</h2></div>
+      <p class="prose">Las preguntas <strong>1 a 7, 10, 11, 13 y 14</strong> son las que hay que responder para poder congelar: sin ellas no puede escribirse la corrección ni fijarse la frontera entre etapas. Las preguntas <strong>8, 9, 12, 15 y 16</strong> pueden quedarse abiertas si así se decide, siempre que quede registrado que lo están.</p>
+      <div class="table-wrap">
+        <table class="matriz">
+          <thead><tr><th>Nº</th><th>Decisión</th><th>Opciones</th><th>Cat.</th><th>¿Bloquea?</th><th>Depende de</th><th>Respuesta</th></tr></thead>
+          <tbody>
+            <tr id="q-1"><td class="id">1</td><td>Modelo de administración de usuarios</td><td>M1 sin roles acotado al propio alcance · M2 rol global más administradores por compañía · M3 centralizada · M4 statu quo</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-2"><td class="id">2</td><td>¿Solo se conceden compañías del propio alcance?</td><td>Sí · No</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><a href="#q-1">1</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-3"><td class="id">3</td><td>Visibilidad del listado de usuarios</td><td>Todos · Solo los de mi alcance · Solo rol global</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><a href="#q-1">1</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-4"><td class="id">4</td><td>Quién bloquea y desbloquea</td><td>Cualquiera con acceso al módulo · Solo rol global</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><a href="#q-1">1</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-5"><td class="id">5</td><td>Mecanismo del primer administrador</td><td>B1 semilla · B2 comando · B3 endpoint de bootstrap · B4 procedimiento manual formalizado</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><a href="#q-1">1</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-6"><td class="id">6</td><td>Alcance inicial de ese primer administrador</td><td>Todas las compañías · Ninguna · Lista explícita</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><a href="#q-1">1</a>, <a href="#q-5">5</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-7"><td class="id">7</td><td>Principio de aislamiento</td><td>A1 estricta · A2 lectura por persona y escritura por objeto · A3 statu quo documentado</td><td><span class="cat cat-a">A</span></td><td><span class="pill bad">Sí</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-8"><td class="id">8</td><td>Efecto de inactivar una compañía</td><td>A denegar dinámicamente · B cascada de escritura · C sin efecto · Dejar abierta</td><td><span class="cat cat-b">B</span></td><td><span class="pill ok">No</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-9"><td class="id">9</td><td>Alcance de esa regla</td><td>Compañía de pertenencia · Principal del área · Ambas</td><td><span class="cat cat-b">B</span></td><td><span class="pill ok">No</span></td><td><a href="#q-8">8</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-10"><td class="id">10</td><td>Calendario que define un «día»</td><td>UTC · Lima · Zona configurable</td><td><span class="cat cat-a">A</span></td><td><span class="pill warn">Sí</span> <span class="muted">al menos escribirlo</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-11"><td class="id">11</td><td>Datos ya grabados si cambia el calendario</td><td>Migrar · Dejar como están · Aceptar el desfase histórico</td><td><span class="cat cat-a">A</span></td><td><span class="pill warn">Sí</span> <span class="muted">si cambia</span></td><td><a href="#q-10">10</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-12"><td class="id">12</td><td>Cambio de TipoCompania con dependientes</td><td>Prohibir · Solo Contratista → Principal · Con cascada · Libre</td><td><span class="cat cat-b">B</span></td><td><span class="pill ok">No</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-13"><td class="id">13</td><td>Destino de T116 y su criterio</td><td>A corregir en Etapa 1 · B reabrir formalmente · C trasladar a Etapa 2</td><td><span class="cat cat-a">A</span></td><td><span class="pill warn">Sí</span> <span class="muted">el registro</span></td><td><a href="#q-1">1</a>, <a href="#q-7">7</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-14"><td class="id">14</td><td>Destino de <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23matriz&desde=Matriz%20de%20decisiones#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23matriz&desde=Matriz%20de%20decisiones#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23matriz&desde=Matriz%20de%20decisiones#cs-032">CS-032</a></td><td>Trasladar a Etapa 2 · Especificar ahora · Retirar del alcance</td><td><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-c">C</span></span></td><td><span class="pill warn">Sí</span> <span class="muted">la frontera</span></td><td><a href="#q-1">1</a>, <a href="#q-7">7</a></td><td class="resp">pendiente</td></tr>
+            <tr id="q-15"><td class="id">15</td><td>Prioridad de <a href="especificaciones-baseline.html?volver=clasificacion-hallazgos-2026-09-16.html%23matriz&desde=Matriz%20de%20decisiones#us-9">Historia 9</a></td><td>Cerrarla confirmando P2 · Cerrarla subiéndola a P1 · Mantenerla abierta</td><td><span class="cat cat-b">B</span></td><td><span class="pill ok">No</span></td><td><span class="muted">—</span></td><td class="resp">pendiente</td></tr>
+            <tr id="q-16"><td class="id">16</td><td>Decisiones heredadas de contraseña y notificaciones</td><td>Confirmar que siguen abiertas · Cerrar la primera ahora · Cerrar la segunda ahora</td><td><span class="cat cat-b">B</span></td><td><span class="pill ok">No</span></td><td><a href="#q-5">5</a></td><td class="resp">pendiente</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose muted">El enunciado completo de cada pregunta, con su contexto, está en la <a href="decisiones-etapa1-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23matriz&desde=Matriz%20de%20decisiones#preguntas">sesión de decisiones</a>. Se puede responder por número y en cualquier orden.</p>
+    </section>
+
+    <section id="sin-espera">
+      <div class="section-head"><span class="letter">▶</span><h2>Trabajo que no espera a ninguna respuesta</h2></div>
+      <p class="prose">Categorías <span class="cat cat-d">D</span> y <span class="cat cat-e">E</span> sin decisión asociada. Nada de esto se ha tocado: queda listado para cuando se autorice.</p>
+      <ul class="tight">
+        <li><strong>Defectos técnicos:</strong> <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-05">F-05</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-06">F-06</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-10">F-10</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-12">F-12</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-13">F-13</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-14">F-14</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-15">F-15</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-16">F-16</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-22">F-22</a>, más la visualización de fechas de <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-08">F-08</a>.</li>
+        <li><strong>Correcciones documentales:</strong> <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-11">F-11</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-18">F-18</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-19">F-19</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-20">F-20</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-21">F-21</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=clasificacion-hallazgos-2026-09-16.html%23sin-espera&desde=Trabajo%20que%20no%20espera%20a%20ninguna%20respuesta#f-23">F-23</a>, más el texto sobre inactivación de compañía que hoy es incorrecto en <code>spec.md</code> y <code>research.md</code>.</li>
+      </ul>
+      <p class="prose muted">Ninguno de estos puntos exige una decisión de negocio: todos están ya resueltos por la especificación vigente y solo requieren autorización para ejecutarlos.</p>
+    </section>
+
+    <footer class="foot">
+      Clasificación generada el 16/09/2026 sobre la auditoría consolidada del 16/09 y la sesión de decisiones. No se ha modificado código, contratos, especificaciones ni tasks.md, no se ha marcado ni desmarcado ninguna tarea, y ninguna decisión de negocio se ha resuelto aquí. Documento local: los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    // Solo se acepta un archivo local con ancla: nada de URLs arbitrarias.
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

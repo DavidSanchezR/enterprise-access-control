@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Áreas de Acceso
+  version: "1.0.0"
+  description: >
+    Árbol de áreas físicas de acceso (Historia 6, RF-009, RF-038) y tipos de persona autorizados por
+    área (Historia 7, RF-019). Cada área de acceso pertenece a exactamente una Compañía PRINCIPAL_MANDANTE
+    (RF-046, a diferencia de UnidadOrganizativa, aquí sí se modela como FK directa); un área hija hereda el
+    companiaPrincipalId de su área padre. El sistema admite varias Compañías Principales simultáneamente,
+    cada una con su propio árbol de áreas aislado (RF-043) — por eso companiaPrincipalId es obligatorio al
+    listar/consultar el árbol y al crear un área raíz.
+tags:
+  - name: AreasAcceso
+paths:
+  /api/areas-acceso:
+    get:
+      tags: [AreasAcceso]
+      summary: Listar áreas de acceso (plano, con áreaSuperiorId) de una Compañía Principal
+      parameters:
+        - name: companiaPrincipalId
+          in: query
+          required: true
+          description: >
+            Compañía PRINCIPAL_MANDANTE propietaria de las áreas a listar. Debe estar dentro del alcance
+            del usuario autenticado (RF-049); 404 si no lo está o si la compañía no es PRINCIPAL_MANDANTE.
+          schema: { type: string, format: uuid }
+        - name: estado
+          in: query
+          schema: { type: string, enum: [ACTIVO, INACTIVO] }
+      responses:
+        "200":
+          description: Lista plana de áreas de esa Compañía Principal
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AreaAcceso" }
+        "404":
+          description: companiaPrincipalId no existe, no es PRINCIPAL_MANDANTE, o está fuera de alcance
+    post:
+      tags: [AreasAcceso]
+      summary: Crear área de acceso (raíz si áreaSuperiorId es null)
+      description: >
+        Al crear un área raíz (areaSuperiorId = null), companiaPrincipalId es obligatorio y debe referenciar
+        una compañía PRINCIPAL_MANDANTE (RF-046). Al crear un área hija, companiaPrincipalId se ignora si se
+        envía: el área hereda automáticamente el de su areaSuperiorId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AreaAccesoRequest" }
+      responses:
+        "201":
+          description: Área creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AreaAcceso" }
+        "400":
+          description: Área raíz sin companiaPrincipalId, o companiaPrincipalId referencia una compañía CONTRATISTA (RF-046)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: El área superior indicada generaría un ciclo o no existe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/areas-acceso/arbol:
+    get:
+      tags: [AreasAcceso]
+      summary: Obtener el árbol anidado de una Compañía Principal (RF-036)
+      parameters:
+        - name: companiaPrincipalId
+          in: query
+          required: true
+          description: Compañía PRINCIPAL_MANDANTE cuyo árbol de áreas se solicita; debe estar dentro del alcance del usuario
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Árbol de áreas de esa Compañía Principal
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NodoArbol" }
+        "404":
+          description: companiaPrincipalId no existe, no es PRINCIPAL_MANDANTE, o está fuera de alcance
+  /api/areas-acceso/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [AreasAcceso]
+      summary: Obtener área de acceso por ID (404 si su Compañía Principal está fuera de alcance)
+      responses:
+        "200":
+          description: Área encontrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AreaAcceso" }
+        "404":
+          description: No encontrada o fuera de alcance
+    put:
+      tags: [AreasAcceso]
+      summary: Actualizar nombre/estado del área (no permite cambiar su Compañía Principal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AreaAccesoUpdateRequest" }
+      responses:
+        "200":
+          description: Área actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AreaAcceso" }
+  /api/areas-acceso/{id}/mover:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [AreasAcceso]
+      summary: Reubicar el área bajo una nueva área superior del mismo árbol (o a raíz si nuevoPadreId es null)
+      description: >
+        Un área no puede reubicarse bajo un padre del árbol de otra Compañía Principal: eso cambiaría
+        implícitamente su companiaPrincipalId, lo cual no está permitido (RF-046).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nuevoPadreId:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "204":
+          description: Área reubicada
+        "409":
+          description: >
+            Rechazado, generaría un ciclo (RF-038, Principio V), o nuevoPadreId pertenece al árbol de una
+            Compañía Principal distinta a la del área (RF-046)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/areas-acceso/{id}/tipos-persona:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [AreasAcceso]
+      summary: Listar tipos de persona autorizados en el área
+      responses:
+        "200":
+          description: Tipos de persona asociados
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string, format: uuid }
+    put:
+      tags: [AreasAcceso]
+      summary: Reemplazar el conjunto de tipos de persona autorizados en el área (RF-019)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipoPersonaIds]
+              properties:
+                tipoPersonaIds:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Asociaciones actualizadas
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AreaAcceso:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        areaSuperiorId: { type: string, format: uuid, nullable: true }
+        companiaPrincipalId:
+          type: string
+          format: uuid
+          description: Compañía PRINCIPAL_MANDANTE propietaria del área (RF-046); en un área hija, igual al de su área padre.
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    AreaAccesoRequest:
+      type: object
+      required: [nombre, estado]
+      description: companiaPrincipalId es obligatorio únicamente cuando areaSuperiorId es null (área raíz).
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        areaSuperiorId: { type: string, format: uuid, nullable: true }
+        companiaPrincipalId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Obligatorio si areaSuperiorId es null; ignorado si se informa junto a un areaSuperiorId no nulo.
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    AreaAccesoUpdateRequest:
+      type: object
+      required: [nombre, estado]
+      description: A diferencia de la creación, la actualización no acepta companiaPrincipalId ni areaSuperiorId (usar POST /mover para reubicar).
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    NodoArbol:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        hijos:
+          type: array
+          items: { $ref: "#/components/schemas/NodoArbol" }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

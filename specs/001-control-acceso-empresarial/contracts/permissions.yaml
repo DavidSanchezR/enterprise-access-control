@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Permisos de Acceso
+  version: "1.0.0"
+  description: >
+    Permisos de acceso por persona, unidad organizativa o compañía, con vigencia y bloques horarios
+    (Historia 8, RF-020, RF-021, RF-022, RF-039). Cuando alcance = COMPANIA, companiaId puede referenciar
+    una compañía PRINCIPAL_MANDANTE o CONTRATISTA indistintamente (research.md §12) — p. ej. otorgar acceso
+    a todo el personal de una Compañía Contratista sobre un área administrada por la Compañía Principal a
+    la que presta servicios es un caso válido, pero solo produce acceso efectivo para las personas de esa
+    Contratista que además tengan un contexto operativo vigente con esa Principal (ver
+    contracts/access-evaluation.yaml, RF-059). Las operaciones de creación/actualización quedan limitadas
+    al alcance de compañías del usuario autenticado, evaluado contra el companiaPrincipalId del área de
+    acceso referenciada (RF-049).
+tags:
+  - name: Permisos
+paths:
+  /api/permisos:
+    get:
+      tags: [Permisos]
+      summary: Listar permisos aplicables a un área, persona, unidad organizativa o compañía
+      parameters:
+        - name: areaAccesoId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: personaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: unidadOrganizativaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: companiaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: estado
+          in: query
+          schema: { type: string, enum: [ACTIVO, INACTIVO] }
+        - name: pagina
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: tamañoPagina
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+      responses:
+        "200":
+          description: Página de permisos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaPermisos" }
+    post:
+      tags: [Permisos]
+      summary: Crear permiso de acceso con sus bloques horarios (RF-020, RF-021, RF-022)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PermisoAccesoRequest" }
+      responses:
+        "201":
+          description: Permiso creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PermisoAcceso" }
+        "400":
+          description: >
+            Vigencia inválida (fin ≤ inicio), bloque horario inválido (fin ≤ inicio) o bloques
+            solapados dentro del mismo día (RF-039)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/permisos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Permisos]
+      summary: Obtener permiso por ID
+      responses:
+        "200":
+          description: Permiso encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PermisoAcceso" }
+        "404":
+          description: No encontrado
+    put:
+      tags: [Permisos]
+      summary: Actualizar vigencia, estado y bloques horarios del permiso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PermisoAccesoRequest" }
+      responses:
+        "200":
+          description: Permiso actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PermisoAcceso" }
+        "400":
+          description: Vigencia o bloques horarios inválidos (RF-039)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AlcancePermiso:
+      type: string
+      enum: [PERSONA, UNIDAD_ORGANIZATIVA, COMPANIA]
+    DiaSemana:
+      type: string
+      enum: [LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO]
+    BloqueHorario:
+      type: object
+      required: [diaSemana, horaInicio, horaFin]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        diaSemana: { $ref: "#/components/schemas/DiaSemana" }
+        horaInicio:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora local America/Lima, formato HH:mm
+        horaFin:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora local America/Lima, formato HH:mm, debe ser posterior a horaInicio
+    PermisoAcceso:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        areaAccesoId: { type: string, format: uuid }
+        alcance: { $ref: "#/components/schemas/AlcancePermiso" }
+        personaId: { type: string, format: uuid, nullable: true }
+        unidadOrganizativaId: { type: string, format: uuid, nullable: true }
+        companiaId: { type: string, format: uuid, nullable: true }
+        fechaHoraInicioVigencia: { type: string, format: date-time }
+        fechaHoraFinVigencia:
+          type: string
+          format: date-time
+          description: >
+            Obligatoria (RF-021 ya lo exigía desde el spec original; corregido en la Sesión 2026-09-14
+            "vigencia temporal jerárquica" — RF-071 — que antes se documentaba incorrectamente como
+            nullable). Aplica a los tres valores de alcance. No sujeta a contención respecto a
+            AsignacionCompania (RF-072 no aplica — PermisoAcceso no depende de la pertenencia).
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        bloquesHorarios:
+          type: array
+          items: { $ref: "#/components/schemas/BloqueHorario" }
+    PermisoAccesoRequest:
+      type: object
+      required: [areaAccesoId, alcance, fechaHoraInicioVigencia, fechaHoraFinVigencia, estado, bloquesHorarios]
+      description: >
+        Exactamente uno de personaId, unidadOrganizativaId, companiaId debe informarse, coincidiendo
+        con el valor de alcance. fechaHoraFinVigencia es obligatoria (RF-021, RF-071) para los tres
+        alcances.
+      properties:
+        areaAccesoId: { type: string, format: uuid }
+        alcance: { $ref: "#/components/schemas/AlcancePermiso" }
+        personaId: { type: string, format: uuid, nullable: true }
+        unidadOrganizativaId: { type: string, format: uuid, nullable: true }
+        companiaId: { type: string, format: uuid, nullable: true }
+        fechaHoraInicioVigencia: { type: string, format: date-time }
+        fechaHoraFinVigencia: { type: string, format: date-time }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        bloquesHorarios:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/BloqueHorario" }
+    PaginaPermisos:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PermisoAcceso" }
+        total: { type: integer }
+        pagina: { type: integer }
+        tamañoPagina: { type: integer }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

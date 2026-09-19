@@ -1,0 +1,283 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Datos Maestros
+  version: "1.0.0"
+  description: >
+    Mantenimiento de catálogos versionados: Tipo de Documento, Tipo de Sangre, Género, Tipo de Persona y
+    Tipo de Credencial (Historia 3, RF-010, RF-017, RF-030, RF-031, RF-032). Los cinco catálogos comparten
+    la misma forma de contrato; se documentan como rutas paralelas bajo /api/maestros/*. Tipo de Credencial
+    representa el tipo/diseño visual de la credencial (p. ej. "Credencial Contratista", "Credencial
+    Corporativo", "Credencial Visitante") — nunca una tecnología de identificación física como RFID, QR,
+    NFC o código de barras (RF-058); no requiere semilla obligatoria para Perú (a diferencia de Tipo de
+    Documento, Tipo de Sangre y Género).
+tags:
+  - name: TiposDocumento
+  - name: TiposSangre
+  - name: Generos
+  - name: TiposPersona
+  - name: TiposCredencial
+paths:
+  /api/maestros/tipos-documento:
+    get:
+      tags: [TiposDocumento]
+      summary: Listar tipos de documento
+      parameters: [ { $ref: "#/components/parameters/Estado" } ]
+      responses:
+        "200":
+          description: Lista de tipos de documento
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterItem" }
+    post:
+      tags: [TiposDocumento]
+      summary: Crear tipo de documento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-documento/{id}:
+    parameters: [ { $ref: "#/components/parameters/Id" } ]
+    put:
+      tags: [TiposDocumento]
+      summary: Actualizar nombre/estado de tipo de documento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+        "409":
+          description: >
+            No se puede pasar a INACTIVO/eliminar si existen referencias que lo requieran activo
+            (RF-032 aplica hacia adelante: no bloquea histórico existente, sólo nuevas asignaciones)
+  /api/maestros/tipos-sangre:
+    get:
+      tags: [TiposSangre]
+      summary: Listar tipos de sangre
+      parameters: [ { $ref: "#/components/parameters/Estado" } ]
+      responses:
+        "200":
+          description: Lista de tipos de sangre
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterItem" }
+    post:
+      tags: [TiposSangre]
+      summary: Crear tipo de sangre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-sangre/{id}:
+    parameters: [ { $ref: "#/components/parameters/Id" } ]
+    put:
+      tags: [TiposSangre]
+      summary: Actualizar tipo de sangre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/generos:
+    get:
+      tags: [Generos]
+      summary: Listar géneros
+      parameters: [ { $ref: "#/components/parameters/Estado" } ]
+      responses:
+        "200":
+          description: Lista de géneros
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterItem" }
+    post:
+      tags: [Generos]
+      summary: Crear género
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/generos/{id}:
+    parameters: [ { $ref: "#/components/parameters/Id" } ]
+    put:
+      tags: [Generos]
+      summary: Actualizar género
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-persona:
+    get:
+      tags: [TiposPersona]
+      summary: Listar tipos/perfiles de persona
+      parameters: [ { $ref: "#/components/parameters/Estado" } ]
+      responses:
+        "200":
+          description: Lista de tipos de persona
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterItem" }
+    post:
+      tags: [TiposPersona]
+      summary: Crear tipo de persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-persona/{id}:
+    parameters: [ { $ref: "#/components/parameters/Id" } ]
+    put:
+      tags: [TiposPersona]
+      summary: Actualizar tipo de persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-credencial:
+    get:
+      tags: [TiposCredencial]
+      summary: Listar tipos de credencial
+      parameters: [ { $ref: "#/components/parameters/Estado" } ]
+      responses:
+        "200":
+          description: Lista de tipos de credencial
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterItem" }
+    post:
+      tags: [TiposCredencial]
+      summary: Crear tipo de credencial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+  /api/maestros/tipos-credencial/{id}:
+    parameters: [ { $ref: "#/components/parameters/Id" } ]
+    put:
+      tags: [TiposCredencial]
+      summary: Actualizar tipo de credencial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MasterItemRequest" }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterItem" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Estado:
+      name: estado
+      in: query
+      schema: { type: string, enum: [ACTIVO, INACTIVO] }
+  schemas:
+    MasterItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    MasterItemRequest:
+      type: object
+      required: [nombre, estado]
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

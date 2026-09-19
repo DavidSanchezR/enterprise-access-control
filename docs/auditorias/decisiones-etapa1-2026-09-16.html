@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisiones de negocio de Etapa 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+  /* .prose organiza bloques hermanos; en un parrafo, el grid convertiria cada <code>,
+     <strong> o enlace en una fila propia a todo el ancho. */
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  .index-sep { margin-top: 18px; }
+  .lista-num { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 78ch; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 78ch; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  .fichas { display: grid; border-top: 1px solid var(--border); }
+  .ficha { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px; }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 15px; font-weight: 600; color: var(--primary); }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts, .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Sesión de decisiones de negocio · Etapa 1</p>
+    <h1>Decisiones pendientes antes de congelar el baseline</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>16/09/2026</b></span>
+      <span>Estado <b>A la espera de respuesta: no se ha modificado código, contratos ni tasks.md</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Decisiones">
+    <p>Decisiones</p>
+    <ol>
+      <li><a href="#d1"><span>D1</span><span>Administración de usuarios</span></a></li>
+      <li><a href="#d2"><span>D2</span><span>Primer administrador</span></a></li>
+      <li><a href="#d3"><span>D3</span><span>Principio de aislamiento</span></a></li>
+      <li><a href="#d4"><span>D4</span><span>Compañía inactivada</span></a></li>
+      <li><a href="#d5"><span>D5</span><span>Calendario del día</span></a></li>
+      <li><a href="#d6"><span>D6</span><span>Cambio de TipoCompania</span></a></li>
+      <li><a href="#d7"><span>D7</span><span>T116</span></a></li>
+      <li><a href="#d8"><span>D8</span><span>RF-067 a RF-069</span></a></li>
+      <li><a href="#d9"><span>D9</span><span>Decisiones #1, #3 y #7</span></a></li>
+      <li><a href="#preguntas"><span>✓</span><span>Preguntas a responder</span></a></li>
+    </ol>
+    <p class="index-sep">Documentos</p>
+    <ol>
+      <li><a href="gate-cierre-etapa1-2026-09-16.html"><span>→</span><span>Gate de cierre</span></a></li>
+      <li><a href="clasificacion-hallazgos-2026-09-16.html"><span>→</span><span>Clasificación y matriz</span></a></li>
+      <li><a href="especificaciones-baseline.html"><span>→</span><span>Especificaciones</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="contexto">
+      <div class="section-head"><span class="letter">0</span><h2>Punto de partida</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">9 decisiones abiertas</span>
+          <span class="muted">Ninguna se resuelve en este documento: cada una queda planteada con sus alternativas y consecuencias.</span>
+        </div>
+        <p class="prose">Tres hechos verificados en el código condicionan las alternativas de este documento:</p>
+        <ul class="tight">
+          <li>El token emite <code>sub</code>, correo, <code>jti</code> y N claims de alcance. <strong>No existe ningún rol</strong> en el token, ni en el dominio, ni en la API.</li>
+          <li><code>ZonaHoraria:TimeZoneId</code> alimenta solo al reloj empresarial, que se usa exclusivamente para los bloques horarios. La normalización de días no lo consulta.</li>
+          <li>El cambio de <code>TipoCompania</code> no valida nada, y dos pruebas dependen de que la reclasificación Contratista → Principal siga permitida.</li>
+        </ul>
+        <p class="prose muted">La Decisión A sobre credenciales permanece congelada y no se reabre aquí.</p>
+      </div>
+    </section>
+
+    <section id="d1">
+      <div class="section-head"><span class="letter">D1</span><h2><a href="auditoria-final-cierre-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#f-01">F-01</a> · Modelo de administración de usuarios y alcance</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd><code>UsuariosController</code> está protegido solo por la política que exige "alcance no vacío", y <code>UsuarioService</code> no recibe el accesor de alcance: ninguna de sus siete operaciones lo aplica. Reproducido en ejecución: un usuario con una sola compañía lista los 12 usuarios con sus correos y alcances, se concede compañías ajenas, cambia el alcance de otro usuario, crea usuarios y desbloquea a terceros.</dd>
+        <dt>Origen</dt>
+        <dd><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#rf-004">RF-004</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#rf-005">RF-005</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#rf-050">RF-050</a>, Principio I, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#us-1">Historia 1</a> criterio 4, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#cs-004">CS-004</a>. El contrato de usuarios no declara ninguna restricción sobre quién puede llamar.</dd>
+        <dt>Problema</dt>
+        <dd>Hoy "usuario autenticado" equivale a "administrador del sistema". Corregirlo exige una regla que el spec nunca definió, porque no hay roles.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Modelo</th><th>Regla</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td class="id">M1</td><td>Sin roles, acotado al propio alcance: cada usuario ve y edita solo usuarios cuyo alcance esté contenido en el suyo, y concede solo compañías propias</td><td>Sin entidades ni claims nuevos; se deriva de <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#rf-005">RF-005</a>. No permite delegar la creación de un administrador de otra compañía. El primer administrador queda sin definir</td></tr>
+            <tr><td class="id">M2</td><td>Rol global más administradores por compañía</td><td>Entidad o campo de rol, migración, claim nuevo, cambios en el contrato de usuarios y en la pantalla. Es el modelo habitual en multi-tenant</td></tr>
+            <tr><td class="id">M3</td><td>Administración centralizada: solo el rol global entra al módulo</td><td>El más restrictivo y el más fácil de verificar. Obliga a que toda alta pase por un equipo central</td></tr>
+            <tr><td class="id">M4</td><td>Statu quo documentado</td><td>Sin trabajo, pero contradice el Principio I y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#cs-004">CS-004</a> y obliga a reescribir <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#rf-005">RF-005</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Artefactos:</strong> spec.md con un RF nuevo o una sesión de clarificación; data-model.md y una migración si aparece el rol; el contrato de usuarios; ux-ui.md en la pantalla de usuarios; README.md; y tareas nuevas de corrección.</p>
+        <p><strong>Implementación y pruebas:</strong> afecta a <code>UsuarioService</code> y a la política de autorización, más la pantalla de usuarios. Hoy <strong>no existe ninguna prueba</strong> sobre alcance en administración de usuarios: harían falta de integración por operación y de contrato.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d1&desde=F-01%20%C2%B7%20Modelo%20de%20administraci%C3%B3n%20de%20usuarios%20y%20alcance#fase-3">Ver la evidencia reproducida en el gate, fase 3</a> · Preguntas <a href="#p-1">1</a>, <a href="#p-2">2</a>, <a href="#p-3">3</a> y <a href="#p-4">4</a></p>
+      </div>
+    </section>
+
+    <section id="d2">
+      <div class="section-head"><span class="letter">D2</span><h2>Primer administrador · mecanismo de bootstrap</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>Una base recién migrada tiene <strong>0 usuarios</strong> y todos los endpoints exigen sesión. El único procedimiento real es insertar <code>Usuario</code> y <code>AlcanceUsuarioCompania</code> directamente en la base con hash Identity V3, que es lo que hace la preparación del E2E. README §6 lo documenta como hueco abierto.</dd>
+        <dt>Origen</dt>
+        <dd><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d2&desde=Primer%20administrador%20%C2%B7%20mecanismo%20de%20bootstrap#us-1">Historia 1</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d2&desde=Primer%20administrador%20%C2%B7%20mecanismo%20de%20bootstrap#rf-001">RF-001</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d2&desde=Primer%20administrador%20%C2%B7%20mecanismo%20de%20bootstrap#rf-004">RF-004</a>, y la conclusión de despliegue de la auditoría.</dd>
+        <dt>Problema</dt>
+        <dd>Sin esto el sistema no es operable desde cero sin intervención manual en la base de datos.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td class="id">B1</td><td><strong>Semilla en migración.</strong> Reproducible y versionada. Riesgo de credencial por defecto conocida en producción; exige forzar el cambio de contraseña y decidir qué alcance recibe</td></tr>
+            <tr><td class="id">B2</td><td><strong>Comando fuera de la API.</strong> El operador crea el administrador con una orden documentada; nada se expone en la red. Requiere acceso al servidor y un punto de entrada nuevo</td></tr>
+            <tr><td class="id">B3</td><td><strong>Endpoint de bootstrap.</strong> Habilitado solo con la tabla vacía y protegido por un secreto. Cómodo, pero añade superficie pública y hay que garantizar que se desactive</td></tr>
+            <tr><td class="id">B4</td><td><strong>Procedimiento manual formalizado.</strong> Es el estado actual, solo mejor documentado. Sin trabajo de código; el despliegue sigue dependiendo de SQL manual y sin auditoría de quién lo hizo</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Dependencias:</strong> el alcance y los permisos del primer administrador dependen de D1; la contraseña inicial roza la decisión <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d2&desde=Primer%20administrador%20%C2%B7%20mecanismo%20de%20bootstrap#decision-1">#1</a>.</p>
+        <p><strong>Artefactos:</strong> spec.md, README.md, quickstart.md, y una migración si eliges B1.</p>
+        <p><strong>Pruebas:</strong> una de despliegue desde cero. Hoy el E2E siembra por su cuenta y no valida ningún mecanismo del producto.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d2&desde=Primer%20administrador%20%C2%B7%20mecanismo%20de%20bootstrap#fase-11">Ver el estado de despliegue en el gate, fase 11</a> · Preguntas <a href="#p-5">5</a> y <a href="#p-6">6</a></p>
+      </div>
+    </section>
+
+    <section id="d3">
+      <div class="section-head"><span class="letter">D3</span><h2><a href="auditoria-final-cierre-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#f-01">F-01</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#f-02">F-02</a> · Confirmación del principio de aislamiento</h2></div>
+      <p class="prose">Conviven tres nociones que el código mezcla:</p>
+      <ol class="lista-num">
+        <li><strong>Alcance del usuario:</strong> las compañías de <code>AlcanceUsuarioCompañía</code>.</li>
+        <li><strong>Alcance histórico de la persona:</strong> se acepta si la persona tocó alguna vez una compañía de mi alcance.</li>
+        <li><strong>Objeto de la operación:</strong> la Principal o compañía concreta que se lee o escribe.</li>
+      </ol>
+      <p class="prose">Áreas, unidades, compañías y permisos validan la tercera. Los servicios del histórico de persona validan solo la segunda, por lo que un usuario con alcance sobre una Contratista lee contextos, estado efectivo y credenciales de Principales ajenas, y <strong>escribe</strong> una unidad organizativa de una Principal ajena. Origen: <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-005">RF-005</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-049">RF-049</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-060">RF-060</a> y el Principio I.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td class="id">A1</td><td><strong>Regla estricta.</strong> Toda operación valida el objeto y los listados filtran por Principal. Es la lectura literal de <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-049">RF-049</a> y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-060">RF-060</a>. Efecto a confirmar: el administrador de una Contratista dejaría de ver los contextos de sus trabajadores con Principales que no administra</td></tr>
+            <tr><td class="id">A2</td><td><strong>Lectura por persona, escritura por objeto.</strong> Mantiene la visibilidad del histórico completo de "mis" personas y cierra solo la escritura. Menos disruptivo; conserva una fuga de lectura entre Principales</td></tr>
+            <tr><td class="id">A3</td><td><strong>Statu quo documentado.</strong> Se acepta el comportamiento y se reescriben <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-049">RF-049</a> y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#rf-060">RF-060</a>. Elimina el defecto por definición, a costa del aislamiento que promete el Principio I</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Artefactos:</strong> spec.md si eliges A2 o A3; los contratos de personas y credenciales por los códigos de los listados; ux-ui.md si cambia lo que se ve en el histórico.</p>
+        <p><strong>Pruebas:</strong> ninguna cubre hoy estos casos; harían falta seis de integración, una por endpoint afectado.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d3&desde=F-01%20y%20F-02%20%C2%B7%20Confirmaci%C3%B3n%20del%20principio%20de%20aislamiento#fase-4">Ver la evidencia en el gate, fase 4</a> · Pregunta <a href="#p-7">7</a></p>
+      </div>
+    </section>
+
+    <section id="d4">
+      <div class="section-head"><span class="letter">D4</span><h2>Decisión <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#decision-6">#6</a> · Qué ocurre al inactivar una Compañía</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>spec.md afirma que la inactivación queda "protegida únicamente por la re-validación dinámica", y research.md §14.5 lo repite. <strong>El motor nunca consulta el estado de la compañía</strong>: solo mira el del área y el del permiso. Hoy inactivar una compañía no deniega nada. Para el fin de una relación Contratista-Principal la afirmación sí se cumple, porque el paso 5 comprueba su vigencia.</dd>
+        <dt>Origen</dt>
+        <dd>Decisión Pendiente #6, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-059">RF-059</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-061">RF-061</a> a <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-065">RF-065</a>, research §14.5.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td class="id">A</td><td><strong>La evaluación dinámica deniega.</strong> El paso 5 comprueba el estado de la compañía. Efecto inmediato y reversible: reactivar restaura el acceso. No escribe histórico, así que no queda constancia de por qué se denegó. Cambio pequeño y localizado</td></tr>
+            <tr><td class="id">B</td><td><strong>Cascada de escritura.</strong> Inactivar cierra contextos, unidades y credenciales como hace <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-061">RF-061</a>. Deja auditoría explícita, pero es <strong>irreversible</strong>: reactivar no devuelve los accesos. Afecta a todo el personal a la vez, con coste de transacción alto</td></tr>
+            <tr><td class="id">C</td><td><strong>Sin efecto sobre accesos existentes.</strong> El estado es informativo y el acceso se corta cerrando pertenencias. Es lo que el código hace hoy, pero exige corregir spec.md y research.md, que afirman lo contrario</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p>Conviene responder por separado si la regla aplica a la compañía <strong>de pertenencia</strong>, a la <strong>Principal propietaria del área</strong>, o a ambas.</p>
+        <p><strong>Artefactos:</strong> spec.md en la decisión <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#decision-6">#6</a> y en <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-059">RF-059</a>/<a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#rf-065">RF-065</a>; research.md §7 y §14.5; data-model.md si eliges B; el contrato de evaluación si aparece un motivo nuevo.</p>
+        <p><strong>Pruebas:</strong> A exige pruebas del motor por variante; B, de cascada y preservación de histórico; C, solo corrección documental.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d4&desde=Decisi%C3%B3n%20%236%20%C2%B7%20Qu%C3%A9%20ocurre%20al%20inactivar%20una%20Compa%C3%B1%C3%ADa#fase-10">Ver el expediente técnico en el gate, fase 10</a> · Preguntas <a href="#p-8">8</a> y <a href="#p-9">9</a></p>
+      </div>
+    </section>
+
+    <section id="d5">
+      <div class="section-head"><span class="letter">D5</span><h2><a href="auditoria-final-cierre-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d5&desde=F-08%20%C2%B7%20Qu%C3%A9%20calendario%20define%20un%20%22d%C3%ADa%22#f-08">F-08</a> · Qué calendario define un "día"</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>La normalización fija el inicio a las 00:00 y el fin a las 23:59:59.999 del día <strong>UTC</strong>. En Lima eso significa que una vigencia empieza a las 19:00 del día anterior y termina a las 18:59 del último día. La zona horaria configurable ya existe, pero solo alimenta los bloques horarios. Aparte hay un defecto de interfaz: la UI envía medianoche UTC y la muestra en formato local, así que el inicio aparece un día antes.</dd>
+        <dt>Origen</dt>
+        <dd><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d5&desde=F-08%20%C2%B7%20Qu%C3%A9%20calendario%20define%20un%20%22d%C3%ADa%22#rf-016">RF-016</a>, que dice "00:00 y 23:59 del último día" sin indicar el calendario; <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d5&desde=F-08%20%C2%B7%20Qu%C3%A9%20calendario%20define%20un%20%22d%C3%ADa%22#us-5">Historia 5</a>; research §5; y el supuesto de que Perú es el locale inicial.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td>UTC (statu quo)</td><td>Sin cambios de código ni de datos. Las vigencias no coinciden con el día natural peruano; el último día pierde sus cinco horas finales</td></tr>
+            <tr><td>Hora local de Lima</td><td>El día coincide con el negocio. Exige convertir en la normalización y decidir qué pasa con los datos ya grabados</td></tr>
+            <tr><td>Zona configurable</td><td>Reutiliza la opción existente y prepara otros países. Añade el riesgo de que cambiar la configuración reinterprete vigencias ya existentes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p>El defecto de visualización de la UI <strong>no requiere decisión</strong>: se corrige en cualquiera de las tres.</p>
+        <p><strong>Artefactos:</strong> spec.md en <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d5&desde=F-08%20%C2%B7%20Qu%C3%A9%20calendario%20define%20un%20%22d%C3%ADa%22#rf-016">RF-016</a>, research.md §5, data-model.md, y README.md si la zona pasa a ser operativa.</p>
+        <p><strong>Pruebas:</strong> de límites alrededor de la medianoche local, que hoy no existen; el E2E evita deliberadamente esa franja.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d5&desde=F-08%20%C2%B7%20Qu%C3%A9%20calendario%20define%20un%20%22d%C3%ADa%22#fase-9">Ver reglas temporales en el gate, fase 9</a> · Preguntas <a href="#p-10">10</a> y <a href="#p-11">11</a></p>
+      </div>
+    </section>
+
+    <section id="d6">
+      <div class="section-head"><span class="letter">D6</span><h2><a href="auditoria-final-cierre-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#f-09">F-09</a> · Cambio de TipoCompania con dependientes</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>La actualización de compañía asigna el nuevo tipo <strong>sin comprobar nada</strong>. Dos pruebas dependen de que la reclasificación Contratista → Principal siga permitida, porque habilita crear áreas y unidades. La dirección inversa puede dejar una CONTRATISTA con áreas, árboles de unidades, contextos y credenciales, que <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-045">RF-045</a> y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-046">RF-046</a> prohíben.</dd>
+        <dt>Origen</dt>
+        <dd><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-042">RF-042</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-045">RF-045</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-046">RF-046</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#rf-051">RF-051</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d6&desde=F-09%20%C2%B7%20Cambio%20de%20TipoCompania%20con%20dependientes#us-2">Historia 2</a>.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td>Prohibir con dependientes</td><td>Invariantes garantizadas. Obliga a limpiar antes y a definir qué cuenta como dependiente: áreas, raíces de unidad, relaciones, contextos y credenciales</td></tr>
+            <tr><td>Permitir solo Contratista → Principal</td><td>Conserva las pruebas actuales y bloquea la dirección peligrosa. Asimetría que hay que documentar</td></tr>
+            <tr><td>Permitir con cierre en cascada</td><td>Un solo paso para el usuario, pero cierra datos de golpe y la auditoría debe explicar por qué</td></tr>
+            <tr><td>Libre (statu quo)</td><td>Sin trabajo. Deja el modelo expuesto a estados que el propio spec declara imposibles</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Artefactos:</strong> spec.md, data-model.md en las validaciones de Compañía, el contrato de compañías por un 409 nuevo, y ux-ui.md si la pantalla debe advertirlo.</p>
+        <p><strong>Pruebas:</strong> de integración por cada tipo de dependiente; hoy no hay ninguna.</p>
+        <p>Pregunta <a href="#p-12">12</a></p>
+      </div>
+    </section>
+
+    <section id="d7">
+      <div class="section-head"><span class="letter">D7</span><h2>T116 · Pantalla Caso A y Caso B</h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>La tarea está marcada y el trabajo no existe: sin selector de Principal, sin árbol para elegir unidad, sin API ni pantalla de perfiles, y con los hooks de crear pertenencia y abrir contexto definidos pero sin uso. <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#us-5">Historia 5</a> solo es operable por API y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#cs-021">CS-021</a> está incumplido.</dd>
+        <dt>Origen</dt>
+        <dd>T116, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#us-5">Historia 5</a> "Comportamiento de la pantalla", <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#cs-021">CS-021</a>, ux-ui §13 y §15.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td class="id">A</td><td><strong>Corregir ahora, en Etapa 1.</strong> La etapa cierra con su alcance real cumplido. Es trabajo de frontend no trivial: wizard, selector, árbol, creación de pertenencia, contexto y perfil</td></tr>
+            <tr><td class="id">B</td><td><strong>Reabrir formalmente.</strong> tasks.md deja de afirmar algo falso y la deuda queda visible. No entrega nada por sí solo: después hay que elegir entre A y C</td></tr>
+            <tr><td class="id">C</td><td><strong>Trasladar a Etapa 2.</strong> Cierre inmediato de Etapa 1, con un criterio de éxito de esta etapa incumplido y registrado como tal</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Artefactos:</strong> tasks.md en cualquiera de los tres casos; spec.md si <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#cs-021">CS-021</a> se reprograma.</p>
+        <p><strong>Pruebas:</strong> la opción A exige pruebas de componente y E2E por interfaz; hoy el E2E cubre el flujo solo por API.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d7&desde=T116%20%C2%B7%20Pantalla%20Caso%20A%20y%20Caso%20B#fase-6">Ver el detalle en el gate, fase 6</a> · Pregunta <a href="#p-13">13</a></p>
+      </div>
+    </section>
+
+    <section id="d8">
+      <div class="section-head"><span class="letter">D8</span><h2><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-067">RF-067</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-068">RF-068</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#cs-032">CS-032</a></h2></div>
+      <dl class="facts">
+        <dt>Situación</dt>
+        <dd>Los tres requisitos describen qué exponer y con qué filtros, y remiten el detalle a ux-ui §8, §20 y §21. No definen forma de endpoint, paginación, límites de rango ni si bastan las columnas de auditoría o hace falta una tabla de eventos. No hay contrato, ni tarea, ni código, ni pantalla, ni prueba. <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#cs-032">CS-032</a> depende por completo de ellos.</dd>
+        <dt>Origen</dt>
+        <dd>Sesión de integración de ux-ui.md, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-040">RF-040</a>, <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#us-10">Historia 10</a>.</dd>
+      </dl>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alternativa</th><th>Consecuencias</th></tr></thead>
+          <tbody>
+            <tr><td>Trasladar a Etapa 2</td><td>Etapa 1 cierra sin ellos, con nota explícita en spec.md. Es lo que tasks.md y plan.md ya asumen de hecho</td></tr>
+            <tr><td>Especificar ahora</td><td>La etapa cumpliría su spec íntegro. Exige una sesión de diseño de contratos y pantallas antes de cualquier tarea</td></tr>
+            <tr><td>Retirar del alcance</td><td>Solo si negocio concluye que esas vistas no se necesitan; obliga a derogar los tres requisitos y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#cs-032">CS-032</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc-diffs">
+        <h3>Después de decidir</h3>
+        <p><strong>Artefactos:</strong> spec.md, plan.md, los contratos si se especifican, y ux-ui.md.</p>
+        <p><strong>Impacto:</strong> ninguno sobre el código actual mientras no se decida.</p>
+        <p><a href="gate-cierre-etapa1-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23d8&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#fase-5">Ver el análisis en el gate, fase 5</a> · Pregunta <a href="#p-14">14</a></p>
+      </div>
+    </section>
+
+    <section id="d9">
+      <div class="section-head"><span class="letter">D9</span><h2>Decisiones <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d9&desde=Decisiones%20%231%2C%20%233%20y%20%237%20%C2%B7%20%C2%BFbloquean%20el%20baseline%3F#decision-1">#1</a>, #3 y #7 · ¿bloquean el baseline?</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Decisión</th><th>Estado verificado</th><th>¿Bloquea congelar?</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono"><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d9&desde=Decisiones%20%231%2C%20%233%20y%20%237#decision-1">#1</a></span> Política de contraseñas</td><td>Umbrales configurables y marcados como provisionales; sin flujo de recuperación</td><td><strong>No</strong>, salvo que el bootstrap de D2 fije una contraseña inicial: ahí conviene confirmar al menos longitud y caducidad</td></tr>
+            <tr><td><span class="mono"><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d9&desde=Decisiones%20%231%2C%20%233%20y%20%237#decision-3">#3</a></span> Retención legal</td><td>Sin purga ni archivado; nada la implementa</td><td><strong>No.</strong> Puede permanecer abierta; solo impide configurar borrados automáticos</td></tr>
+            <tr><td><span class="mono"><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d9&desde=Decisiones%20%231%2C%20%233%20y%20%237#decision-7">#7</a></span> Prioridad de <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23d9&desde=Decisiones%20%231%2C%20%233%20y%20%237%20%C2%B7%20%C2%BFbloquean%20el%20baseline%3F#us-9">Historia 9</a></td><td>Sigue en P2 y está implementada por secuenciación técnica</td><td><strong>No</strong> tiene efecto técnico. Puede cerrarse sin coste o quedarse abierta como registro</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose">Preguntas <a href="#p-15">15</a> y <a href="#p-16">16</a></p>
+    </section>
+
+    <section id="preguntas">
+      <div class="section-head"><span class="letter">✓</span><h2>Preguntas que necesito que respondas</h2></div>
+      <div class="fichas">
+        <article class="ficha" id="p-1"><span class="ficha-id mono">1</span><p class="ficha-texto"><strong>Modelo de administración de usuarios:</strong> ¿M1 sin roles acotado al propio alcance, M2 rol global más administradores por compañía, M3 administración centralizada, o M4 statu quo? <a href="#d1">Ver D1</a></p></article>
+        <article class="ficha" id="p-2"><span class="ficha-id mono">2</span><p class="ficha-texto"><strong>Concesión de alcance:</strong> ¿un usuario solo puede conceder compañías que ya están en su propio alcance? <a href="#d1">Ver D1</a></p></article>
+        <article class="ficha" id="p-3"><span class="ficha-id mono">3</span><p class="ficha-texto"><strong>Visibilidad del listado de usuarios:</strong> ¿ve todos, solo los de su alcance, o solo los administradores globales acceden al módulo? <a href="#d1">Ver D1</a></p></article>
+        <article class="ficha" id="p-4"><span class="ficha-id mono">4</span><p class="ficha-texto"><strong>Bloqueo y desbloqueo:</strong> ¿cualquiera con acceso al módulo, o solo el rol global? <a href="#d1">Ver D1</a></p></article>
+        <article class="ficha" id="p-5"><span class="ficha-id mono">5</span><p class="ficha-texto"><strong>Primer administrador:</strong> ¿B1 semilla en migración, B2 comando fuera de la API, B3 endpoint de bootstrap, o B4 procedimiento manual formalizado? <a href="#d2">Ver D2</a></p></article>
+        <article class="ficha" id="p-6"><span class="ficha-id mono">6</span><p class="ficha-texto"><strong>Alcance inicial del primer administrador:</strong> ¿todas las compañías existentes, ninguna, o una lista explícita al crearlo? <a href="#d2">Ver D2</a></p></article>
+        <article class="ficha" id="p-7"><span class="ficha-id mono">7</span><p class="ficha-texto"><strong>Principio de aislamiento:</strong> ¿A1 estricta, A2 lectura por persona y escritura por objeto, o A3 statu quo documentado? <a href="#d3">Ver D3</a></p></article>
+        <article class="ficha" id="p-8"><span class="ficha-id mono">8</span><p class="ficha-texto"><strong>Decisión <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#decision-6">#6</a>, compañía inactivada:</strong> ¿A denegar por evaluación dinámica, B cascada de escritura, o C sin efecto? <a href="#d4">Ver D4</a></p></article>
+        <article class="ficha" id="p-9"><span class="ficha-id mono">9</span><p class="ficha-texto"><strong>Alcance de esa regla:</strong> ¿aplica a la compañía de pertenencia, a la Principal propietaria del área, o a ambas? <a href="#d4">Ver D4</a></p></article>
+        <article class="ficha" id="p-10"><span class="ficha-id mono">10</span><p class="ficha-texto"><strong>Calendario del "día":</strong> ¿UTC, hora de Lima, o zona configurable? <a href="#d5">Ver D5</a></p></article>
+        <article class="ficha" id="p-11"><span class="ficha-id mono">11</span><p class="ficha-texto"><strong>Datos ya grabados</strong> si cambia el calendario: ¿se migran, se dejan como están, o se acepta el desfase histórico? <a href="#d5">Ver D5</a></p></article>
+        <article class="ficha" id="p-12"><span class="ficha-id mono">12</span><p class="ficha-texto"><strong>Cambio de TipoCompania:</strong> ¿prohibir con dependientes, permitir solo Contratista → Principal, permitir con cascada, o dejarlo libre? <a href="#d6">Ver D6</a></p></article>
+        <article class="ficha" id="p-13"><span class="ficha-id mono">13</span><p class="ficha-texto"><strong>T116:</strong> ¿A corregir en Etapa 1, B reabrir formalmente, o C trasladar a Etapa 2? <a href="#d7">Ver D7</a></p></article>
+        <article class="ficha" id="p-14"><span class="ficha-id mono">14</span><p class="ficha-texto"><strong><a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#cs-032">CS-032</a>:</strong> ¿trasladar a Etapa 2, especificar ahora, o retirar del alcance? <a href="#d8">Ver D8</a></p></article>
+        <article class="ficha" id="p-15"><span class="ficha-id mono">15</span><p class="ficha-texto"><strong>Decisión <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#decision-7">#7</a>:</strong> ¿la cierras ahora confirmando la prioridad de <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#us-9">Historia 9</a>, o permanece abierta? <a href="#d9">Ver D9</a></p></article>
+        <article class="ficha" id="p-16"><span class="ficha-id mono">16</span><p class="ficha-texto"><strong>Decisiones <a href="especificaciones-baseline.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#decision-1">#1</a> y #3:</strong> ¿confirmas que permanecen abiertas y no bloquean el baseline? <a href="#d9">Ver D9</a></p></article>
+      </div>
+      <p class="prose muted">Estas mismas preguntas, clasificadas por categoría y con su dependencia entre sí, están en la <a href="clasificacion-hallazgos-2026-09-16.html?volver=decisiones-etapa1-2026-09-16.html%23preguntas&desde=Preguntas%20que%20necesito%20que%20respondas#matriz">matriz de decisiones</a>.</p>
+    </section>
+
+    <footer class="foot">
+      Documento de sesión de decisiones, generado el 16/09/2026. No se ha modificado código, contratos, especificaciones ni tasks.md, y ninguna decisión de negocio se ha resuelto aquí. Con las respuestas se preparará el registro de decisiones y la lista de artefactos a actualizar. Documento local: los enlaces al gate, a las especificaciones y a la auditoría funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    // Solo se acepta un archivo local con ancla: nada de URLs arbitrarias.
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

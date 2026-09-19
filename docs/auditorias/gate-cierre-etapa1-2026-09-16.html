@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gate de cierre de Etapa 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+  /* .prose organiza bloques hermanos; en un parrafo, el grid convertiria cada <code>,
+     <strong> o enlace en una fila propia a todo el ancho. */
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  .index-sep { margin-top: 18px; }
+  .lista-num { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 78ch; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 78ch; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  .fichas { display: grid; border-top: 1px solid var(--border); }
+  .ficha { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px; }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 15px; font-weight: 600; color: var(--primary); }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts, .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Gate de cierre de Etapa 1 · auditoría consolidada</p>
+    <h1>¿Puede congelarse hoy esta implementación como baseline?</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>16/09/2026</b></span>
+      <span>Fuentes <b>Auditorías del 15/09 y 16/09, verificadas de nuevo en disco y en ejecución</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Secciones del gate">
+    <p>Fases</p>
+    <ol>
+      <li><a href="#veredicto"><span>0</span><span>Veredicto</span></a></li>
+      <li><a href="#fase-1"><span>1</span><span>Reconciliación</span></a></li>
+      <li><a href="#fase-2"><span>2</span><span>tasks.md</span></a></li>
+      <li><a href="#fase-3"><span>3</span><span>Seguridad F-01</span></a></li>
+      <li><a href="#fase-4"><span>4</span><span>Alcance histórico</span></a></li>
+      <li><a href="#fase-5"><span>5</span><span>RF-067 a 069</span></a></li>
+      <li><a href="#fase-6"><span>6</span><span>T116</span></a></li>
+      <li><a href="#fase-7"><span>7</span><span>T019</span></a></li>
+      <li><a href="#fase-8"><span>8</span><span>Contratos</span></a></li>
+      <li><a href="#fase-9"><span>9</span><span>Reglas temporales</span></a></li>
+      <li><a href="#fase-10"><span>10</span><span>Decisión #6</span></a></li>
+      <li><a href="#fase-11"><span>11</span><span>Despliegue</span></a></li>
+      <li><a href="#fase-12"><span>12</span><span>Pruebas</span></a></li>
+      <li><a href="#fase-13"><span>13</span><span>Clasificación</span></a></li>
+      <li><a href="#fase-14"><span>14</span><span>Plan de acción</span></a></li>
+    </ol>
+    <p class="index-sep">Documentos</p>
+    <ol>
+      <li><a href="decisiones-etapa1-2026-09-16.html"><span>→</span><span>Decisiones abiertas</span></a></li>
+      <li><a href="clasificacion-hallazgos-2026-09-16.html"><span>→</span><span>Clasificación y matriz</span></a></li>
+      <li><a href="especificaciones-baseline.html"><span>→</span><span>Especificaciones</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+      <li><a href="auditoria-cierre-2026-09-15.html"><span>→</span><span>Auditoría 15/09</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="veredicto">
+      <div class="section-head"><span class="letter">0</span><h2>Veredicto del gate</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">No congelable hoy</span>
+          <span class="muted">El dominio está probado; el perímetro de autorización no cumple el Principio I.</span>
+        </div>
+        <p class="prose"><strong>Método.</strong> Verificación en disco y en ejecución, sin apoyarme en los PDF. Comprobación previa: ningún archivo de código, prueba o especificación cambió desde el 15/09 a las 12:03, de modo que ambas auditorías describen el mismo árbol. No modifiqué código, <code>tasks.md</code> ni especificaciones, y no resolví ninguna decisión de negocio.</p>
+        <ol>
+          <li>Un usuario con alcance sobre <strong>una</strong> compañía descubrió <strong>34 compañías ajenas</strong> y <strong>12 usuarios</strong>, se concedió dos (204), <strong>modificó el alcance de otro usuario</strong> (204), creó un usuario con alcance ajeno (201) y, tras reautenticarse, leyó una compañía ajena y sus personas (200).</li>
+          <li>Con alcance solo sobre una Contratista, <strong>escribió</strong> una unidad organizativa de una Principal fuera de su alcance (201) y leyó contextos y estado efectivo ajenos.</li>
+          <li>La cascada persistió un histórico con <strong>fin anterior al inicio</strong> (<span class="mono">2026-10-16 → 2026-09-16</span>).</li>
+          <li><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23veredicto&desde=Veredicto%20del%20gate#rf-067">RF-067</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23veredicto&desde=Veredicto%20del%20gate#rf-068">RF-068</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23veredicto&desde=Veredicto%20del%20gate#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23veredicto&desde=Veredicto%20del%20gate#cs-032">CS-032</a> no existen en ninguna forma.</li>
+          <li>Dos tareas marcadas sin trabajo: T019 parcial y T116 ausente.</li>
+          <li>Ninguna prueba cubre esos defectos, pese a las 960 en verde.</li>
+        </ol>
+        <div class="runs" aria-label="Suites ejecutadas hoy">
+          <span>Unitarias <b>92/92</b></span>
+          <span>Contrato <b>242/242</b></span>
+          <span>Integración <b>485/485</b></span>
+          <span>Vitest <b>141/141</b></span>
+          <span>E2E <b>3/3</b></span>
+          <span>Modelo EF <b>sin cambios</b></span>
+        </div>
+      </div>
+      <p class="prose muted">La clasificación de cada hallazgo en categorías A a E, con lo que bloquea el baseline y lo que no, está en la <a href="clasificacion-hallazgos-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23veredicto&desde=Veredicto%20del%20gate#clasificacion">clasificación de hallazgos y matriz de decisiones</a>.</p>
+    </section>
+
+    <section id="fase-1">
+      <div class="section-head"><span class="letter">1</span><h2>Reconciliación de las dos auditorías</h2></div>
+      <p class="prose">Como no hubo cambios entre ambas fechas, <strong>ningún hallazgo del 15/09 fue corregido</strong>: todos persisten. El 16/09 los renombró, añadió evidencia de ejecución y detectó dos hallazgos nuevos.</p>
+      <div class="table-wrap">
+        <table class="coverage">
+          <thead><tr><th>ID 15/09</th><th>Hallazgo</th><th>Estado 16/09</th><th>Estado real hoy</th><th>Evidencia</th><th>Acción</th></tr></thead>
+          <tbody>
+            <tr><td class="id">D-1</td><td>Administración de usuarios sin alcance</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-01">F-01</a>, ampliado</td><td class="state"><span class="pill bad">Abierto y agravado</span></td><td>7 pasos reproducidos, incluido el PUT del alcance de otro usuario</td><td>Bloqueante</td></tr>
+            <tr><td class="id">D-2</td><td>Alcance en histórico de persona</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-02">F-02</a></td><td class="state"><span class="pill bad">Abierto</span></td><td>Escritura fuera de alcance reproducida (201)</td><td>Bloqueante</td></tr>
+            <tr><td class="id">D-3</td><td><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#cs-032">CS-032</a> ausentes</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-03">F-03</a></td><td class="state"><span class="pill bad">Abierto</span></td><td>Sin contrato ni código; 2 menciones en tasks.md solo para excluirlos</td><td>Etapa 2</td></tr>
+            <tr><td class="id">D-4</td><td>Compañía o UO INACTIVA no bloquean</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-05">F-05</a></td><td class="state"><span class="pill warn">Abierto</span></td><td><code>people.yaml:172</code> y <code>:363</code> declaran 409; el servicio no comprueba estado</td><td>Corrección</td></tr>
+            <tr><td class="id">D-5</td><td>T116 sin trabajo</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-04">F-04</a></td><td class="state"><span class="pill bad">Abierto</span></td><td>Sin selector de Principal, sin árbol, sin creación de contexto</td><td>Decisión de alcance</td></tr>
+            <tr><td class="id">D-6</td><td>Pertenencia vencida marcada FINALIZADA</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-22">F-22</a></td><td class="state"><span class="pill neutral">Abierto</span></td><td><code>HistorialPersonaService.cs:79-85</code></td><td>Corrección menor</td></tr>
+            <tr><td class="id">D-7</td><td>Finalizar sin confirmación</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-10">F-10</a></td><td class="state"><span class="pill warn">Abierto</span></td><td><code>PersonaHistorialPage.tsx:124-136</code></td><td>Corrección</td></tr>
+            <tr><td class="id">D-8</td><td>T019 clúster incompleto</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-06">F-06</a></td><td class="state"><span class="pill warn">Abierto</span></td><td>1 uso de la convención; 1 índice en el snapshot, de 6</td><td>Corrección</td></tr>
+            <tr><td class="id">D-9</td><td>Perfiles duplicados solapados</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-14">F-14</a></td><td class="state"><span class="pill neutral">Abierto</span></td><td><code>EstadoEfectivoService.cs:100</code></td><td>Corrección menor</td></tr>
+            <tr><td class="id">D-10</td><td>Fechas de relación sin normalizar</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-21">F-21</a></td><td class="state"><span class="pill neutral">Abierto</span></td><td><code>RelacionContratistaPrincipalService.cs:65</code></td><td>Documental</td></tr>
+            <tr><td class="id">R-15</td><td>Filtro global de alcance ausente</td><td>Riesgo alto</td><td class="state"><span class="pill bad">Abierto</span></td><td>Sin <code>HasQueryFilter</code>; research §3 lo prescribe</td><td>Causa raíz de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-01">F-01</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-02">F-02</a></td></tr>
+            <tr><td class="id">R-15</td><td>Contraseña pendiente y JWT no revocable</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-07">F-07</a></td><td class="state"><span class="pill warn">Abierto</span></td><td>Guard solo en el cliente</td><td>Decisión y corrección</td></tr>
+            <tr><td class="id">R-15</td><td>Día normalizado en UTC y desfase en la UI</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-08">F-08</a></td><td class="state"><span class="pill warn">Abierto</span></td><td><code>Vigencia.cs:19-34</code></td><td>Decisión y corrección</td></tr>
+            <tr><td class="id">R-15</td><td>TipoCompania reclasificable</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-09">F-09</a></td><td class="state"><span class="pill warn">Abierto</span></td><td><code>CompaniaService.cs:95-115</code></td><td>Decisión</td></tr>
+            <tr><td class="id">R-15</td><td>Intervalos invertidos</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-12">F-12</a></td><td class="state"><span class="pill warn">Abierto, ahora reproducido</span></td><td>Contexto quedó 2026-10-16 → 2026-09-16</td><td>Corrección</td></tr>
+            <tr><td class="id">R-15</td><td>Sujeto de permiso sin validar</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-13">F-13</a></td><td class="state"><span class="pill neutral">Abierto</span></td><td><code>PermisoAccesoService.cs:258-295</code></td><td>Riesgo aceptable</td></tr>
+            <tr><td class="id">R-15</td><td>401 sin notificar, UUID en UI, personas sin histórico</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-15">F-15</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-16">F-16</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-17">F-17</a></td><td class="state"><span class="pill neutral">Abiertos</span></td><td>Código verificado</td><td>Menores</td></tr>
+            <tr><td class="id">DOC-15</td><td>Rutas de tasks.md, research, contratos, data-model, ux-ui</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-18">F-18</a> a <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-21">F-21</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-23">F-23</a></td><td class="state"><span class="pill neutral">Abiertos</span></td><td>Verificados hoy</td><td>Documental</td></tr>
+            <tr><td class="id">—</td><td><em>Nuevo el 16/09:</em> vocabulario de códigos sin declarar</td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-1&desde=Reconciliaci%C3%B3n%20de%20las%20dos%20auditor%C3%ADas#f-11">F-11</a></td><td class="state"><span class="pill warn">Abierto</span></td><td>26 de 29 códigos no aparecen en los contratos</td><td>Documental</td></tr>
+            <tr><td class="id">—</td><td><em>Nuevo el 16/09:</em> paridad de rutas contrato ↔ código</td><td>—</td><td class="state"><span class="pill ok">Correcto</span></td><td>45 = 45, conjuntos idénticos</td><td>Sin acción</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fase-2">
+      <div class="section-head"><span class="letter">2</span><h2>Verificación de tasks.md</h2></div>
+      <p class="prose"><strong>Integridad estructural:</strong> 168 entradas, T001 a T168, orden estrictamente ascendente, 0 duplicados, 0 huecos, 0 sin marcar. No se ha tocado desde el 15/09 a las 12:03.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tarea</th><th>Exige</th><th>Realidad verificada</th><th>Clase</th></tr></thead>
+          <tbody>
+            <tr><td class="id">T006</td><td><code>.eslintrc.cjs</code> y <code>.prettierrc</code></td><td>No existe <code>.eslintrc.cjs</code>; existen <code>eslint.config.js</code> (flat config) y <code>.prettierrc</code>, funcionando</td><td class="state"><span class="pill ok">C</span></td></tr>
+            <tr><td class="id">T019</td><td>Clúster por CreatedAt en <strong>6</strong> entidades</td><td>Aplicado solo a HistorialContraseña</td><td class="state"><span class="pill bad">D/B</span></td></tr>
+            <tr><td class="id">T020</td><td>rowversion en 6 entidades y 409</td><td>11 propiedades configuradas y traducción a 409 en el middleware</td><td class="state"><span class="pill ok">A</span> <span class="pill neutral">ruta C</span></td></tr>
+            <tr><td class="id">T103</td><td>ContextoOperativoPersonaPrincipal y trigger</td><td><code>AsociacionesPersona.cs:64</code> con trigger particionado</td><td class="state"><span class="pill ok">C</span></td></tr>
+            <tr><td class="id">T104</td><td>AsignacionPersonaUnidadOrganizativa y trigger</td><td><code>AsociacionesPersona.cs:79</code>, trigger por contexto</td><td class="state"><span class="pill ok">C</span></td></tr>
+            <tr><td class="id">T105</td><td>AsignacionCredencial y trigger ASIGNADO</td><td><code>AsociacionesPersona.cs:99</code>, trigger filtrado</td><td class="state"><span class="pill ok">C</span></td></tr>
+            <tr><td class="id">T106</td><td>AsignacionTipoPersona</td><td><code>AsociacionesPersona.cs:151</code></td><td class="state"><span class="pill ok">C</span></td></tr>
+            <tr><td class="id">T116</td><td>Pantalla con Caso A y Caso B</td><td>No existe (ver fase 6)</td><td class="state"><span class="pill bad">D</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose muted">Leyenda: A existe y validado · B existe pero incompleto · C consolidado, ruta obsoleta · D marcada sin implementación · E depende de decisión abierta. No marqué ni desmarqué nada.</p>
+    </section>
+
+    <section id="fase-3">
+      <div class="section-head"><span class="letter">3</span><h2>Seguridad: <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-3&desde=Seguridad%3A%20F-01%20reproducido#f-01">F-01</a> reproducido</h2></div>
+      <p class="prose">Ejecutado hoy en el entorno temporal, con un usuario de una sola compañía. Alcances restaurados al finalizar.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Paso</th><th>Operación</th><th>Resultado</th></tr></thead>
+          <tbody>
+            <tr><td class="id">1</td><td><code>GET /api/usuarios</code></td><td><strong>200</strong> — descubre 12 usuarios y 34 compañías ajenas, con sus correos</td></tr>
+            <tr><td class="id">2</td><td><code>GET /api/companias/{ajena}</code> antes</td><td><strong>404</strong></td></tr>
+            <tr><td class="id">3</td><td>PUT de su <strong>propio</strong> alcance con 2 compañías ajenas</td><td><strong>204</strong></td></tr>
+            <tr><td class="id">4</td><td>PUT del alcance <strong>de otro usuario</strong></td><td><strong>204</strong></td></tr>
+            <tr><td class="id">5</td><td>POST crear usuario con alcance ajeno</td><td><strong>201</strong></td></tr>
+            <tr><td class="id">6</td><td>PUT actualizar y POST desbloquear a otro usuario</td><td><strong>200 / 204</strong></td></tr>
+            <tr><td class="id">7</td><td>Re-login y <code>GET</code> de la compañía ajena</td><td><strong>200</strong>, con nombre y personas visibles</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Defecto técnico puro</h3>
+          <p>Corregible sin decisión, porque <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-3&desde=Seguridad%3A%20F-01%20reproducido#rf-005">RF-005</a> y el Principio I ya lo exigen: el listado de usuarios no filtra nada y expone correos y alcances de todos. <code>UsuarioService</code> no inyecta <code>IAlcanceCompaniaAccessor</code>.</p>
+        </div>
+        <div class="panel">
+          <h3>Requiere decisión de negocio</h3>
+          <p>Quién puede administrar usuarios y qué compañías puede conceder. El spec <strong>no define roles</strong>: limitar a "solo mi alcance" o crear un administrador global son reglas nuevas. Sin esa decisión tampoco hay forma correcta de dar de alta al primer administrador.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="fase-4">
+      <div class="section-head"><span class="letter">4</span><h2>Alcance en el histórico: <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#f-02">F-02</a> reproducido</h2></div>
+      <p class="prose">Usuario con alcance <strong>solo sobre la Contratista</strong>, operando sobre una persona suya que tiene contexto con una Principal ajena.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Operación</th><th>Resultado</th><th>Debería</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/companias/{PrincipalX}</code></td><td class="state"><span class="pill ok">404 correcto</span></td><td>404</td></tr>
+            <tr><td><code>GET .../contextos-operativos</code></td><td class="state"><span class="pill bad">200</span> expone 1 contexto ajeno</td><td>filtrar (<a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#rf-060">RF-060</a>)</td></tr>
+            <tr><td><code>GET .../estado-efectivo</code></td><td class="state"><span class="pill bad">200</span> expone el contexto vigente</td><td>filtrar</td></tr>
+            <tr><td><code>POST .../contextos/{id}/unidad-organizativa</code></td><td class="state"><span class="pill bad">201 escribe</span> una UO ajena</td><td>404 (<a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#rf-049">RF-049</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#rf-055">RF-055</a>)</td></tr>
+            <tr><td><code>GET .../credenciales</code></td><td class="state"><span class="pill bad">200</span> sin filtro por Principal</td><td>filtrar</td></tr>
+            <tr><td><code>POST .../finalizar</code> y <code>/renovar</code></td><td class="state"><span class="pill bad">Sin validar</span> la compañía de la pertenencia</td><td>exigir alcance sobre ella</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose"><strong>Patrón exacto:</strong> estos servicios llaman a <code>ExigirAlcanceHistoricoAsync(personaId)</code>, que responde a "¿esta persona toca alguna compañía de mi alcance?", no a "¿tengo alcance sobre la Principal que estoy tocando?". Por contraste, áreas, unidades, compañías y permisos sí validan la compañía concreta vía <code>CompaniaService.ObtenerEnAlcanceAsync</code>. Corrección técnica: <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#rf-049">RF-049</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-4&desde=Alcance%20en%20el%20hist%C3%B3rico%3A%20F-02%20reproducido#rf-060">RF-060</a> ya fijan la regla.</p>
+    </section>
+
+    <section id="fase-5">
+      <div class="section-head"><span class="letter">5</span><h2><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-5&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-067">RF-067</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-5&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-068">RF-068</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-5&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-5&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#cs-032">CS-032</a></h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Criterio</th><th>Resultado</th></tr></thead>
+          <tbody>
+            <tr><td>Definición funcional</td><td><strong>Parcial.</strong> Dicen qué exponer y con qué filtros, y remiten el detalle a ux-ui §8, §20 y §21. No definen forma de endpoint, paginación, límites de rango ni modelo de evento</td></tr>
+            <tr><td>Contrato</td><td><strong>No.</strong> Ningún YAML los cubre</td></tr>
+            <tr><td>Tareas</td><td><strong>No.</strong> 2 menciones en tasks.md, ambas para excluirlos</td></tr>
+            <tr><td>Código</td><td><strong>No</strong></td></tr>
+            <tr><td>UI</td><td><strong>No.</strong> El menú muestra Dashboard como pantalla pendiente</td></tr>
+            <tr><td>Pruebas</td><td><strong>No</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose"><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-5&desde=RF-067%2C%20RF-068%2C%20RF-069%20y%20CS-032#cs-032">CS-032</a> depende por completo de ellos. Clasificación: <strong>requiere especificación o decisión antes de implementación</strong>. Pertenecen formalmente a Etapa 1 por estar en el spec, pero no son implementables sin diseñar contrato y pantallas. No inventé endpoints ni ejecuté generadores de plan o tareas.</p>
+    </section>
+
+    <section id="fase-6">
+      <div class="section-head"><span class="letter">6</span><h2>T116</h2></div>
+      <p class="prose"><strong>Exige:</strong> pantalla de asignación de UO con Caso A (Principal fijada automáticamente) y Caso B (selector limitado a relaciones vigentes de la Contratista).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Elemento</th><th>Realidad</th></tr></thead>
+          <tbody>
+            <tr><td>Caso A</td><td>No existe como flujo: el componente parte de un contexto ya creado</td></tr>
+            <tr><td>Caso B</td><td>No existe: ninguna pantalla de personas ofrece selector de Principal</td></tr>
+            <tr><td>Crear pertenencia</td><td>Hook definido, <strong>ninguna pantalla lo usa</strong></td></tr>
+            <tr><td>Abrir contexto</td><td>Hook definido, <strong>sin uso</strong></td></tr>
+            <tr><td>Asignar perfil</td><td><strong>No existe</strong> ni API ni pantalla en el frontend</td></tr>
+            <tr><td>Selección jerárquica de UO</td><td><code>&lt;select&gt;</code> plano; el árbol no se usa en personas (<a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-6&desde=T116#cs-021">CS-021</a> incumplido)</td></tr>
+            <tr><td>Flujo completo desde UI</td><td><strong>Imposible</strong>: <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-6&desde=T116#us-5">Historia 5</a> solo es operable por API</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose"><strong>Opciones, sin decidir:</strong> <strong>A</strong> corregir dentro de Etapa 1, <strong>B</strong> reabrir formalmente dejando constancia del error de marcado, <strong>C</strong> trasladar a Etapa 2. Recomendación técnica: <strong>B seguido de A</strong>, porque <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-6&desde=T116#us-5">Historia 5</a> es P1 y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-6&desde=T116#cs-021">CS-021</a> es criterio de éxito de esta etapa; dejarlo en C convierte un criterio de Etapa 1 en deuda silenciosa. La decisión es de negocio.</p>
+    </section>
+
+    <section id="fase-7">
+      <div class="section-head"><span class="letter">7</span><h2>T019</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entidad de histórico (research §20)</th><th>PK no-clúster + clúster por CreatedAt</th></tr></thead>
+          <tbody>
+            <tr><td>HistorialContraseña</td><td class="state"><span class="pill ok">Sí</span></td></tr>
+            <tr><td>AsignaciónPersonaCompañía</td><td class="state"><span class="pill bad">No</span></td></tr>
+            <tr><td>ContextoOperativoPersonaPrincipal</td><td class="state"><span class="pill bad">No</span></td></tr>
+            <tr><td>AsignaciónPersonaUnidadOrganizativa</td><td class="state"><span class="pill bad">No</span></td></tr>
+            <tr><td>AsignaciónCredencial</td><td class="state"><span class="pill bad">No</span></td></tr>
+            <tr><td>RelaciónContratistaPrincipal</td><td class="state"><span class="pill bad">No</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose"><strong>Efecto en rendimiento:</strong> no medible hoy — <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-7&desde=T019#cs-002">CS-002</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-7&desde=T019#cs-003">CS-003</a> pasan con holgura, 45 ms y 13 ms p95 — porque el volumen es de una corrida, no de años de inserciones. El riesgo que research describe (fragmentación y page splits con PK GUID) es acumulativo. T019 está realmente incompleta; la corrección es técnica y su migración sería aditiva.</p>
+    </section>
+
+    <section id="fase-8">
+      <div class="section-head"><span class="letter">8</span><h2>Contratos frente a código</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Aspecto</th><th>Resultado</th></tr></thead>
+          <tbody>
+            <tr><td>Rutas</td><td class="state"><span class="pill ok">45 = 45</span> conjuntos idénticos, sin endpoints adelantados ni declarados sin implementar</td></tr>
+            <tr><td>Enums y esquemas</td><td>Verificados por las 242 pruebas de contrato y el snapshot de OpenAPI</td></tr>
+            <tr><td><code>credentials.yaml</code> (<a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-8&desde=Contratos%20frente%20a%20c%C3%B3digo#f-11">F-11</a>)</td><td>Declara 200, 201, 400, 409 y 204. El controlador expone además <strong>404 en las 4 operaciones</strong> y <strong>409 en DELETE</strong>: el contrato sub-declara</td></tr>
+            <tr><td><code>people.yaml</code> (<a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-8&desde=Contratos%20frente%20a%20c%C3%B3digo#f-05">F-05</a>)</td><td>Declara <strong>409</strong> por compañía INACTIVA y por unidad INACTIVA. El código responde <strong>201</strong>: contradicción real</td></tr>
+            <tr><td><code>access-evaluation.yaml</code></td><td>Declara 3 motivos que la API nunca devuelve, porque esos casos son 404</td></tr>
+            <tr><td>CREDENCIAL_REVOCADA</td><td><strong>No existe en contrato ni código</strong>, y no debe existir: el spec resolvió un motivo único. Solo sobrevive en ux-ui §16 y §19 como ejemplo desactualizado</td></tr>
+            <tr><td>Vocabulario de códigos</td><td><strong>26 de 29</strong> códigos emitidos no están nombrados en ningún contrato, y el frontend depende de varios</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fase-9">
+      <div class="section-head"><span class="letter">9</span><h2>Reglas temporales</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Regla</th><th>Veredicto</th></tr></thead>
+          <tbody>
+            <tr><td><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#rf-071">RF-071</a> fechas obligatorias</td><td class="state"><span class="pill ok">Correcta</span> rechazo 400 probado en las 6 entidades</td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#rf-072">RF-072</a> contención</td><td class="state"><span class="pill ok">Correcta</span> desigualdades no estrictas, con los 4 casos de <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#cs-034">CS-034</a></td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#rf-073">RF-073</a> renovación</td><td class="state"><span class="pill ok">Correcta</span> exige ACTIVA y vigencia dinámica; 11 pruebas</td></tr>
+            <tr><td>No-solapamiento</td><td class="state"><span class="pill ok">Correcto</span> 5 triggers con particiones distintas</td></tr>
+            <tr><td>Límites inclusivos</td><td class="state"><span class="pill ok">Correctos</span> credencial inclusiva en el fin; el resto exclusivo</td></tr>
+            <tr><td>Cascadas</td><td class="state"><span class="pill ok">Correctas</span> alcance, motivo, origen y fecha futura</td></tr>
+            <tr><td>Pertenencia vencida (<a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#f-22">F-22</a>)</td><td class="state"><span class="pill neutral">Contradicción</span> data-model dice que no se modifica; el código la marca FINALIZADA</td></tr>
+            <tr><td>Intervalos invertidos (<a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#f-12">F-12</a>)</td><td class="state"><span class="pill warn">Defecto real</span> reproducido hoy; sin CHECK que lo impida. Inerte para el acceso, corrompe el histórico que <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#rf-063">RF-063</a> manda preservar</td></tr>
+            <tr><td>Zona horaria (<a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-9&desde=Reglas%20temporales#f-08">F-08</a>)</td><td class="state"><span class="pill warn">Ambigüedad + defecto</span> el spec no dice en qué calendario; el código usa el día UTC. La UI, además, muestra el inicio un día antes. <strong>No resuelvo la zona horaria</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fase-10">
+      <div class="section-head"><span class="letter">10</span><h2>Decisión <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-10&desde=Decisi%C3%B3n%20%236%3A%20expediente%20t%C3%A9cnico#decision-6">#6</a>: expediente técnico</h2></div>
+      <div class="prose">
+        <ul class="tight">
+          <li><strong>spec.md, literal:</strong> "ambos permanecen protegidos únicamente por la re-validación dinámica de la evaluación de acceso (<a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-10&desde=Decisi%C3%B3n%20%236%3A%20expediente%20t%C3%A9cnico#rf-059">RF-059</a>/<a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-10&desde=Decisi%C3%B3n%20%236%3A%20expediente%20t%C3%A9cnico#rf-065">RF-065</a>), sin cascada de escritura equivalente a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-10&desde=Decisi%C3%B3n%20%236%3A%20expediente%20t%C3%A9cnico#rf-061">RF-061</a>".</li>
+          <li><strong>research.md §14.5:</strong> repite que la re-validación dinámica "cubre ambos casos como red de seguridad mínima (deniega acceso correctamente)".</li>
+          <li><strong>Código:</strong> el motor solo lee <code>Area.Estado</code> y <code>Permiso.Estado</code>. <strong>Nunca consulta <code>Compania.Estado</code></strong>, pese a que <code>DatosDeEvaluacion</code> ya transporta la entidad completa. La afirmación de ambos documentos es falsa para la compañía inactivada.</li>
+          <li><strong>Escenarios posibles hoy:</strong> inactivar una Contratista o una Principal no deniega nada; su personal conserva acceso mientras pertenencia, contexto, credencial y permisos sigan vigentes por fechas. Para la relación Contratista-Principal la afirmación sí se cumple, porque el paso 5 comprueba su vigencia.</li>
+          <li><strong>Qué debe decidir negocio:</strong> si inactivar una compañía debe (a) denegar por revalidación dinámica, (b) disparar cascada de escritura como <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-10&desde=Decisi%C3%B3n%20%236%3A%20expediente%20t%C3%A9cnico#rf-061">RF-061</a>, o (c) no afectar a accesos ya concedidos. <strong>No la resuelvo.</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="fase-11">
+      <div class="section-head"><span class="letter">11</span><h2>Despliegue</h2></div>
+      <p class="prose">Verificado hoy de extremo a extremo: el arranque del E2E levantó compose, aplicó las 12 migraciones, esperó <code>/health/ready</code> y sembró datos; después los 3 escenarios pasaron.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Elemento</th><th>Estado</th></tr></thead>
+          <tbody>
+            <tr><td>Compose de producción</td><td class="state"><span class="pill ok">Correcto</span> sin secretos rechaza el arranque, probado con 3 variables obligatorias</td></tr>
+            <tr><td>Migraciones</td><td class="state"><span class="pill ok">Reproducibles</span> la API no migra al arrancar, por decisión explícita</td></tr>
+            <tr><td>Health checks</td><td class="state"><span class="pill ok">Operativos</span></td></tr>
+            <tr><td>Frontend</td><td class="state"><span class="pill warn">Parcial</span> compila a estáticos, sin Dockerfile ni proxy de referencia</td></tr>
+            <tr><td>Secretos</td><td class="state"><span class="pill ok">Correctos</span> sin secretos reales versionados</td></tr>
+            <tr><td>README</td><td class="state"><span class="pill ok">Fiel</span> describe implementado, pendiente y limitaciones</td></tr>
+            <tr><td>Primer administrador</td><td class="state"><span class="pill bad">No existe</span> base migrada = 0 usuarios y todos los endpoints exigen sesión</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose"><strong>Falta para un despliegue reproducible desde cero:</strong> el alta del primer administrador, bloqueada por la decisión de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-11&desde=Despliegue#f-01">F-01</a>, y una configuración de proxy inverso de referencia. No invento ningún mecanismo.</p>
+    </section>
+
+    <section id="fase-12">
+      <div class="section-head"><span class="letter">12</span><h2>Pruebas</h2></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Ejecutadas hoy</h3>
+          <ul class="tight">
+            <li><code>dotnet build</code>: 0 errores, 0 advertencias.</li>
+            <li>Unitarias 92/92 · contrato 242/242 · integración 485/485.</li>
+            <li><code>has-pending-model-changes</code>: sin cambios.</li>
+            <li>Vitest 141/141 · tsc, eslint, prettier y build limpios.</li>
+            <li>E2E 3/3 con entorno reconstruido desde cero.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Pruebas ausentes, verificadas por búsqueda</h3>
+          <p>Ninguna existe para: <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-01">F-01</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-02">F-02</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-05">F-05</a> en sus dos casos, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-07">F-07</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-08">F-08</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-10">F-10</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-13">F-13</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#f-14">F-14</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#rf-069">RF-069</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#cs-001">CS-001</a>, <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#cs-021">CS-021</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-12&desde=Pruebas#cs-032">CS-032</a>.</p>
+          <p class="muted">Las suites verdes no cubren ninguno de los defectos abiertos: son verdes sobre el comportamiento que sí está especificado e implementado.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="fase-13">
+      <div class="section-head"><span class="letter">13</span><h2>Clasificación final</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Categoría</th><th>Hallazgos</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill bad">Bloqueante técnico</span></td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-02">F-02</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-05">F-05</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-12">F-12</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-06">F-06</a> (T019) · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-10">F-10</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-14">F-14</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-22">F-22</a> · la parte de UI de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-08">F-08</a> · la parte de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-01">F-01</a> que consiste en dejar de exponer usuarios, correos y alcances ajenos</td></tr>
+            <tr><td><span class="pill bad">Bloqueante de negocio</span></td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-01">F-01</a> en su parte de fondo: modelo de administración y concesión de alcance · alta del primer administrador · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-07">F-07</a> · la parte de calendario de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-08">F-08</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-09">F-09</a> · decisión <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#decision-6">#6</a> · decisiones <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#decision-1">#1</a>, #3 y #7, que siguen abiertas</td></tr>
+            <tr><td><span class="pill warn">Etapa 2</span></td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-03">F-03</a>: <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#cs-032">CS-032</a> · pantallas transversales de ux-ui §8, §20 y §21 · T116 y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#cs-021">CS-021</a> solo si negocio elige la opción C</td></tr>
+            <tr><td><span class="pill neutral">Documental</span></td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-11">F-11</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-18">F-18</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-19">F-19</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-20">F-20</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-21">F-21</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-23">F-23</a></td></tr>
+            <tr><td><span class="pill neutral">Riesgo aceptable</span></td><td><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-13">F-13</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-15">F-15</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-16">F-16</a> · <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-13&desde=Clasificaci%C3%B3n%20final#f-17">F-17</a> · ventana de 60 minutos del JWT · efecto del E2E sobre el entorno de desarrollo</td></tr>
+            <tr><td><span class="pill ok">Falso positivo</span></td><td>Ninguno entre los hallazgos publicados. Durante esta auditoría descarté una señal propia: un conteo automático sugirió que las áreas y las unidades no aplicaban alcance; la inspección mostró que lo delegan correctamente</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fase-14">
+      <div class="section-head"><span class="letter">14</span><h2>Plan de acción</h2></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Corregible sin decisiones</h3>
+          <p><a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-02">F-02</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-05">F-05</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-06">F-06</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-10">F-10</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-12">F-12</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-14">F-14</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-22">F-22</a>, la visualización de fechas y la parte de <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-01">F-01</a> que solo consiste en dejar de exponer datos ajenos. Todo con pruebas, que hoy no existen.</p>
+        </div>
+        <div class="panel">
+          <h3>Requiere decisión de negocio</h3>
+          <p>Modelo de administración de usuarios y alcance; primer administrador; decisión <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#decision-6">#6</a>; zona horaria del día; reclasificación de compañía; aplicación de la contraseña pendiente; y las decisiones <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#decision-1">#1</a>, #3 y #7 ya abiertas.</p>
+        </div>
+        <div class="panel">
+          <h3>Pasa a Etapa 2</h3>
+          <p><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#cs-032">CS-032</a> con especificación previa; las pantallas transversales de ux-ui; y T116 con <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#cs-021">CS-021</a> solo si negocio lo decide así.</p>
+        </div>
+        <div class="panel">
+          <h3>Qué necesita especificación</h3>
+          <p><a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-067">RF-067</a>: forma del endpoint, filtros, paginación y si bastan las columnas de auditoría o hace falta tabla de eventos. <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-068">RF-068</a>: eventos incluidos y su forma. <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-069">RF-069</a>: lista cerrada de indicadores y umbral de "próximo a vencer". <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#cs-032">CS-032</a>: cómo se prueba el respeto del alcance en vistas agregadas.</p>
+        </div>
+      </div>
+      <h3>Documentos a actualizar</h3>
+      <ul class="tight">
+        <li><code>spec.md</code>: nota sobre la decisión <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#decision-6">#6</a> y sobre <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-069">RF-069</a>.</li>
+        <li><code>research.md</code>: §3 (filtro global no implementado), §7 y §8.</li>
+        <li><code>data-model.md</code>: cierre de pertenencia vencida y relación sin normalizar.</li>
+        <li><code>contracts/</code>: <code>credentials.yaml</code>, <code>people.yaml</code> y <code>access-evaluation.yaml</code>, con el vocabulario de códigos.</li>
+        <li><code>ux-ui.md</code>: CREDENCIAL_REVOCADA y el motivo en credenciales.</li>
+        <li><code>tasks.md</code>: rutas obsoletas y estado real de T019 y T116.</li>
+        <li><code>README.md</code>: advertir que el PUT de alcance hoy no tiene restricción.</li>
+      </ul>
+      <h3>Secuencia hasta una línea base estable</h3>
+      <ol class="lista-num">
+        <li><strong>Sesión de decisiones de negocio</strong>, sin código: modelo de administración y alcance, primer administrador, decisión <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#decision-6">#6</a>, zona horaria, reclasificación de compañía, y destino de T116 y <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#rf-069">RF-069</a>.</li>
+        <li><strong>Corrección del perímetro</strong>: <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-01">F-01</a> según lo decidido y <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-02">F-02</a> completo, cada uno con pruebas de integración.</li>
+        <li><strong>Correcciones técnicas sin decisión</strong>: <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-05">F-05</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-12">F-12</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-22">F-22</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-14">F-14</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-06">F-06</a>, <a href="auditoria-final-cierre-2026-09-16.html?volver=gate-cierre-etapa1-2026-09-16.html%23fase-14&desde=Plan%20de%20acci%C3%B3n#f-10">F-10</a> y la visualización de fechas.</li>
+        <li><strong>Sincronizar la documentación</strong> con el estado real, incluido el de T019 y T116 en tasks.md.</li>
+        <li><strong>Regresión completa</strong> más las pruebas nuevas, y repetir el gate sobre esos puntos.</li>
+        <li><strong>Congelar la línea base</strong> y solo entonces abrir la Etapa 2.</li>
+      </ol>
+    </section>
+
+    <footer class="foot">
+      Gate de cierre ejecutado el 16/09/2026 sobre el estado en disco, con reproducción en un entorno temporal aislado y restauración posterior. No se modificó código, especificación ni tasks.md, y no se resolvió ninguna decisión de negocio. La Decisión A sobre credenciales se verificó de nuevo y permanece congelada. Documento local: los enlaces a especificaciones y a las auditorías previas funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    // Solo se acepta un archivo local con ancla: nada de URLs arbitrarias.
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Especificaciones de Control de Acceso Empresarial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+  /* .prose organiza bloques hermanos; en un parrafo, el grid convertiria cada <code>,
+     <strong> o enlace en una fila propia a todo el ancho. */
+  p.prose { display: block; }
+</style>
+
+<style>
+  .filtro-barra { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .filtro-barra input {
+    flex: 1 1 260px; min-width: 0; padding: 9px 12px; font: inherit; font-size: 14px;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 5px;
+  }
+  .filtro-barra input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .filtro-conteo { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fichas { display: grid; gap: 0; border-top: 1px solid var(--border); }
+  .ficha {
+    display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 18px;
+    padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px;
+  }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 13px; font-weight: 600; color: var(--primary); padding-top: 1px; }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  .ficha del { color: var(--muted); }
+  .us { display: grid; gap: 10px; padding-block: 18px; border-bottom: 1px solid var(--border); scroll-margin-top: 20px; }
+  .us:target { background: var(--info-soft); border-radius: 4px; padding-inline: 12px; }
+  .us-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+  .us-cab .mono { color: var(--primary); font-weight: 600; font-size: 13px; }
+  .us-cab h3 { font-size: 16px; }
+  .us-resumen { max-width: 78ch; font-size: 14px; }
+  .us ol { margin: 0; padding-left: 20px; display: grid; gap: 5px; max-width: 78ch; font-size: 13.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+    padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface); color: var(--ink);
+  }
+  .lista-simple { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 78ch; font-size: 14px; }
+  .marca-hallazgo {
+    display: inline-block; font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+    color: var(--danger); background: var(--danger-soft);
+    padding: 1px 5px; border-radius: 3px; text-decoration: none; vertical-align: 1px;
+  }
+  .marca-hallazgo:hover { text-decoration: underline; }
+  .cats { display: inline-flex; gap: 3px; text-decoration: none; }
+  .cat { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+    border-radius: 5px; font-size: 11.5px; font-weight: 700; padding: 0 5px; }
+  .cat-a { background: var(--danger-soft); color: var(--danger); }
+  .cat-b { background: var(--success-soft); color: var(--success); }
+  .cat-c { background: var(--info-soft); color: var(--primary); }
+  .cat-d { background: var(--warning-soft); color: var(--warning); }
+  .cat-e { background: var(--neutral-soft); color: var(--neutral); }
+  .table-wrap a { white-space: nowrap; }
+  .ficha-afectada .ficha-id { color: var(--ink); }
+  .leyenda {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 18px 22px; display: grid; gap: 12px;
+  }
+  .leyenda h2 { font-size: 16px; font-weight: 650; }
+  .leyenda-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 24px; font-size: 13.5px; }
+  .leyenda-items p { display: flex; gap: 8px; align-items: baseline; }
+  @media (max-width: 620px) {
+    .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  }
+  @media print { .filtro-barra { display: none; } }
+</style>
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  .index-sep { margin-top: 18px; }
+  .lista-num { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 78ch; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 78ch; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  .fichas { display: grid; border-top: 1px solid var(--border); }
+  .ficha { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px; }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 15px; font-weight: 600; color: var(--primary); }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts, .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Catálogo de especificación · uso local</p>
+    <h1>Especificaciones de Control de Acceso Empresarial</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Generado <b>16/09/2026</b></span>
+      <span>Fuente <b>spec.md, contracts/ y enums del dominio</b></span>
+      <span><b class="mono">73</b> RF · <b class="mono">35</b> CS · <b class="mono">10</b> historias · <b class="mono">22</b> entidades</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Secciones">
+    <p>Índice</p>
+    <ol>
+      <li><a href="#historias"><span>US</span><span>Historias de usuario</span></a></li>
+      <li><a href="#requisitos"><span>RF</span><span>Requisitos funcionales</span></a></li>
+      <li><a href="#criterios"><span>CS</span><span>Criterios de éxito</span></a></li>
+      <li><a href="#reglas"><span>RN</span><span>Reglas transversales</span></a></li>
+      <li><a href="#entidades"><span>EN</span><span>Entidades</span></a></li>
+      <li><a href="#enums"><span>EV</span><span>Estados y enumerados</span></a></li>
+      <li><a href="#codigos"><span>EC</span><span>Códigos de error</span></a></li>
+      <li><a href="#contratos"><span>API</span><span>Contratos y rutas</span></a></li>
+      <li><a href="#decisiones"><span>DP</span><span>Decisiones</span></a></li>
+      <li><a href="#sesiones"><span>CL</span><span>Clarificaciones</span></a></li>
+      <li><a href="#supuestos"><span>SU</span><span>Supuestos</span></a></li>
+      <li><a href="#hallazgos"><span>HA</span><span>Hallazgos abiertos</span></a></li>
+      <li><a href="#preguntas"><span>PD</span><span>Preguntas de negocio</span></a></li>
+      <li><a href="gate-cierre-etapa1-2026-09-16.html"><span>→</span><span>Gate de cierre</span></a></li>
+      <li><a href="decisiones-etapa1-2026-09-16.html"><span>→</span><span>Decisiones abiertas</span></a></li>
+      <li><a href="clasificacion-hallazgos-2026-09-16.html"><span>→</span><span>Clasificación y matriz</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="leyenda">
+      <div class="leyenda">
+        <h2>Cómo leer este catálogo</h2>
+        <p class="prose muted">Todo el contenido se extrae de <code>spec.md</code>, <code>contracts/</code> y los enumerados del dominio: es el estado especificado, no el implementado. Lo que de verdad está construido y lo que falta se detalla en el gate de cierre y en la auditoría del 16/09.</p>
+        <div class="leyenda-items">
+          <p><a class="marca-hallazgo" href="#hallazgos">F-00</a> <span>Requisito con un hallazgo abierto: la marca lleva a su ficha.</span></p>
+          <p><span class="cats"><span class="cat cat-a">A</span><span class="cat cat-d">D</span></span> <span>Categoría de resolución del hallazgo: lleva a su ficha en la clasificación.</span></p>
+          <p><span class="pill ok">P1</span> <span>Prioridad de la historia de usuario, tal como la fija el spec.</span></p>
+          <p><span class="pill warn">Abierta</span> <span>Decisión de negocio sin resolver; no debe implementarse nada que la presuponga.</span></p>
+          <p><span class="pill ok">Resuelta</span> <span>Decisión ya cerrada y congelada, con su respuesta registrada en el spec.</span></p>
+          <p><span>🔎</span> <span>Los filtros de requisitos y criterios funcionan sin conexión, sobre el texto completo.</span></p>
+          <p><span>←</span> <span>Si llegaste desde otro documento, abajo aparece el botón para volver al punto exacto.</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="historias">
+      <div class="section-head"><span class="letter">US</span><h2>Historias de usuario</h2></div>
+      <article class="us" id="us-1">
+        <div class="us-cab">
+          <span class="mono">Historia 1</span>
+          <h3>Inicio de sesión y alcance de gestión</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero iniciar sesión mediante correo electrónico y contraseña para que el sistema determine qué compañías puedo gestionar y limite todas mis operaciones a ese alcance.</p>
+        <ol>
+          <li>Un usuario ACTIVO con contraseña válida puede iniciar sesión y obtiene su alcance de compañías.</li>
+          <li>Un usuario INACTIVO o BLOQUEADO no puede iniciar sesión.</li>
+          <li>Si la política de seguridad exige cambio de contraseña, el sistema debe solicitarlo.</li>
+          <li>Un usuario que gestiona las compañías A y B no puede consultar ni modificar personas de C.</li>
+        </ol>
+      </article>
+      <article class="us" id="us-2">
+        <div class="us-cab">
+          <span class="mono">Historia 2</span>
+          <h3>Compañías (Principal/Contratista), sus relaciones y unidades organizativas</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero clasificar cada compañía como PRINCIPAL_MANDANTE o CONTRATISTA, declarar qué compañías Contratistas prestan servicios a qué compañías Principales, y administrar las unidades organizativas jerárquicas que representan exclusivamente la estructura organizativa de una Compañía Principal/Mandante.</p>
+        <ol>
+          <li>Toda compañía se crea con una clasificación explícita PRINCIPAL_MANDANTE o CONTRATISTA.</li>
+          <li>Una unidad organizativa raíz (sin unidad superior) se asocia a exactamente una Compañía Principal al crearse.</li>
+          <li>Una unidad hija aparece debajo de su unidad superior y pertenece implícitamente a la misma Compañía Principal que su raíz (heredada recorriendo la jerarquía, no mediante una relación propia).</li>
+          <li>No se permite que una unidad sea ancestro de sí misma.</li>
+          <li>No es posible asociar una unidad organizativa raíz a una compañía clasificada como CONTRATISTA.</li>
+          <li>Una compañía o unidad INACTIVA no puede recibir nuevas asignaciones activas.</li>
+          <li>Las unidades organizativas de una Compañía Principal solo son visibles y administrables por usuarios cuyo alcance de compañías (<code>AlcanceUsuarioCompañía</code>) incluya esa Compañía Principal.</li>
+          <li>Una Compañía Principal puede tener varios nodos raíz de unidad organizativa (varios árboles) al mismo tiempo (<a href="#cs-010">CS-010</a>); dos Compañías Principales distintas nunca comparten unidades organizativas (<a href="#cs-011">CS-011</a>).</li>
+          <li>Una Compañía Contratista puede declararse con relación vigente simultánea hacia dos o más Compañías Principales distintas (<a href="#cs-012">CS-012</a>); no es posible declarar una relación entre dos compañías que no sean, respectivamente, CONTRATISTA y PRINCIPAL_MANDANTE.</li>
+          <li>Las relaciones Contratista↔Principal solo son visibles/administrables por usuarios cuyo alcance de compañías incluya la Compañía Principal de esa relación (<a href="#rf-060">RF-060</a>).</li>
+        </ol>
+      </article>
+      <article class="us" id="us-3">
+        <div class="us-cab">
+          <span class="mono">Historia 3</span>
+          <h3>Datos maestros</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero administrar los datos maestros para mantener catálogos consistentes.</p>
+
+      </article>
+      <article class="us" id="us-4">
+        <div class="us-cab">
+          <span class="mono">Historia 4</span>
+          <h3>Personas</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero registrar personas con sus datos personales, de identificación y contacto.</p>
+
+      </article>
+      <article class="us" id="us-5">
+        <div class="us-cab">
+          <span class="mono">Historia 5</span>
+          <h3>Históricos de compañía, contexto operativo por Principal, unidad organizativa y perfil</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero conservar los históricos de pertenencia de una persona a su compañía empleadora, y administrar sus contextos operativos — uno por cada Compañía Principal para la que trabaja — cada uno con su propia unidad organizativa asignada.</p>
+
+      </article>
+      <article class="us" id="us-6">
+        <div class="us-cab">
+          <span class="mono">Historia 6</span>
+          <h3>Árbol de áreas físicas de acceso</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero crear y visualizar las áreas físicas de acceso como un árbol.</p>
+
+      </article>
+      <article class="us" id="us-7">
+        <div class="us-cab">
+          <span class="mono">Historia 7</span>
+          <h3>Tipos de persona autorizados por área</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero indicar qué tipos de persona pueden acceder a cada área.</p>
+
+      </article>
+      <article class="us" id="us-8">
+        <div class="us-cab">
+          <span class="mono">Historia 8</span>
+          <h3>Permisos de acceso con vigencia y horarios</h3>
+          <span class="pill ok">P1</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero configurar permisos de acceso por persona, unidad organizativa o compañía, siempre evaluados dentro del contexto de la Compañía Principal propietaria del área.</p>
+
+      </article>
+      <article class="us" id="us-9">
+        <div class="us-cab">
+          <span class="mono">Historia 9</span>
+          <h3>Asignación de credencial/fotocheck por Compañía Principal</h3>
+          <span class="pill neutral">P2</span>
+        </div>
+        <p class="us-resumen">Como usuario autorizado, quiero asignar una credencial a una persona <strong>dentro del contexto de una Compañía Principal</strong> y conservar su histórico.</p>
+
+      </article>
+      <article class="us" id="us-10">
+        <div class="us-cab">
+          <span class="mono">Historia 10</span>
+          <h3>Auditoría</h3>
+          <span class="pill neutral">P2</span>
+        </div>
+        <p class="us-resumen">Todas las entidades persistentes deben registrar automáticamente: - Fecha de Registro - Fecha de Última Actualización - ID Usuario Creación - ID Usuario Última Actualización</p>
+
+      </article>
+    </section>
+
+    <section id="requisitos">
+      <div class="section-head"><span class="letter">RF</span><h2>Requisitos funcionales</h2></div>
+      <div class="filtro-barra">
+        <input id="filtro-rf" type="search" placeholder="Filtrar requisitos por texto o identificador" aria-label="Filtrar requisitos">
+        <span class="filtro-conteo" id="conteo-rf">73 de 73</span>
+      </div>
+      <div class="fichas" data-lista="rf">
+        <article class="ficha" id="rf-001">
+          <span class="ficha-id mono">RF-001</span>
+          <p class="ficha-texto">El sistema DEBE autenticar mediante correo electrónico y contraseña.</p>
+        </article>
+        <article class="ficha" id="rf-002">
+          <span class="ficha-id mono">RF-002</span>
+          <p class="ficha-texto">El usuario DEBE soportar estados ACTIVO, INACTIVO y BLOQUEADO.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-003">
+          <span class="ficha-id mono">RF-003 <a class="marca-hallazgo" href="#f-07" title="Hallazgo abierto F-07">F-07</a></span>
+          <p class="ficha-texto">DEBE existir historial de contraseñas; las contraseñas no pueden almacenarse en texto plano.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-004">
+          <span class="ficha-id mono">RF-004 <a class="marca-hallazgo" href="#f-01" title="Hallazgo abierto F-01">F-01</a></span>
+          <p class="ficha-texto">El alcance de compañías administrables DEBE ser una entidad independiente.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-005">
+          <span class="ficha-id mono">RF-005 <a class="marca-hallazgo" href="#f-01" title="Hallazgo abierto F-01">F-01</a> <a class="marca-hallazgo" href="#f-02" title="Hallazgo abierto F-02">F-02</a> <a class="marca-hallazgo" href="#f-17" title="Hallazgo abierto F-17">F-17</a></span>
+          <p class="ficha-texto">Las consultas y operaciones DEBEN respetar el alcance de compañías del usuario autenticado.</p>
+        </article>
+        <article class="ficha" id="rf-006">
+          <span class="ficha-id mono">RF-006</span>
+          <p class="ficha-texto">Compañía DEBE contener ID, compañía, tipo de documento, número de documento, tipo de compañía (PRINCIPAL_MANDANTE o CONTRATISTA) y estado.</p>
+        </article>
+        <article class="ficha" id="rf-007">
+          <span class="ficha-id mono">RF-007</span>
+          <p class="ficha-texto">Unidad Organizativa DEBE contener ID, nombre, unidad superior y estado.</p>
+        </article>
+        <article class="ficha" id="rf-008">
+          <span class="ficha-id mono">RF-008</span>
+          <p class="ficha-texto">Las unidades organizativas DEBEN visualizarse como árbol.</p>
+        </article>
+        <article class="ficha" id="rf-009">
+          <span class="ficha-id mono">RF-009</span>
+          <p class="ficha-texto">Las áreas de acceso DEBEN visualizarse como árbol.</p>
+        </article>
+        <article class="ficha" id="rf-010">
+          <span class="ficha-id mono">RF-010</span>
+          <p class="ficha-texto">DEBEN existir tipos/perfiles de persona.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-011">
+          <span class="ficha-id mono">RF-011 <a class="marca-hallazgo" href="#f-14" title="Hallazgo abierto F-14">F-14</a></span>
+          <p class="ficha-texto">Una persona DEBE poder tener uno o varios tipos/perfiles.</p>
+        </article>
+        <article class="ficha" id="rf-012">
+          <span class="ficha-id mono">RF-012</span>
+          <p class="ficha-texto">Persona DEBE contener todos los datos personales especificados.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-013">
+          <span class="ficha-id mono">RF-013 <a class="marca-hallazgo" href="#f-16" title="Hallazgo abierto F-16">F-16</a></span>
+          <p class="ficha-texto">Todos los IDs DEBEN ser UID/UUID autogenerados, inmutables y ocultos en la interfaz.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-014">
+          <span class="ficha-id mono">RF-014 <a class="marca-hallazgo" href="#f-22" title="Hallazgo abierto F-22">F-22</a></span>
+          <p class="ficha-texto">DEBE existir histórico de compañía <strong>de pertenencia laboral/contractual</strong> (<code>AsignaciónPersonaCompañía</code>) por persona; en cualquier momento dado, una persona DEBE tener como máximo UNA asignación de compañía de pertenencia activa (sin solapamiento) — es decir, a qué única compañía pertenece actualmente. <strong>Esta restricción NO limita, ni directa ni indirectamente ni por analogía, el número de <code>ContextoOperativoPersonaPrincipal</code> vigentes simultáneos de la persona</strong>, que se rige de forma completamente independiente por su propia regla de cardinalidad (<a href="#rf-052">RF-052</a>: como máximo un contexto activo por cada Compañía Principal distinta, sin límite superior de Principales simultáneas). <em>(Redacción aclarada — Sesión 2026-09-14 "corrección Modelo de Cardinalidad Definitivo"; no cambia ninguna regla de negocio ya vigente.)</em></p>
+        </article>
+        <article class="ficha" id="rf-015">
+          <span class="ficha-id mono">RF-015</span>
+          <p class="ficha-texto">DEBE existir histórico de unidad organizativa por persona, registrado dentro de un contexto operativo <code>ContextoOperativoPersonaPrincipal</code> vigente (<a href="#rf-052">RF-052</a>); en cualquier momento dado, una persona DEBE tener como máximo una asignación de unidad organizativa activa <strong>por contexto operativo</strong> (sin solapamiento dentro del mismo contexto) — distintos contextos operativos (distintas Compañías Principales) pueden tener asignaciones de unidad organizativa simultáneas y vigentes para la misma persona. <em>(Corrige la versión anterior de este requisito, que imponía como máximo una asignación activa por persona a nivel global; ver Clarifications, Sesión 2026-09-14 "corrección Contexto Operativo".)</em></p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-016">
+          <span class="ficha-id mono">RF-016 <a class="marca-hallazgo" href="#f-08" title="Hallazgo abierto F-08">F-08</a> <a class="marca-hallazgo" href="#f-21" title="Hallazgo abierto F-21">F-21</a></span>
+          <p class="ficha-texto">Las asignaciones de compañía y unidad DEBEN iniciar a 00:00 y finalizar a 23:59 del último día.</p>
+        </article>
+        <article class="ficha" id="rf-017">
+          <span class="ficha-id mono">RF-017</span>
+          <p class="ficha-texto">Tipo de Credencial DEBE tener estado ACTIVO/INACTIVO.</p>
+        </article>
+        <article class="ficha" id="rf-018">
+          <span class="ficha-id mono">RF-018</span>
+          <p class="ficha-texto">DEBE existir histórico de asignación de credenciales.</p>
+        </article>
+        <article class="ficha" id="rf-019">
+          <span class="ficha-id mono">RF-019</span>
+          <p class="ficha-texto">Un área DEBE poder asociarse a uno o varios tipos de persona.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-020">
+          <span class="ficha-id mono">RF-020 <a class="marca-hallazgo" href="#f-13" title="Hallazgo abierto F-13">F-13</a></span>
+          <p class="ficha-texto">Los permisos DEBEN soportar alcance persona, unidad organizativa y compañía.</p>
+        </article>
+        <article class="ficha" id="rf-021">
+          <span class="ficha-id mono">RF-021</span>
+          <p class="ficha-texto">Todo permiso DEBE tener inicio y fin de vigencia.</p>
+        </article>
+        <article class="ficha" id="rf-022">
+          <span class="ficha-id mono">RF-022</span>
+          <p class="ficha-texto">Todo permiso DEBE soportar bloques horarios por día de semana.</p>
+        </article>
+        <article class="ficha" id="rf-023">
+          <span class="ficha-id mono">RF-023</span>
+          <p class="ficha-texto">La evaluación DEBE utilizar las asignaciones vigentes en la fecha evaluada.</p>
+        </article>
+        <article class="ficha" id="rf-024">
+          <span class="ficha-id mono">RF-024</span>
+          <p class="ficha-texto">La elegibilidad de perfil/área DEBE validarse antes de conceder acceso.</p>
+        </article>
+        <article class="ficha" id="rf-025">
+          <span class="ficha-id mono">RF-025</span>
+          <p class="ficha-texto">Los conflictos entre permisos aplicables en distintos niveles DEBEN resolverse de forma determinística usando la precedencia PERSONA &gt; UNIDAD_ORGANIZATIVA &gt; COMPAÑÍA (el nivel más específico prevalece).</p>
+        </article>
+        <article class="ficha" id="rf-026">
+          <span class="ficha-id mono">RF-026</span>
+          <p class="ficha-texto">Todas las entidades persistentes DEBEN tener auditoría.</p>
+        </article>
+        <article class="ficha" id="rf-027">
+          <span class="ficha-id mono">RF-027</span>
+          <p class="ficha-texto">La auditoría DEBE ser generada por el sistema.</p>
+        </article>
+        <article class="ficha" id="rf-028">
+          <span class="ficha-id mono">RF-028</span>
+          <p class="ficha-texto">Los campos de negocio DEBEN ser obligatorios salvo que se definan explícitamente como opcionales.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-029">
+          <span class="ficha-id mono">RF-029 <a class="marca-hallazgo" href="#f-08" title="Hallazgo abierto F-08">F-08</a></span>
+          <p class="ficha-texto">Los campos de fecha/hora DEBEN manejar fecha y hora.</p>
+        </article>
+        <article class="ficha" id="rf-030">
+          <span class="ficha-id mono">RF-030</span>
+          <p class="ficha-texto">DEBEN existir módulos de mantenimiento para todas las entidades indicadas.</p>
+        </article>
+        <article class="ficha" id="rf-031">
+          <span class="ficha-id mono">RF-031</span>
+          <p class="ficha-texto">DEBEN cargarse valores maestros genéricos válidos para Perú.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-032">
+          <span class="ficha-id mono">RF-032 <a class="marca-hallazgo" href="#f-05" title="Hallazgo abierto F-05">F-05</a></span>
+          <p class="ficha-texto">Los valores maestros INACTIVOS no pueden utilizarse en nuevas asignaciones.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-033">
+          <span class="ficha-id mono">RF-033 <a class="marca-hallazgo" href="#f-11" title="Hallazgo abierto F-11">F-11</a></span>
+          <p class="ficha-texto">Las validaciones deben devolver mensajes comprensibles.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-034">
+          <span class="ficha-id mono">RF-034 <a class="marca-hallazgo" href="#f-15" title="Hallazgo abierto F-15">F-15</a></span>
+          <p class="ficha-texto">Toda operación protegida DEBE requerir autorización.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-035">
+          <span class="ficha-id mono">RF-035 <a class="marca-hallazgo" href="#f-17" title="Hallazgo abierto F-17">F-17</a></span>
+          <p class="ficha-texto">DEBE existir búsqueda de personas dentro del alcance autorizado.</p>
+        </article>
+        <article class="ficha" id="rf-036">
+          <span class="ficha-id mono">RF-036</span>
+          <p class="ficha-texto">Los árboles DEBEN permitir expandir, contraer y seleccionar nodos.</p>
+        </article>
+        <article class="ficha" id="rf-037">
+          <span class="ficha-id mono">RF-037</span>
+          <p class="ficha-texto">Los históricos DEBEN permitir reconstruir el estado efectivo de una persona en una fecha/hora.</p>
+        </article>
+        <article class="ficha" id="rf-038">
+          <span class="ficha-id mono">RF-038</span>
+          <p class="ficha-texto">Los ciclos jerárquicos DEBEN rechazarse.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-039">
+          <span class="ficha-id mono">RF-039 <a class="marca-hallazgo" href="#f-12" title="Hallazgo abierto F-12">F-12</a> <a class="marca-hallazgo" href="#f-14" title="Hallazgo abierto F-14">F-14</a></span>
+          <p class="ficha-texto">Los períodos inválidos y solapamientos incompatibles DEBEN rechazarse.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-040">
+          <span class="ficha-id mono">RF-040 <a class="marca-hallazgo" href="#f-03" title="Hallazgo abierto F-03">F-03</a> <a class="marca-hallazgo" href="#f-11" title="Hallazgo abierto F-11">F-11</a> <a class="marca-hallazgo" href="#f-20" title="Hallazgo abierto F-20">F-20</a></span>
+          <p class="ficha-texto">DEBE existir contrato API para autenticación, maestros, personas, jerarquías, credenciales, permisos, evaluación de acceso, y las consultas agregadas de auditoría/históricos transversales e indicadores operativos (<a href="#rf-067">RF-067</a> a <a href="#rf-069">RF-069</a>, nuevo — Sesión 2026-09-14, integración <code>ux-ui.md</code>).</p>
+        </article>
+        <article class="ficha" id="rf-041">
+          <span class="ficha-id mono">RF-041</span>
+          <p class="ficha-texto">La combinación de tipo de documento y número de documento DEBE ser única en todo el sistema; el sistema DEBE rechazar el registro de una persona con una combinación ya existente.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-042">
+          <span class="ficha-id mono">RF-042 <a class="marca-hallazgo" href="#f-09" title="Hallazgo abierto F-09">F-09</a></span>
+          <p class="ficha-texto">Toda Compañía DEBE clasificarse como PRINCIPAL_MANDANTE o CONTRATISTA.</p>
+        </article>
+        <article class="ficha" id="rf-043">
+          <span class="ficha-id mono">RF-043</span>
+          <p class="ficha-texto">El sistema DEBE soportar una o varias compañías PRINCIPAL_MANDANTE simultáneamente; no DEBE asumirse una única compañía Principal global. Cada Compañía Principal constituye su propio contexto organizacional y operacional, aislado del de cualquier otra Compañía Principal.</p>
+        </article>
+        <article class="ficha" id="rf-044">
+          <span class="ficha-id mono">RF-044</span>
+          <p class="ficha-texto">UnidadOrganizativa NO DEBE tener ninguna columna ni relación (FK) directa hacia Compañía.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-045">
+          <span class="ficha-id mono">RF-045 <a class="marca-hallazgo" href="#f-09" title="Hallazgo abierto F-09">F-09</a></span>
+          <p class="ficha-texto">Toda Unidad Organizativa raíz (sin unidad superior) DEBE asociarse a exactamente una Compañía clasificada como PRINCIPAL_MANDANTE mediante una entidad de enlace independiente de <code>UnidadOrganizativa</code>; no DEBE ser posible asociarla a una compañía CONTRATISTA. Toda unidad no raíz hereda la Compañía Principal propietaria recorriendo la jerarquía (<code>UnidadSuperiorId</code>) hasta su raíz. Las compañías CONTRATISTA NO DEBEN tener unidades organizativas propias.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-046">
+          <span class="ficha-id mono">RF-046 <a class="marca-hallazgo" href="#f-09" title="Hallazgo abierto F-09">F-09</a></span>
+          <p class="ficha-texto">Toda ÁreaAcceso DEBE pertenecer a exactamente una Compañía clasificada como PRINCIPAL_MANDANTE; un área hija DEBE pertenecer a la misma Compañía Principal que su área padre.</p>
+        </article>
+        <article class="ficha" id="rf-047">
+          <span class="ficha-id mono">RF-047</span>
+          <p class="ficha-texto">El histórico de compañía de una persona (<a href="#rf-014">RF-014</a>) puede referenciar indistintamente una compañía PRINCIPAL_MANDANTE o CONTRATISTA.</p>
+        </article>
+        <article class="ficha" id="rf-048">
+          <span class="ficha-id mono">RF-048</span>
+          <p class="ficha-texto">La asignación de una persona a una unidad organizativa (<a href="#rf-015">RF-015</a>) se realiza dentro de un contexto operativo <code>ContextoOperativoPersonaPrincipal</code> (<a href="#rf-052">RF-052</a>) vigente entre la persona y la Compañía Principal propietaria de esa unidad. <strong>[REEMPLAZADA — ver Sesión 2026-09-14 "vigencia temporal jerárquica" en Clarifications]</strong> <del>no existe validación cruzada entre el histórico de compañía de pertenencia (<a href="#rf-014">RF-014</a>) y el contexto operativo, salvo la restricción de <a href="#rf-054">RF-054</a></del> SÍ existe validación cruzada temporal: la vigencia de <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code> y <code>AsignaciónCredencial</code> DEBE estar contenida dentro de la vigencia de la <code>AsignaciónPersonaCompañía</code> vigente de la persona en el momento de su creación (<a href="#rf-072">RF-072</a>) — además, sin cambios, la restricción de <a href="#rf-054">RF-054</a> (una persona de una Contratista solo puede abrir contexto con Principales con relación vigente). Esta asignación, junto con el contexto operativo que la contiene, es la relación operacional explícita, histórica y temporal entre la persona y esa Compañía Principal; el sistema NO DEBE conceder acceso implícito de una persona a otras Compañías Principales para las que trabaje su empleador fuera de esta asignación. <em>(Corrige la versión anterior de este requisito, que no exigía un contexto operativo explícito ni la restricción de relación vigente para personas de compañías Contratistas; ver Clarifications, Sesión 2026-09-14 "corrección Contexto Operativo".)</em></p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-049">
+          <span class="ficha-id mono">RF-049 <a class="marca-hallazgo" href="#f-02" title="Hallazgo abierto F-02">F-02</a> <a class="marca-hallazgo" href="#f-13" title="Hallazgo abierto F-13">F-13</a></span>
+          <p class="ficha-texto">Las operaciones de mantenimiento y asignación sobre unidades organizativas y áreas de acceso DEBEN limitarse a las Compañías Principales dentro del alcance de compañías del usuario autenticado (resuelto vía la entidad de enlace de raíz para unidades organizativas, o directamente para áreas de acceso).</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-050">
+          <span class="ficha-id mono">RF-050 <a class="marca-hallazgo" href="#f-01" title="Hallazgo abierto F-01">F-01</a></span>
+          <p class="ficha-texto">El alcance administrativo de un Usuario (<code>AlcanceUsuarioCompañía</code>, <a href="#rf-004">RF-004</a>) DEBE mantenerse independiente de la relación operacional Persona→Compañía→UnidadOrganizativa; un usuario administrativo puede gestionar una o varias compañías según su alcance, sin que ello implique ni derive de ninguna asignación operacional de personas.</p>
+        </article>
+        <article class="ficha" id="rf-051">
+          <span class="ficha-id mono">RF-051</span>
+          <p class="ficha-texto">DEBE existir una relación explícita <code>RelaciónContratistaPrincipal</code> entre una Compañía CONTRATISTA y una o varias Compañías PRINCIPAL_MANDANTE, con vigencia temporal propia (fecha/hora de inicio y fin); una misma Contratista puede tener relaciones vigentes simultáneas con múltiples Principales, y una misma Principal puede tener relaciones vigentes simultáneas con múltiples Contratistas.</p>
+        </article>
+        <article class="ficha" id="rf-052">
+          <span class="ficha-id mono">RF-052</span>
+          <p class="ficha-texto">DEBE existir un <code>ContextoOperativoPersonaPrincipal</code> que represente la relación operativa entre una Persona y una Compañía Principal, independiente del histórico de compañía de pertenencia (<a href="#rf-014">RF-014</a>); una persona puede tener ningún, uno o varios contextos operativos vigentes simultáneamente, cada uno con una Compañía Principal distinta, <strong>sin límite superior en el número de Compañías Principales simultáneas</strong> más allá de las que su compañía de pertenencia sustente legítimamente (directamente si es PRINCIPAL_MANDANTE — <a href="#rf-053">RF-053</a> — o vía <code>RelaciónContratistaPrincipal</code> vigente si es CONTRATISTA — <a href="#rf-054">RF-054</a>); en cualquier momento dado, una persona DEBE tener como máximo un contexto operativo activo por cada Compañía Principal (sin solapamiento dentro del mismo par persona-Principal) — la exclusividad es por <strong>par</strong> <code>(Persona, Compañía Principal)</code>, nunca global por persona.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-053">
+          <span class="ficha-id mono">RF-053 <a class="marca-hallazgo" href="#f-04" title="Hallazgo abierto F-04">F-04</a></span>
+          <p class="ficha-texto">Si la compañía vigente de una persona es PRINCIPAL_MANDANTE, su contexto operativo con esa misma Principal DEBE fijarse automáticamente por el sistema, sin permitir seleccionar ni registrar un contexto con una Principal distinta.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-054">
+          <span class="ficha-id mono">RF-054 <a class="marca-hallazgo" href="#f-04" title="Hallazgo abierto F-04">F-04</a></span>
+          <p class="ficha-texto">Si la compañía vigente de una persona es CONTRATISTA, un nuevo contexto operativo DEBE restringirse únicamente a Compañías Principales con las que esa Contratista tenga una <code>RelaciónContratistaPrincipal</code> vigente en el momento de la asignación.</p>
+        </article>
+        <article class="ficha" id="rf-055">
+          <span class="ficha-id mono">RF-055</span>
+          <p class="ficha-texto">La asignación de unidad organizativa de una persona (<a href="#rf-015">RF-015</a>, <a href="#rf-048">RF-048</a>) DEBE realizarse dentro de un <code>ContextoOperativoPersonaPrincipal</code> vigente, y la unidad organizativa seleccionada DEBE pertenecer a la misma Compañía Principal de ese contexto.</p>
+        </article>
+        <article class="ficha" id="rf-056">
+          <span class="ficha-id mono">RF-056</span>
+          <p class="ficha-texto">La asignación de credencial (<a href="#rf-018">RF-018</a>) DEBE registrar explícitamente la Compañía Principal para la cual se emite; una persona puede tener credenciales vigentes simultáneas para distintas Compañías Principales, condicionado a que exista un contexto operativo vigente entre la persona y esa Principal.</p>
+        </article>
+        <article class="ficha" id="rf-057">
+          <span class="ficha-id mono">RF-057</span>
+          <p class="ficha-texto">En cualquier momento dado, una persona DEBE tener como máximo una credencial en estado ASIGNADO activa <strong>por Compañía Principal</strong> (sin solapamiento dentro de la misma Principal); distintas Principales pueden tener credenciales ASIGNADAS simultáneas para la misma persona.</p>
+        </article>
+        <article class="ficha" id="rf-058">
+          <span class="ficha-id mono">RF-058</span>
+          <p class="ficha-texto"><code>TipoCredencial</code> DEBE representar el tipo/diseño visual de la credencial (p. ej. Contratista, Corporativo, Visitante, Proveedor, Temporal), NUNCA una tecnología de identificación física (RFID, QR, NFC, código de barras) ni un identificador físico; la impresión y el diseño gráfico quedan fuera del alcance del sistema.</p>
+        </article>
+        <article class="ficha" id="rf-059">
+          <span class="ficha-id mono">RF-059</span>
+          <p class="ficha-texto">La evaluación de acceso (<a href="#rf-023">RF-023</a>) DEBE determinar primero la Compañía Principal propietaria del área solicitada, y DEBE denegar el acceso por defecto si la persona no tiene un contexto operativo vigente con esa Principal (y, siendo de una Contratista, si la relación Contratista→Principal correspondiente no está vigente en la fecha evaluada), antes de evaluar cualquier permiso.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-060">
+          <span class="ficha-id mono">RF-060 <a class="marca-hallazgo" href="#f-02" title="Hallazgo abierto F-02">F-02</a></span>
+          <p class="ficha-texto">Las operaciones sobre <code>RelaciónContratistaPrincipal</code> y <code>ContextoOperativoPersonaPrincipal</code> DEBEN limitarse a las Compañías Principales dentro del alcance de compañías del usuario autenticado (extiende <a href="#rf-049">RF-049</a>).</p>
+        </article>
+        <article class="ficha" id="rf-061">
+          <span class="ficha-id mono">RF-061</span>
+          <p class="ficha-texto"><strong>[REEMPLAZADA — ver Sesión 2026-09-14 "corrección Revocación Automática" en Clarifications]</strong> El cese o inactivación de una pertenencia Persona–Compañía (<code>AsignaciónPersonaCompañía</code>, <a href="#rf-014">RF-014</a>) —ya sea por cierre explícito o porque una nueva asignación reemplaza automáticamente a la vigente— DEBE provocar la revocación automática de todos los <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code> y <code>AsignaciónCredencial</code> de esa persona que dependan de dicha pertenencia y estén vigentes en ese momento, preservando íntegramente el histórico. La revocación no afecta contextos, asignaciones ni credenciales que dependan de otra pertenencia vigente de la misma persona (regla fundamental; <a href="#rf-062">RF-062</a> a <a href="#rf-065">RF-065</a> detallan alcance, campos, efectividad temporal y relación con la evaluación dinámica). <code>PermisoAcceso</code> no se modifica por esta revocación: es configuración compartida, no un registro por persona; su aplicabilidad efectiva deja de producirse como consecuencia transitiva de que el contexto/asignación de unidad organizativa de la que dependía ya no está vigente (<a href="#rf-065">RF-065</a>).</p>
+        </article>
+        <article class="ficha" id="rf-062">
+          <span class="ficha-id mono">RF-062</span>
+          <p class="ficha-texto">La revocación automática (<a href="#rf-061">RF-061</a>) DEBE determinarse por dependencia de la pertenencia concreta que finaliza, no por <code>PersonaId</code> en bloque: solo se revocan los registros cuya legitimidad dependía específicamente de esa pertenencia (según la compañía de pertenencia vigente en el momento en que cada contexto operativo fue abierto — <a href="#rf-053">RF-053</a>/<a href="#rf-054">RF-054</a>). Una persona puede tener <strong>múltiples</strong> <code>ContextoOperativoPersonaPrincipal</code> vigentes simultáneamente en el momento del cese — uno por cada Compañía Principal con la que su (única) compañía de pertenencia tuviera relación vigente (<a href="#rf-052">RF-052</a>) — y la cascada de revocación DEBE alcanzarlos a <strong>todos ellos</strong>, precisamente porque, al existir como máximo una <code>AsignaciónPersonaCompañía</code> activa a la vez (<a href="#rf-014">RF-014</a>), <strong>todo</strong> contexto abierto en ese momento depende necesariamente de esa misma pertenencia que finaliza (no puede existir un contexto abierto que dependiera de una pertenencia distinta y también vigente al mismo tiempo, porque eso requeriría dos pertenencias activas simultáneas, lo que <a href="#rf-014">RF-014</a> prohíbe). Esto es una consecuencia de la cardinalidad de <code>AsignaciónPersonaCompañía</code> (<a href="#rf-014">RF-014</a>), <strong>no una restricción sobre la cardinalidad de <code>ContextoOperativoPersonaPrincipal</code></strong> (que sigue rigiéndose únicamente por <a href="#rf-052">RF-052</a>). Una pertenencia distinta y posterior de la misma persona (p. ej. tras cambiar de compañía) abre contextos nuevos y propios, no afectados por revocaciones previas.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-063">
+          <span class="ficha-id mono">RF-063 <a class="marca-hallazgo" href="#f-12" title="Hallazgo abierto F-12">F-12</a> <a class="marca-hallazgo" href="#f-22" title="Hallazgo abierto F-22">F-22</a></span>
+          <p class="ficha-texto">Los registros afectados por la revocación automática (<a href="#rf-061">RF-061</a>) DEBEN conservar su <code>FechaHoraInicio</code> original sin modificarla, NO DEBEN eliminarse físicamente, y DEBEN distinguir explícitamente: (a) fecha de inicio, (b) fecha de fin de vigencia, (c) estado actual, y (d) motivo de finalización. <code>Estado</code> es administrativo/informativo (refleja la disposición final del registro para auditoría y presentación), mientras que la vigencia efectiva para autorización se determina siempre comparando <code>FechaHoraInicio</code>/ <code>FechaHoraFin</code> contra la fecha evaluada (Principio IV) — nunca por <code>Estado</code> de forma aislada. Cada registro afectado DEBE conservar una referencia a la <code>AsignaciónPersonaCompañía</code> que originó su revocación, para permitir auditar qué contextos, asignaciones de unidad organizativa y credenciales fueron afectados por una pertenencia específica.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-064">
+          <span class="ficha-id mono">RF-064 <a class="marca-hallazgo" href="#f-10" title="Hallazgo abierto F-10">F-10</a></span>
+          <p class="ficha-texto">Si el cese de una pertenencia se registra con una <code>FechaHoraFin</code> futura, los registros dependientes permanecen efectivamente vigentes hasta ese instante — el sistema NO DEBE esperar a que la fecha llegue para aplicar la revocación: DEBE propagar la misma <code>FechaHoraFin</code> a los registros dependientes en la misma operación en que se registra el cese (sin necesitar un proceso programado ni distinguir una fecha administrativa de una fecha efectiva separadas — <code>FechaHoraFin</code> ya representa la fecha efectiva). La propagación NUNCA debe extender una <code>FechaHoraFin</code> ya fijada a una fecha anterior en un registro dependiente.</p>
+        </article>
+        <article class="ficha" id="rf-065">
+          <span class="ficha-id mono">RF-065</span>
+          <p class="ficha-texto">La re-validación dinámica de la evaluación de acceso (<a href="#rf-059">RF-059</a>) DEBE mantenerse como defensa adicional y NO ser reemplazada por la revocación automática (<a href="#rf-061">RF-061</a>): el motor de autorización DEBE seguir considerando inválido cualquier contexto operativo cuya pertenencia de origen ya no esté vigente, incluso ante datos históricos inconsistentes.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-066">
+          <span class="ficha-id mono">RF-066 <a class="marca-hallazgo" href="#f-23" title="Hallazgo abierto F-23">F-23</a></span>
+          <p class="ficha-texto">La evaluación de acceso (<a href="#rf-023">RF-023</a>, <a href="#rf-059">RF-059</a>) DEBE verificar, además de los pasos ya establecidos, que exista una <code>AsignaciónCredencial</code> <strong>vigente</strong> (definida con precisión en <a href="#rf-070">RF-070</a>) para la persona y la Compañía Principal determinada en el paso 4 del algoritmo (<a href="#us-8">Historia 8</a>), en la fecha evaluada; en su ausencia, el acceso DEBE denegarse por defecto (<code>SIN_CREDENCIAL_VIGENTE</code>), sin evaluar los pasos restantes del algoritmo. Esta verificación es condición necesaria, no suficiente: no sustituye la evaluación de permisos (<a href="#rf-020">RF-020</a> a <a href="#rf-025">RF-025</a>). <em>(Nuevo — Sesión 2026-09-14, integración <code>ux-ui.md</code>; reemplaza la afirmación anterior de <a href="#us-9">Historia 9</a> de que la credencial nunca determina el acceso por sí misma.)</em></p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-067">
+          <span class="ficha-id mono">RF-067 <a class="marca-hallazgo" href="#f-03" title="Hallazgo abierto F-03">F-03</a></span>
+          <p class="ficha-texto">El sistema DEBE exponer una consulta agregada y transversal de auditoría (no limitada a una entidad individual), filtrable por rango temporal, usuario, persona, compañía, Compañía Principal, entidad y acción, respetando el alcance de compañías del usuario autenticado (<a href="#rf-005">RF-005</a>). <em>(Nuevo — Sesión 2026-09-14, integración <code>ux-ui.md</code>, <a href="#us-10">Historia 10</a>.)</em></p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-068">
+          <span class="ficha-id mono">RF-068 <a class="marca-hallazgo" href="#f-03" title="Hallazgo abierto F-03">F-03</a></span>
+          <p class="ficha-texto">El sistema DEBE exponer una consulta transversal de los históricos de compañía de pertenencia, contexto operativo y unidad organizativa (<a href="#us-5">Historia 5</a>), filtrable por persona, compañía, Compañía Principal, entidad y tipo de evento, respetando el alcance de compañías del usuario autenticado (<a href="#rf-005">RF-005</a>). <em>(Nuevo — Sesión 2026-09-14, integración <code>ux-ui.md</code>, <a href="#us-5">Historia 5</a>.)</em></p>
+        </article>
+        <article class="ficha ficha-afectada" id="rf-069">
+          <span class="ficha-id mono">RF-069 <a class="marca-hallazgo" href="#f-03" title="Hallazgo abierto F-03">F-03</a></span>
+          <p class="ficha-texto">El sistema DEBE exponer indicadores operativos agregados (conteos de personas/Contratistas/ Principales activas, credenciales próximas a vencer, relaciones o pertenencias próximas a finalizar), respetando el alcance de compañías del usuario autenticado (<a href="#rf-005">RF-005</a>). <em>(Nuevo — Sesión 2026-09-14, integración <code>ux-ui.md</code>.)</em></p>
+        </article>
+        <article class="ficha" id="rf-070">
+          <span class="ficha-id mono">RF-070</span>
+          <p class="ficha-texto"><code>AsignaciónCredencial.FechaHoraFin</code> representa el fin de vigencia de la credencial. <strong>[MATIZADA — ver Sesión 2026-09-14 "vigencia temporal jerárquica" en Clarifications: <code>FechaHoraFin</code> deja de ser nullable — <a href="#rf-071">RF-071</a> exige un valor real conocido desde la creación, <code>null</code> ya no representa vigencia indefinida]</strong> Puede tener cualquier fecha/hora conocida al momento de la asignación (p. ej. una "Credencial Temporal" de corta duración, <a href="#us-9">Historia 9</a>, o una vigencia larga si negocio así la define), y la credencial permanece en Estado <code>ASIGNADO</code> incluso después de que esa fecha pase — el sistema NO DEBE transicionar automáticamente su <code>Estado</code> por el mero paso del tiempo. Una <code>AsignaciónCredencial</code> es <strong>vigente</strong> (satisface <a href="#rf-066">RF-066</a>) si y solo si se cumplen conjuntamente: (a) <code>Estado = ASIGNADO</code>, y (b) <code>FechaHoraInicio &lt;= fecha evaluada &lt;= FechaHoraFin</code>. <code>Estado</code> sigue siendo administrativo/informativo (igual que para las demás entidades revocables, <a href="#rf-063">RF-063</a>) y la revocación administrativa (cese/reemplazo de pertenencia — <a href="#rf-061">RF-061</a>; devolución; baja lógica) sigue siendo el único mecanismo que cambia <code>Estado</code>, pudiendo acortar <code>FechaHoraFin</code> cuando corresponda (nunca extenderla) y conservando siempre <code>FechaHoraInicio</code> sin modificar; la expiración temporal (b) es una condición evaluada dinámicamente en cada evaluación de acceso, distinta e independiente de una revocación administrativa, y nunca escribe ni modifica ningún campo por sí sola. <em>(Sesión 2026-09-14, integración <code>ux-ui.md</code>, auditoría de consistencia <a href="#rf-066">RF-066</a> — corrigió data-model.md, que restringía incorrectamente <code>FechaHoraFin</code> a <code>null</code> mientras <code>Estado = ASIGNADO</code>; matizada en la sesión siguiente al eliminarse la nulabilidad por completo, <a href="#rf-071">RF-071</a>.)</em></p>
+        </article>
+        <article class="ficha" id="rf-071">
+          <span class="ficha-id mono">RF-071</span>
+          <p class="ficha-texto">Toda asociación temporal vinculada a una persona DEBE tener <code>FechaHoraInicio</code> y <code>FechaHoraFin</code> <strong>obligatorias</strong> desde su creación: <code>AsignaciónPersonaCompañía</code>, <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code>, <code>AsignaciónCredencial</code>, <code>AsignaciónTipoPersona</code>, y <code>PermisoAcceso</code> (los tres alcances — ya exigido de forma general por <a href="#rf-021">RF-021</a> desde el spec original, nunca reflejado correctamente en <code>data-model.md</code>, que lo documentaba como nullable). <code>FechaHoraFin</code> NO DEBE representarse con <code>null</code> ni con una fecha centinela (p. ej. <code>9999-12-31</code>); DEBE ser una fecha/hora real y conocida elegida en el momento de la creación de la asociación. No existe, para estas entidades, ningún estado de "vigencia indefinida/permanente". <code>RelaciónContratistaPrincipal</code> queda fuera del alcance de este requisito — no está vinculada a una persona (es una relación Compañía↔Compañía). <em>(Nuevo — Sesión 2026-09-14, "vigencia temporal jerárquica".)</em></p>
+        </article>
+        <article class="ficha" id="rf-072">
+          <span class="ficha-id mono">RF-072</span>
+          <p class="ficha-texto"><code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code> y <code>AsignaciónCredencial</code> — las tres asociaciones que la cascada de <a href="#rf-061">RF-061</a> revoca por dependencia de una <code>AsignaciónPersonaCompañía</code> — DEBEN estar temporalmente contenidas dentro de la vigencia de la <code>AsignaciónPersonaCompañía</code> vigente de la persona en el momento de su creación: <code>FechaHoraInicio_hija &gt;= FechaHoraInicio_pertenencia</code> <strong>Y</strong> <code>FechaHoraFin_hija &lt;= FechaHoraFin_pertenencia</code>. Una asociación hija puede finalizar antes que la pertenencia (no se exige igualdad de <code>FechaHoraFin</code>), pero nunca puede iniciar antes que ella ni extenderse más allá de su fin. Esta contención se valida en el momento de creación/actualización de la asociación hija, contra la <code>AsignaciónPersonaCompañía</code> vigente en ese momento; es independiente del acortamiento que la cascada de <a href="#rf-061">RF-061</a>/<a href="#rf-064">RF-064</a> ya aplica cuando la pertenencia se cierra después de que la hija existe (ambos mecanismos son complementarios, no redundantes). <code>AsignaciónTipoPersona</code> y <code>PermisoAcceso</code> NO están sujetas a esta contención — el modelo de dominio no las establece como dependientes de la pertenencia (<a href="#rf-011">RF-011</a>: perfiles múltiples sin exclusividad; <code>PermisoAcceso</code> no está en la lista de entidades revocadas por <a href="#rf-061">RF-061</a> — <a href="#us-8">Historia 8</a> las trata como configuración evaluada independientemente del histórico de pertenencia). <em>(Nuevo — Sesión 2026-09-14, "vigencia temporal jerárquica"; ver <a href="#rf-048">RF-048</a> reescrito.)</em></p>
+        </article>
+        <article class="ficha" id="rf-073">
+          <span class="ficha-id mono">RF-073</span>
+          <p class="ficha-texto"><code>AsignaciónPersonaCompañía.FechaHoraFin</code> DEBE poder extenderse hacia una fecha posterior a la ya vigente mediante una operación explícita de <strong>renovación</strong>, distinta de la creación de una nueva <code>AsignaciónPersonaCompañía</code> y distinta del cierre por reemplazo/cese (<a href="#rf-061">RF-061</a>, <a href="#rf-064">RF-064</a>) — la renovación representa continuidad de la misma relación contractual, no una relación nueva, y NO dispara la cascada de revocación. La renovación: (a) solo aplica a una pertenencia en <code>Estado = ACTIVA</code> <strong>y que además siga vigente dinámicamente en el momento de renovar</strong> (<code>fecha actual &lt;= FechaHoraFin</code> ya declarada) — una pertenencia <code>FINALIZADA</code>, o una <code>ACTIVA</code> cuya <code>FechaHoraFin</code> ya pasó (expiración dinámica sin cierre administrativo), NO es renovable en ningún caso: requiere una nueva <code>AsignaciónPersonaCompañía</code> (histórico secuencial, <a href="#rf-014">RF-014</a>); la renovación nunca "puentea" retroactivamente un vacío temporal ya transcurrido; (b) NO modifica <code>FechaHoraInicio</code> (<a href="#rf-063">RF-063</a>, sin cambios); (c) NO modifica <code>Estado</code> ni <code>MotivoFin</code>, ni crea ninguna asociación dependiente nueva; (d) las asociaciones dependientes ya existentes (<code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code>, <code>AsignaciónCredencial</code>) conservan su propia <code>FechaHoraFin</code> sin cambios — la renovación solo amplía el techo temporal que <a href="#rf-072">RF-072</a> permite para asociaciones futuras; (e) NUNCA puede usarse para acortar <code>FechaHoraFin</code> ni para modificarla hacia una fecha anterior — esa operación sigue siendo exclusiva de la cascada de cese/reemplazo; (f) queda registrada mediante los mecanismos de auditoría ya existentes (<code>UpdatedAt</code>/<code>UpdatedById</code>, <a href="#rf-026">RF-026</a>/<a href="#rf-027">RF-027</a>), sin necesitar un campo o entidad nueva. <em>(Nuevo — Sesión 2026-09-14, "renovación de AsignaciónPersonaCompañía", cierra Decisión Pendiente #9; punto (a) ampliado en la Sesión "cierre Decisión Pendiente #10" con la exigencia de vigencia dinámica.)</em></p>
+        </article>
+      </div>
+    </section>
+
+    <section id="criterios">
+      <div class="section-head"><span class="letter">CS</span><h2>Criterios de éxito</h2></div>
+      <div class="filtro-barra">
+        <input id="filtro-cs" type="search" placeholder="Filtrar criterios por texto o identificador" aria-label="Filtrar criterios">
+        <span class="filtro-conteo" id="conteo-cs">35 de 35</span>
+      </div>
+      <div class="fichas" data-lista="cs">
+        <article class="ficha" id="cs-001">
+          <span class="ficha-id mono">CS-001</span>
+          <p class="ficha-texto">Inicio de sesión y carga del alcance en menos de 10 segundos en condiciones normales.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-002">
+          <span class="ficha-id mono">CS-002 <a class="marca-hallazgo" href="#f-06" title="Hallazgo abierto F-06">F-06</a></span>
+          <p class="ficha-texto">Búsqueda de personas p95 &lt; 2 segundos para al menos 100,000 personas.</p>
+        </article>
+        <article class="ficha" id="cs-003">
+          <span class="ficha-id mono">CS-003</span>
+          <p class="ficha-texto">Evaluación de acceso p95 &lt; 500 ms.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-004">
+          <span class="ficha-id mono">CS-004 <a class="marca-hallazgo" href="#f-01" title="Hallazgo abierto F-01">F-01</a> <a class="marca-hallazgo" href="#f-02" title="Hallazgo abierto F-02">F-02</a></span>
+          <p class="ficha-texto">100% de endpoints protegidos deben aplicar autenticación y alcance.</p>
+        </article>
+        <article class="ficha" id="cs-005">
+          <span class="ficha-id mono">CS-005</span>
+          <p class="ficha-texto">100% de operaciones de creación/actualización deben generar auditoría automáticamente.</p>
+        </article>
+        <article class="ficha" id="cs-006">
+          <span class="ficha-id mono">CS-006</span>
+          <p class="ficha-texto">100% de operaciones jerárquicas deben impedir ciclos.</p>
+        </article>
+        <article class="ficha" id="cs-007">
+          <span class="ficha-id mono">CS-007</span>
+          <p class="ficha-texto">100% de históricos deben permitir reconstrucción temporal.</p>
+        </article>
+        <article class="ficha" id="cs-008">
+          <span class="ficha-id mono">CS-008</span>
+          <p class="ficha-texto">Las historias P1 deben tener pruebas automatizadas antes de liberar.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-009">
+          <span class="ficha-id mono">CS-009 <a class="marca-hallazgo" href="#f-04" title="Hallazgo abierto F-04">F-04</a></span>
+          <p class="ficha-texto">Un usuario debe poder crear una jerarquía de tres niveles y configurar un permiso horario.</p>
+        </article>
+        <article class="ficha" id="cs-010">
+          <span class="ficha-id mono">CS-010</span>
+          <p class="ficha-texto">Una Compañía Principal puede tener múltiples árboles de Unidad Organizativa (varios nodos raíz) simultáneamente.</p>
+        </article>
+        <article class="ficha" id="cs-011">
+          <span class="ficha-id mono">CS-011</span>
+          <p class="ficha-texto">Dos Compañías Principales diferentes nunca comparten Unidades Organizativas.</p>
+        </article>
+        <article class="ficha" id="cs-012">
+          <span class="ficha-id mono">CS-012</span>
+          <p class="ficha-texto">Una Compañía Contratista puede estar relacionada simultáneamente con múltiples Compañías Principales mediante <code>RelaciónContratistaPrincipal</code>.</p>
+        </article>
+        <article class="ficha" id="cs-013">
+          <span class="ficha-id mono">CS-013</span>
+          <p class="ficha-texto">Una persona perteneciente a una Compañía Contratista puede tener simultáneamente contextos operativos vigentes con múltiples Compañías Principales.</p>
+        </article>
+        <article class="ficha" id="cs-014">
+          <span class="ficha-id mono">CS-014</span>
+          <p class="ficha-texto">Una persona puede tener una Unidad Organizativa diferente para cada Compañía Principal con la que tenga contexto operativo vigente.</p>
+        </article>
+        <article class="ficha" id="cs-015">
+          <span class="ficha-id mono">CS-015</span>
+          <p class="ficha-texto">Una persona puede tener permisos diferentes para cada Compañía Principal con la que tenga contexto operativo vigente.</p>
+        </article>
+        <article class="ficha" id="cs-016">
+          <span class="ficha-id mono">CS-016</span>
+          <p class="ficha-texto">Una persona puede tener una credencial diferente para cada Compañía Principal con la que tenga contexto operativo vigente.</p>
+        </article>
+        <article class="ficha" id="cs-017">
+          <span class="ficha-id mono">CS-017</span>
+          <p class="ficha-texto">Una persona puede tener credenciales vigentes simultáneamente para dos Compañías Principales diferentes.</p>
+        </article>
+        <article class="ficha" id="cs-018">
+          <span class="ficha-id mono">CS-018</span>
+          <p class="ficha-texto">El acceso a un área de la Compañía Principal A nunca puede ser otorgado por un permiso correspondiente a la Compañía Principal B.</p>
+        </article>
+        <article class="ficha" id="cs-019">
+          <span class="ficha-id mono">CS-019</span>
+          <p class="ficha-texto">Una persona perteneciente a una Compañía Contratista solamente puede abrir un contexto operativo con una Compañía Principal si existe una <code>RelaciónContratistaPrincipal</code> vigente entre su compañía y esa Principal.</p>
+        </article>
+        <article class="ficha" id="cs-020">
+          <span class="ficha-id mono">CS-020</span>
+          <p class="ficha-texto">Una persona perteneciente directamente a una Compañía Principal utiliza automáticamente esa Principal como su contexto operativo, sin poder seleccionar una Principal arbitraria.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-021">
+          <span class="ficha-id mono">CS-021 <a class="marca-hallazgo" href="#f-04" title="Hallazgo abierto F-04">F-04</a></span>
+          <p class="ficha-texto">El árbol mostrado en la pantalla de asignación de Unidad Organizativa para una persona de una Compañía Contratista corresponde exclusivamente a la Compañía Principal seleccionada.</p>
+        </article>
+        <article class="ficha" id="cs-022">
+          <span class="ficha-id mono">CS-022</span>
+          <p class="ficha-texto">La asignación de una credencial requiere obligatoriamente una Compañía Principal y un TipoCredencial.</p>
+        </article>
+        <article class="ficha" id="cs-023">
+          <span class="ficha-id mono">CS-023</span>
+          <p class="ficha-texto"><code>TipoCredencial</code> representa el diseño/tipo visual de la credencial, nunca una tecnología de identificación física (RFID, QR, NFC, código de barras).</p>
+        </article>
+        <article class="ficha" id="cs-024">
+          <span class="ficha-id mono">CS-024</span>
+          <p class="ficha-texto">Una credencial emitida en el contexto de la Compañía Principal A no puede utilizarse para satisfacer las reglas de contexto o autorización de la Compañía Principal B.</p>
+        </article>
+        <article class="ficha" id="cs-025">
+          <span class="ficha-id mono">CS-025</span>
+          <p class="ficha-texto">Cuando finaliza la pertenencia de una persona a su compañía, todos sus contextos operativos, asignaciones de unidad organizativa y credenciales vigentes que dependan de esa pertenencia quedan revocados automáticamente, sin intervención manual adicional.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-026">
+          <span class="ficha-id mono">CS-026 <a class="marca-hallazgo" href="#f-12" title="Hallazgo abierto F-12">F-12</a></span>
+          <p class="ficha-texto">Ningún registro histórico se elimina físicamente ni cambia su <code>FechaHoraInicio</code> como consecuencia de la revocación automática.</p>
+        </article>
+        <article class="ficha" id="cs-027">
+          <span class="ficha-id mono">CS-027</span>
+          <p class="ficha-texto">Una persona que trabaja simultáneamente para varias Compañías Principales pierde el acceso derivado de <strong>todas ellas</strong> cuando termina la única pertenencia (Contratista) de la que dependían, pero conserva sin cambios cualquier contexto que dependa de una pertenencia distinta y posterior.</p>
+        </article>
+        <article class="ficha" id="cs-028">
+          <span class="ficha-id mono">CS-028</span>
+          <p class="ficha-texto">Un cese de pertenencia registrado con fecha de fin futura mantiene los accesos derivados vigentes hasta esa fecha, y los revoca automáticamente a partir de ese instante, sin requerir un proceso programado separado.</p>
+        </article>
+        <article class="ficha" id="cs-029">
+          <span class="ficha-id mono">CS-029</span>
+          <p class="ficha-texto">La re-validación dinámica de la evaluación de acceso sigue denegando el acceso derivado de una pertenencia no vigente, incluso en un escenario hipotético donde la revocación en cascada no se hubiera aplicado correctamente sobre algún registro.</p>
+        </article>
+        <article class="ficha" id="cs-030">
+          <span class="ficha-id mono">CS-030</span>
+          <p class="ficha-texto">Ninguna regla del sistema limita el número de Compañías Principales distintas para las que una persona puede tener <code>ContextoOperativoPersonaPrincipal</code> vigentes simultáneamente — el único límite es que cada una de esas Principales debe estar sustentada legítimamente por la compañía de pertenencia vigente de la persona (directamente, o vía <code>RelaciónContratistaPrincipal</code> vigente si es una Contratista). En particular, <a href="#rf-014">RF-014</a> (máximo una compañía de pertenencia activa) NO impone ningún límite al número de Principales simultáneas.</p>
+        </article>
+        <article class="ficha" id="cs-031">
+          <span class="ficha-id mono">CS-031</span>
+          <p class="ficha-texto">El acceso se deniega si la persona no tiene una <code>AsignaciónCredencial</code> vigente en Estado <code>ASIGNADO</code> para la Compañía Principal propietaria del área evaluada, incluso si el resto de las reglas de <a href="#us-8">Historia 8</a> (contexto operativo, área activa, perfil, unidad organizativa, permiso, vigencia, horario) se cumplen.</p>
+        </article>
+        <article class="ficha ficha-afectada" id="cs-032">
+          <span class="ficha-id mono">CS-032 <a class="marca-hallazgo" href="#f-03" title="Hallazgo abierto F-03">F-03</a></span>
+          <p class="ficha-texto">Las consultas agregadas/transversales de auditoría, históricos e indicadores operativos (<a href="#us-10">Historia 10</a>) respetan siempre el alcance de compañías del usuario autenticado — ningún usuario puede observar, mediante estas vistas, actividad de una compañía fuera de su alcance.</p>
+        </article>
+        <article class="ficha" id="cs-033">
+          <span class="ficha-id mono">CS-033</span>
+          <p class="ficha-texto">Ninguna asociación temporal vinculada a una persona (<code>AsignaciónPersonaCompañía</code>, <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code>, <code>AsignaciónCredencial</code>, <code>AsignaciónTipoPersona</code>, <code>PermisoAcceso</code>) puede crearse con <code>FechaHoraFin</code> nula o con una fecha centinela; siempre requiere una fecha/hora real y conocida desde la creación (<a href="#rf-071">RF-071</a>).</p>
+        </article>
+        <article class="ficha" id="cs-034">
+          <span class="ficha-id mono">CS-034</span>
+          <p class="ficha-texto">Dada una <code>AsignaciónPersonaCompañía</code> con <code>FechaHoraInicio = 01/08/2026</code> y <code>FechaHoraFin = 31/07/2027</code>, una <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code> o <code>AsignaciónCredencial</code> dependiente de ella: (a) con <code>FechaHoraFin = 31/03/2027</code> es válida; (b) con <code>FechaHoraFin</code> igual a <code>31/07/2027</code> (la misma fecha que la pertenencia) es válida; (c) con <code>FechaHoraFin = 01/08/2027</code> es inválida (excede la vigencia de la pertenencia); (d) con <code>FechaHoraInicio = 01/07/2026</code> (anterior al inicio de la pertenencia) es inválida (<a href="#rf-072">RF-072</a>).</p>
+        </article>
+        <article class="ficha" id="cs-035">
+          <span class="ficha-id mono">CS-035</span>
+          <p class="ficha-texto">Renovar una <code>AsignaciónPersonaCompañía</code> extendiendo su <code>FechaHoraFin</code> de <code>31/07/2027</code> a <code>31/01/2028</code> no modifica <code>FechaHoraInicio</code>, no modifica <code>Estado</code> ni <code>MotivoFin</code>, y no cambia la <code>FechaHoraFin</code> de ningún <code>ContextoOperativoPersonaPrincipal</code>, <code>AsignaciónPersonaUnidadOrganizativa</code> o <code>AsignaciónCredencial</code> ya existente de esa persona; solo amplía el techo temporal permitido (<a href="#rf-072">RF-072</a>) para asociaciones creadas después de la renovación (<a href="#rf-073">RF-073</a>).</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="reglas">
+      <div class="section-head"><span class="letter">RN</span><h2>Reglas de negocio transversales</h2></div>
+      <p class="prose muted">El spec no numera reglas de negocio de forma independiente: cada una vive dentro de sus RF. Esta tabla las agrupa por tema y cita su origen, sin crear identificadores nuevos.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Regla</th><th>Enunciado</th><th>Origen</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Denegación por defecto</strong></td><td>Cualquier paso de la evaluación sin resultado inequívoco produce DENEGADO.</td><td><a href="#rf-023">RF-023</a>, <a href="#rf-059">RF-059</a>, <a href="#rf-066">RF-066</a></td></tr>
+            <tr><td><strong>Aislamiento por compañía</strong></td><td>Toda consulta y operación se limita al alcance de compañías del usuario autenticado; fuera de alcance se responde 404, no 403.</td><td><a href="#rf-005">RF-005</a>, <a href="#rf-049">RF-049</a>, <a href="#rf-060">RF-060</a></td></tr>
+            <tr><td><strong>Aislamiento entre Principales</strong></td><td>Un permiso, unidad o credencial de una Principal nunca satisface una evaluación de otra.</td><td><a href="#rf-043">RF-043</a>, <a href="#rf-046">RF-046</a>, <a href="#rf-055">RF-055</a>, <a href="#cs-018">CS-018</a></td></tr>
+            <tr><td><strong>Vigencia obligatoria</strong></td><td>Toda asociación temporal de una persona nace con inicio y fin reales; no existe vigencia indefinida ni fecha centinela.</td><td><a href="#rf-071">RF-071</a>, <a href="#cs-033">CS-033</a></td></tr>
+            <tr><td><strong>Vigencia por fechas, no por estado</strong></td><td>El estado es administrativo; la vigencia efectiva siempre se calcula comparando fechas contra el instante evaluado.</td><td><a href="#rf-063">RF-063</a>, <a href="#rf-070">RF-070</a></td></tr>
+            <tr><td><strong>No-solapamiento</strong></td><td>Cinco particiones distintas, validadas en la aplicación y respaldadas por trigger en la base de datos.</td><td><a href="#rf-014">RF-014</a>, <a href="#rf-015">RF-015</a>, <a href="#rf-051">RF-051</a>, <a href="#rf-052">RF-052</a>, <a href="#rf-057">RF-057</a></td></tr>
+            <tr><td><strong>Contención temporal</strong></td><td>Contexto operativo, unidad organizativa y credencial deben caber dentro de la pertenencia vigente al crearse.</td><td><a href="#rf-072">RF-072</a>, <a href="#cs-034">CS-034</a></td></tr>
+            <tr><td><strong>Revocación automática en cascada</strong></td><td>Cerrar una pertenencia revoca sus dependientes en la misma transacción, sin borrar histórico y sin extender fechas.</td><td><a href="#rf-061">RF-061</a> a <a href="#rf-065">RF-065</a>, <a href="#cs-025">CS-025</a> a <a href="#cs-028">CS-028</a></td></tr>
+            <tr><td><strong>Renovación</strong></td><td>Solo extiende el fin de una pertenencia ACTIVA y aún vigente; nunca acorta, nunca dispara cascada.</td><td><a href="#rf-073">RF-073</a>, <a href="#cs-035">CS-035</a></td></tr>
+            <tr><td><strong>Histórico íntegro</strong></td><td>Ninguna operación elimina físicamente un registro ni modifica su fecha de inicio.</td><td><a href="#rf-063">RF-063</a>, <a href="#cs-026">CS-026</a></td></tr>
+            <tr><td><strong>Auditoría automática</strong></td><td>Las cuatro columnas de auditoría las estampa el sistema; nunca llegan desde el payload.</td><td><a href="#rf-026">RF-026</a>, <a href="#rf-027">RF-027</a>, <a href="#cs-005">CS-005</a></td></tr>
+            <tr><td><strong>Credencial como condición necesaria</strong></td><td>Sin credencial vigente para la Principal evaluada no hay acceso, aunque el resto de reglas se cumpla.</td><td><a href="#rf-066">RF-066</a>, <a href="#cs-031">CS-031</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="entidades">
+      <div class="section-head"><span class="letter">EN</span><h2>Entidades principales</h2></div>
+      <ul class="lista-simple">
+        <li>Usuario</li>
+        <li>HistorialContraseña</li>
+        <li>AlcanceUsuarioCompañía</li>
+        <li>Compañía (clasificada como PRINCIPAL_MANDANTE o CONTRATISTA)</li>
+        <li>RelaciónContratistaPrincipal (relación vigente entre una Compañía CONTRATISTA y una o varias Compañías</li>
+        <li>UnidadOrganizativa (sin relación directa hacia Compañía)</li>
+        <li>CompañíaPrincipalUnidadOrganizativaRaiz (enlace exclusivo de nodos raíz de UnidadOrganizativa con su</li>
+        <li>TipoPersona</li>
+        <li>Persona</li>
+        <li>AsignaciónTipoPersona</li>
+        <li>AsignaciónPersonaCompañía (histórico de compañía de pertenencia/empleadora; su cierre dispara revocación</li>
+        <li>ContextoOperativoPersonaPrincipal (relación operativa vigente entre una Persona y una Compañía Principal;</li>
+        <li>AsignaciónPersonaUnidadOrganizativa (dentro de un contexto operativo; revocable automáticamente — <a href="#rf-061">RF-061</a>)</li>
+        <li>ÁreaAcceso (pertenece a exactamente una Compañía Principal)</li>
+        <li>ÁreaAccesoTipoPersona</li>
+        <li>PermisoAcceso</li>
+        <li>BloqueHorarioPermiso</li>
+        <li>TipoCredencial (tipo/diseño visual de credencial, no tecnología de identificación física)</li>
+        <li>AsignaciónCredencial (dentro del contexto de una Compañía Principal; revocable automáticamente, estado</li>
+        <li>TipoDocumento</li>
+        <li>TipoSangre</li>
+        <li>Género</li>
+      </ul>
+    </section>
+
+    <section id="enums">
+      <div class="section-head"><span class="letter">EV</span><h2>Estados y enumerados</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Enumerado</th><th>Valores</th></tr></thead>
+          <tbody>
+            <tr><td><code>EstadoCredencial</code></td><td class="chips-cell"><span class="chip">ASIGNADO</span> <span class="chip">DEVUELTO</span> <span class="chip">ELIMINADO</span> <span class="chip">REVOCADA</span></td></tr>
+            <tr><td><code>MotivoFinRevocacion</code></td><td><span class="chip">REVOCACION_CESE_PERTENENCIA</span> <span class="chip">REEMPLAZO_ASIGNACION</span> <span class="chip">CIERRE_MANUAL</span></td></tr>
+            <tr><td><code>AlcancePermiso</code></td><td><span class="chip">PERSONA</span> <span class="chip">UNIDAD_ORGANIZATIVA</span> <span class="chip">COMPANIA</span></td></tr>
+            <tr><td><code>MotivoDenegacion</code></td><td><span class="chip">PERSONA_NO_ENCONTRADA</span> <span class="chip">AREA_NO_ENCONTRADA</span> <span class="chip">FUERA_DE_ALCANCE_USUARIO</span> <span class="chip">SIN_CONTEXTO_OPERATIVO_VIGENTE</span> <span class="chip">RELACION_CONTRATISTA_PRINCIPAL_VENCIDA</span> <span class="chip">SIN_CREDENCIAL_VIGENTE</span> <span class="chip">AREA_INACTIVA</span> <span class="chip">PERFIL_NO_AUTORIZADO_EN_AREA</span> <span class="chip">SIN_PERMISO_APLICABLE</span> <span class="chip">PERMISO_FUERA_DE_VIGENCIA</span> <span class="chip">FUERA_DE_BLOQUE_HORARIO</span></td></tr>
+            <tr><td><code>DiaSemana</code></td><td><span class="chip">LUNES</span> <span class="chip">MARTES</span> <span class="chip">MIERCOLES</span> <span class="chip">JUEVES</span> <span class="chip">VIERNES</span> <span class="chip">SABADO</span> <span class="chip">DOMINGO</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="codigos">
+      <div class="section-head"><span class="letter">EC</span><h2>Códigos de error de negocio</h2></div>
+      <p class="prose muted">Constantes declaradas en <code>CodigosError</code>. Viajan en la extensión <code>codigo</code> de ProblemDetails.</p>
+      <div class="chips">
+        <span class="chip">SOLAPAMIENTO_VIGENCIA</span>
+        <span class="chip">PERIODO_INVALIDO</span>
+        <span class="chip">FUERA_DE_CONTENCION_TEMPORAL</span>
+        <span class="chip">FECHA_FIN_OBLIGATORIA</span>
+        <span class="chip">RENOVACION_NO_POSTERIOR</span>
+        <span class="chip">PERTENENCIA_NO_RENOVABLE</span>
+        <span class="chip">PRINCIPAL_NO_CORRESPONDE_A_PERTENENCIA</span>
+        <span class="chip">SIN_RELACION_CONTRATISTA_PRINCIPAL_VIGENTE</span>
+        <span class="chip">SIN_CONTEXTO_OPERATIVO_VIGENTE</span>
+        <span class="chip">SIN_PERTENENCIA_VIGENTE</span>
+        <span class="chip">CICLO_JERARQUICO</span>
+        <span class="chip">COMPANIA_DEBE_SER_PRINCIPAL</span>
+        <span class="chip">CREDENCIAL_NO_ASIGNADA</span>
+        <span class="chip">VALOR_MAESTRO_INACTIVO</span>
+        <span class="chip">CONFLICTO_CONCURRENCIA</span>
+        <span class="chip">RECURSO_NO_ENCONTRADO</span>
+        <span class="chip">VALIDACION_ENTRADA</span>
+      </div>
+    </section>
+
+    <section id="contratos">
+      <div class="section-head"><span class="letter">API</span><h2>Contratos y rutas</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Contrato</th><th>Rutas</th><th>Detalle</th></tr></thead>
+          <tbody>
+            <tr><td><code>access-evaluation.yaml</code></td><td class="mono">1</td><td><code>/api/evaluacion-acceso</code></td></tr>
+            <tr><td><code>area-access.yaml</code></td><td class="mono">5</td><td><code>/api/areas-acceso</code><br><code>/api/areas-acceso/arbol</code><br><code>/api/areas-acceso/{id}</code><br><code>/api/areas-acceso/{id}/mover</code><br><code>/api/areas-acceso/{id}/tipos-persona</code></td></tr>
+            <tr><td><code>auth.yaml</code></td><td class="mono">3</td><td><code>/api/auth/login</code><br><code>/api/auth/cambiar-password</code><br><code>/api/auth/sesion</code></td></tr>
+            <tr><td><code>companies.yaml</code></td><td class="mono">4</td><td><code>/api/companias</code><br><code>/api/companias/{id}</code><br><code>/api/companias/{contratistaId}/relaciones-principales</code><br><code>/api/companias/{contratistaId}/relaciones-principales/{id}/finalizar</code></td></tr>
+            <tr><td><code>credentials.yaml</code></td><td class="mono">3</td><td><code>/api/personas/{personaId}/credenciales</code><br><code>/api/personas/{personaId}/credenciales/{id}/devolver</code><br><code>/api/personas/{personaId}/credenciales/{id}</code></td></tr>
+            <tr><td><code>masters.yaml</code></td><td class="mono">10</td><td><code>/api/maestros/tipos-documento</code><br><code>/api/maestros/tipos-documento/{id}</code><br><code>/api/maestros/tipos-sangre</code><br><code>/api/maestros/tipos-sangre/{id}</code><br><code>/api/maestros/generos</code><br><code>/api/maestros/generos/{id}</code><br><code>/api/maestros/tipos-persona</code><br><code>/api/maestros/tipos-persona/{id}</code><br><code>/api/maestros/tipos-credencial</code><br><code>/api/maestros/tipos-credencial/{id}</code></td></tr>
+            <tr><td><code>org-units.yaml</code></td><td class="mono">4</td><td><code>/api/unidades-organizativas</code><br><code>/api/unidades-organizativas/arbol</code><br><code>/api/unidades-organizativas/{id}</code><br><code>/api/unidades-organizativas/{id}/mover</code></td></tr>
+            <tr><td><code>people.yaml</code></td><td class="mono">9</td><td><code>/api/personas</code><br><code>/api/personas/{id}</code><br><code>/api/personas/{id}/estado-efectivo</code><br><code>/api/personas/{id}/historial-companias</code><br><code>/api/personas/{id}/historial-companias/{asignacionId}/finalizar</code><br><code>/api/personas/{id}/historial-companias/{asignacionId}/renovar</code><br><code>/api/personas/{id}/contextos-operativos</code><br><code>/api/personas/{id}/contextos-operativos/{contextoId}/unidad-organizativa</code><br><code>/api/personas/{id}/perfiles</code></td></tr>
+            <tr><td><code>permissions.yaml</code></td><td class="mono">2</td><td><code>/api/permisos</code><br><code>/api/permisos/{id}</code></td></tr>
+            <tr><td><code>users.yaml</code></td><td class="mono">4</td><td><code>/api/usuarios</code><br><code>/api/usuarios/{id}</code><br><code>/api/usuarios/{id}/desbloquear</code><br><code>/api/usuarios/{id}/alcance-companias</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decisiones">
+      <div class="section-head"><span class="letter">DP</span><h2>Decisiones de negocio</h2></div>
+      <div class="fichas">
+        <article class="ficha" id="decision-1">
+          <span class="ficha-id mono">#1 <span class="pill warn">Abierta</span></span>
+          <p class="ficha-texto">Umbrales concretos de política de contraseña: número de intentos fallidos antes de bloqueo, período de expiración y flujo de recuperación (MFA descartado para esta fase; ver Clarifications).</p>
+        </article>
+        <article class="ficha" id="decision-2">
+          <span class="ficha-id mono">#2 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del>Si una credencial necesita un identificador físico adicional: número, código de barras, QR, UID, etc.</del> <strong>Resuelto (Sesión 2026-09-14, corrección Contexto Operativo)</strong>: NO. <code>TipoCredencial</code> es únicamente tipo/diseño visual; no se incorpora ningún identificador físico ni tecnología de identificación salvo que negocio lo solicite explícitamente en el futuro (<a href="#rf-058">RF-058</a>).</p>
+        </article>
+        <article class="ficha" id="decision-3">
+          <span class="ficha-id mono">#3 <span class="pill warn">Abierta</span></span>
+          <p class="ficha-texto">Requisitos legales de privacidad y retención de información.</p>
+        </article>
+        <article class="ficha" id="decision-4">
+          <span class="ficha-id mono">#4 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del>Al cambiar la compañía vigente de una persona (nueva <code>AsignaciónPersonaCompañía</code>), ¿deben cerrarse automáticamente sus contextos operativos, asignaciones de unidad organizativa y credenciales vigentes, o permanecen abiertos hasta su cierre manual o vencimiento natural de su propia vigencia?</del> <strong>Resuelto — corregido en Sesión 2026-09-14 "corrección Revocación Automática"</strong> (reemplaza la resolución previa de la Sesión "auditoría final de consistencia", que solo exigía re-validación dinámica): SÍ deben revocarse automáticamente en cascada — es obligatorio, no opcional. Ver <a href="#rf-061">RF-061</a> a <a href="#rf-065">RF-065</a> y <a href="#us-5">Historia 5</a>, "Revocación automática por cese de pertenencia".</p>
+        </article>
+        <article class="ficha" id="decision-5">
+          <span class="ficha-id mono">#5 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del>¿Debe poder declararse más de un <code>ContextoOperativoPersonaPrincipal</code> simultáneo entre la misma persona y la misma Principal en algún escenario (p. ej. dos roles distintos con la misma Principal), o la exclusividad por par (Persona, Principal) es siempre correcta?</del> <strong>Resuelto (Sesión 2026-09-14, auditoría final de consistencia)</strong>: NO; la exclusividad estricta por par <code>(PersonaId, CompañíaPrincipalId)</code> de <a href="#rf-052">RF-052</a> se confirma como decisión final. Ningún caso de negocio establecido requiere múltiples contextos simultáneos con la misma Principal.</p>
+        </article>
+        <article class="ficha" id="decision-6">
+          <span class="ficha-id mono">#6 <span class="pill warn">Abierta</span></span>
+          <p class="ficha-texto">¿Debe aplicarse la misma revocación automática en cascada cuando finaliza una <code>RelaciónContratistaPrincipal</code> (en vez de una pertenencia Persona–Compañía), o cuando una <code>Compañía</code> es marcada <code>INACTIVO</code> administrativamente (afectando potencialmente a todo su personal a la vez)? Ninguno de los dos casos fue especificado por negocio en esta corrección (que se limitó explícitamente al cese de pertenencia Persona–Compañía); por ahora ambos permanecen protegidos únicamente por la re-validación dinámica de la evaluación de acceso (<a href="#rf-059">RF-059</a>/<a href="#rf-065">RF-065</a>), sin cascada de escritura equivalente a <a href="#rf-061">RF-061</a>. Requiere confirmación de negocio si se desea extender el mismo mecanismo.</p>
+        </article>
+        <article class="ficha" id="decision-7">
+          <span class="ficha-id mono">#7 <span class="pill warn">Abierta</span></span>
+          <p class="ficha-texto"><strong>(Nueva — Sesión 2026-09-14, integración <code>ux-ui.md</code>)</strong> <a href="#rf-066">RF-066</a> hace que la evaluación de acceso (<a href="#us-8">Historia 8</a>, P1) dependa funcionalmente de que exista una <code>AsignaciónCredencial</code> vigente (<a href="#us-9">Historia 9</a>, actualmente P2): sin credencial asignada, ninguna persona puede obtener <code>CONCEDIDO</code>, sin importar cuán completos sean sus permisos. ¿Debe elevarse la prioridad de <a href="#us-9">Historia 9</a> a P1 para reflejar que dejó de ser una funcionalidad complementaria y pasó a ser un prerrequisito operativo de <a href="#us-8">Historia 8</a>? Esta sesión de clarificación resolvió la regla de negocio (<a href="#rf-066">RF-066</a>) pero <strong>no</strong> la pregunta de alcance/priorización de entrega — queda pendiente de decisión explícita antes de que se vea reflejada en <code>tasks.md</code>.</p>
+        </article>
+        <article class="ficha" id="decision-8">
+          <span class="ficha-id mono">#8 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del><code>AsignaciónPersonaCompañía</code>, <code>ContextoOperativoPersonaPrincipal</code> y <code>AsignaciónPersonaUnidadOrganizativa</code> conservan en <code>data-model.md</code> la misma redacción de campo que <code>AsignaciónCredencial</code> tenía antes de la sesión de auditoría de <a href="#rf-066">RF-066</a> ("<code>FechaHoraFin</code>... <code>null</code> mientras esté vigente"). ¿Tienen la misma necesidad de permitir <code>FechaHoraFin</code> con valor mientras están vigentes?</del> <strong>Resuelto dos veces (Sesión 2026-09-14): primero</strong> en la sesión de cierre de Decisión Pendiente #8, que concluyó que NO era necesario extender la semántica de <code>AsignaciónCredencial</code> a las otras tres (sus contratos de creación estructuralmente lo impedían). <strong>Después, REEMPLAZADO por una decisión de negocio más amplia</strong> en la Sesión "vigencia temporal jerárquica": <code>FechaHoraFin</code> deja de ser nullable <strong>para las seis entidades</strong> vinculadas a una persona (no solo para las tres originalmente en duda) — ya no es una pregunta de "permitir valor mientras vigente", sino de exigir siempre un valor real desde la creación, sin <code>null</code> como opción. Ver <a href="#rf-071">RF-071</a>, <a href="#rf-072">RF-072</a>.</p>
+        </article>
+        <article class="ficha" id="decision-9">
+          <span class="ficha-id mono">#9 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del>¿Puede extenderse hacia adelante la <code>FechaHoraFin</code> de una <code>AsignaciónPersonaCompañía</code> ya creada (p. ej. renovación de un contrato cuyo plazo se amplía), o toda extensión de vigencia requiere necesariamente crear una nueva <code>AsignaciónPersonaCompañía</code>?</del> <strong>Resuelto (Sesión 2026-09-14, "renovación de AsignaciónPersonaCompañía")</strong>: SÍ, mediante una operación explícita de <strong>renovación</strong>, distinta del reemplazo/cese, que solo extiende <code>FechaHoraFin</code> hacia una fecha posterior, sin crear una nueva <code>AsignaciónPersonaCompañía</code>, sin modificar <code>FechaHoraInicio</code> ni <code>Estado</code>, y sin afectar a las asociaciones dependientes ya existentes. Ver <a href="#rf-073">RF-073</a>.</p>
+        </article>
+        <article class="ficha" id="decision-10">
+          <span class="ficha-id mono">#10 <span class="pill ok">Resuelta</span></span>
+          <p class="ficha-texto"><del>Las reglas de renovación (<a href="#rf-073">RF-073</a>) especifican que la nueva <code>FechaHoraFin</code> debe ser posterior a la ya vigente, pero no especifican si esto incluye el caso en que la pertenencia ya expiró <strong>dinámicamente</strong> antes de renovarse (<code>Estado = ACTIVA</code> pero <code>FechaHoraFin</code> ya anterior a la fecha actual)?</del> <strong>Resuelto (Sesión 2026-09-14, "cierre Decisión Pendiente #10")</strong>: NO. La renovación exige, además de <code>Estado = ACTIVA</code>, que la pertenencia siga <strong>vigente dinámicamente</strong> en el momento de renovar (<code>fecha actual &lt;= FechaHoraFin</code> ya declarada). Si <code>FechaHoraFin</code> ya pasó — aunque <code>Estado</code> continúe <code>ACTIVA</code> porque nadie la cerró administrativamente —, la pertenencia NO es renovable: se rechaza, y DEBE crearse una nueva <code>AsignaciónPersonaCompañía</code> (histórico secuencial, <a href="#rf-014">RF-014</a>) en su lugar. Esto ya estaba soportado sin cambios adicionales: al no haber solapamiento posible entre una pertenencia dinámicamente expirada y una nueva que inicia después, la anterior no se modifica (<a href="#rf-063">RF-063</a>, "Validaciones clave" de <code>AsignaciónPersonaCompañía</code> en data-model.md). Ver <a href="#rf-073">RF-073</a> (ampliado).</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="sesiones">
+      <div class="section-head"><span class="letter">CL</span><h2>Sesiones de clarificación</h2></div>
+      <ol class="lista-simple">
+        <li>Session 2026-09-14</li>
+        <li>Sesión 2026-09-14 (corrección funcional: Compañía Principal/Mandante vs. Contratista)</li>
+        <li>Sesión 2026-09-14 (corrección funcional: Contexto Operativo Persona↔Principal y Relación</li>
+        <li>Sesión 2026-09-14 (auditoría final de consistencia — Contexto Operativo)</li>
+        <li>Sesión 2026-09-14 (corrección funcional: Revocación Automática por Cese de Pertenencia)</li>
+        <li>Sesión 2026-09-14 (corrección funcional: Modelo de Cardinalidad Definitivo — <a href="#rf-014">RF-014</a> no limita</li>
+        <li>Sesión 2026-09-14 (corrección funcional: integración de <code>ux-ui.md</code> — Credencial como factor de gating,</li>
+        <li>Sesión 2026-09-14 (corrección funcional: auditoría de consistencia de <a href="#rf-066">RF-066</a> — vigencia temporal de</li>
+        <li>Sesión 2026-09-14 (corrección funcional: vigencia temporal jerárquica de las asociaciones de una</li>
+        <li>Sesión 2026-09-14 (corrección funcional: renovación de <code>AsignaciónPersonaCompañía</code> — cierra Decisión</li>
+        <li>Sesión 2026-09-14 (cierre de Decisión Pendiente #10 — renovación exige vigencia dinámica)</li>
+        <li>Sesión 2026-09-15 (decisión A: sin cierre automático de la credencial previa)</li>
+      </ol>
+    </section>
+
+    <section id="supuestos">
+      <div class="section-head"><span class="letter">SU</span><h2>Supuestos</h2></div>
+      <ul class="lista-simple">
+        <li>Aplicación web con frontend y backend API separados.</li>
+        <li>Base de datos relacional.</li>
+        <li>Stack tecnológico ratificado (decisión arquitectónica del usuario, Sesión 2026-09-14): .NET 10, ASP.NET</li>
+        <li>Perú es el locale inicial.</li>
+        <li>Los timestamps persistidos utilizan UTC.</li>
+        <li>Las reglas de negocio de horario utilizan <code>America/Lima</code>.</li>
+        <li>Una persona puede tener múltiples tipos/perfiles, salvo que negocio defina lo contrario.</li>
+        <li>Los permisos iniciales son concesiones; el modelo de denegación explícita queda para una fase posterior.</li>
+        <li>El ID interno es UID/UUID y no se muestra en pantallas normales.</li>
+        <li>La autenticación multifactor (MFA) queda fuera de alcance en esta fase; el inicio de sesión usa</li>
+        <li>El sistema soporta una o varias Compañías Principales/Mandantes; cada una constituye su propio contexto</li>
+        <li>Una Compañía Contratista puede prestar servicios, de forma simultánea o en distintos períodos, a una o</li>
+        <li>Una persona puede tener, simultáneamente, unidad organizativa, permisos y credencial distintos e</li>
+      </ul>
+    </section>
+
+    <section id="hallazgos">
+      <div class="section-head"><span class="letter">HA</span><h2>Hallazgos abiertos</h2></div>
+      <p class="prose muted">Los 23 hallazgos de la auditoría consolidada del 16/09, ninguno corregido a esa fecha. Cada uno enlaza a su ficha en la auditoría; la columna de requisitos vuelve a este catálogo y la de categoría lleva a la <a href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#clasificacion">clasificación de resolución</a>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Hallazgo</th><th>Severidad</th><th>Cat.</th><th>Descripción</th><th>Requisitos afectados</th></tr></thead>
+          <tbody>
+            <tr id="f-01"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-01">F-01</a></td><td class="state"><span class="pill bad">Crítico</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-01" title="Ver la clasificación de F-01"><span class="cat cat-a">A</span><span class="cat cat-d">D</span></a></td><td>Administración de usuarios sin alcance</td><td><a href="#rf-005">RF-005</a>, <a href="#rf-004">RF-004</a>, <a href="#rf-050">RF-050</a>, <a href="#cs-004">CS-004</a></td></tr>
+            <tr id="f-02"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-02">F-02</a></td><td class="state"><span class="pill bad">Alto</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-02" title="Ver la clasificación de F-02"><span class="cat cat-a">A</span><span class="cat cat-d">D</span></a></td><td>Alcance no aplicado en el histórico de persona</td><td><a href="#rf-005">RF-005</a>, <a href="#rf-049">RF-049</a>, <a href="#rf-060">RF-060</a>, <a href="#cs-004">CS-004</a></td></tr>
+            <tr id="f-03"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-03">F-03</a></td><td class="state"><span class="pill bad">Alto</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-03" title="Ver la clasificación de F-03"><span class="cat cat-c">C</span><span class="cat cat-a">A</span></a></td><td>Consultas transversales inexistentes</td><td><a href="#rf-067">RF-067</a>, <a href="#rf-068">RF-068</a>, <a href="#rf-069">RF-069</a>, <a href="#rf-040">RF-040</a>, <a href="#cs-032">CS-032</a></td></tr>
+            <tr id="f-04"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-04">F-04</a></td><td class="state"><span class="pill bad">Alto</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-04" title="Ver la clasificación de F-04"><span class="cat cat-a">A</span><span class="cat cat-d">D</span><span class="cat cat-c">C</span></a></td><td>T116: pantalla Caso A y Caso B ausente</td><td><a href="#rf-053">RF-053</a>, <a href="#rf-054">RF-054</a>, <a href="#cs-009">CS-009</a>, <a href="#cs-021">CS-021</a></td></tr>
+            <tr id="f-05"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-05">F-05</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-05" title="Ver la clasificación de F-05"><span class="cat cat-d">D</span></a></td><td>Compañía o unidad INACTIVA no bloquean asignaciones</td><td><a href="#rf-032">RF-032</a></td></tr>
+            <tr id="f-06"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-06">F-06</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-06" title="Ver la clasificación de F-06"><span class="cat cat-d">D</span></a></td><td>T019: índice clúster en 1 de 6 entidades</td><td><a href="#cs-002">CS-002</a></td></tr>
+            <tr id="f-07"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-07">F-07</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-07" title="Ver la clasificación de F-07"><span class="cat cat-b">B</span><span class="cat cat-d">D</span></a></td><td>Cambio de contraseña obligatorio solo en la interfaz</td><td><a href="#rf-003">RF-003</a></td></tr>
+            <tr id="f-08"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-08">F-08</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-08" title="Ver la clasificación de F-08"><span class="cat cat-a">A</span><span class="cat cat-d">D</span><span class="cat cat-e">E</span></a></td><td>Día normalizado en UTC y desfase de fechas en la interfaz</td><td><a href="#rf-016">RF-016</a>, <a href="#rf-029">RF-029</a></td></tr>
+            <tr id="f-09"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-09">F-09</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-09" title="Ver la clasificación de F-09"><span class="cat cat-b">B</span><span class="cat cat-d">D</span></a></td><td>TipoCompania reclasificable con dependientes</td><td><a href="#rf-042">RF-042</a>, <a href="#rf-045">RF-045</a>, <a href="#rf-046">RF-046</a></td></tr>
+            <tr id="f-10"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-10">F-10</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-10" title="Ver la clasificación de F-10"><span class="cat cat-d">D</span></a></td><td>Finalizar pertenencia sin confirmación ni fecha efectiva</td><td><a href="#rf-064">RF-064</a></td></tr>
+            <tr id="f-11"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-11">F-11</a></td><td class="state"><span class="pill warn">Medio</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-11" title="Ver la clasificación de F-11"><span class="cat cat-e">E</span></a></td><td>Vocabulario de códigos de error sin declarar en los contratos</td><td><a href="#rf-040">RF-040</a>, <a href="#rf-033">RF-033</a></td></tr>
+            <tr id="f-12"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-12">F-12</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-12" title="Ver la clasificación de F-12"><span class="cat cat-d">D</span></a></td><td>Intervalos invertidos tras la cascada</td><td><a href="#rf-039">RF-039</a>, <a href="#rf-063">RF-063</a>, <a href="#cs-026">CS-026</a></td></tr>
+            <tr id="f-13"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-13">F-13</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-13" title="Ver la clasificación de F-13"><span class="cat cat-d">D</span></a></td><td>Sujeto de permiso sin validar Principal, estado ni alcance</td><td><a href="#rf-020">RF-020</a>, <a href="#rf-049">RF-049</a></td></tr>
+            <tr id="f-14"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-14">F-14</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-14" title="Ver la clasificación de F-14"><span class="cat cat-d">D</span></a></td><td>Perfiles duplicados solapados no rechazados</td><td><a href="#rf-011">RF-011</a>, <a href="#rf-039">RF-039</a></td></tr>
+            <tr id="f-15"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-15">F-15</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-15" title="Ver la clasificación de F-15"><span class="cat cat-d">D</span></a></td><td>Un 401 no notifica al guard de sesión</td><td><a href="#rf-034">RF-034</a></td></tr>
+            <tr id="f-16"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-16">F-16</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-16" title="Ver la clasificación de F-16"><span class="cat cat-d">D</span></a></td><td>La interfaz muestra UUID como respaldo</td><td><a href="#rf-013">RF-013</a></td></tr>
+            <tr id="f-17"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-17">F-17</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-17" title="Ver la clasificación de F-17"><span class="cat cat-d">D</span></a></td><td>Personas sin histórico escribibles conociendo su identificador</td><td><a href="#rf-005">RF-005</a>, <a href="#rf-035">RF-035</a></td></tr>
+            <tr id="f-18"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-18">F-18</a></td><td class="state"><span class="pill neutral">Documental</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-18" title="Ver la clasificación de F-18"><span class="cat cat-e">E</span></a></td><td>Rutas obsoletas en tasks.md</td><td><span class="muted">—</span></td></tr>
+            <tr id="f-19"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-19">F-19</a></td><td class="state"><span class="pill neutral">Documental</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-19" title="Ver la clasificación de F-19"><span class="cat cat-e">E</span></a></td><td>research.md §7 y §8 desalineados</td><td><span class="muted">—</span></td></tr>
+            <tr id="f-20"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-20">F-20</a></td><td class="state"><span class="pill neutral">Documental</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-20" title="Ver la clasificación de F-20"><span class="cat cat-e">E</span></a></td><td>Códigos 404/409 y motivos inalcanzables en contratos</td><td><a href="#rf-040">RF-040</a></td></tr>
+            <tr id="f-21"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-21">F-21</a></td><td class="state"><span class="pill neutral">Documental</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-21" title="Ver la clasificación de F-21"><span class="cat cat-e">E</span></a></td><td>data-model.md: cierre y normalización de relación</td><td><a href="#rf-016">RF-016</a></td></tr>
+            <tr id="f-22"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-22">F-22</a></td><td class="state"><span class="pill neutral">Bajo</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-22" title="Ver la clasificación de F-22"><span class="cat cat-d">D</span></a></td><td>Pertenencia vencida marcada como reemplazada</td><td><a href="#rf-014">RF-014</a>, <a href="#rf-063">RF-063</a></td></tr>
+            <tr id="f-23"><td class="id"><a href="auditoria-final-cierre-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-23">F-23</a></td><td class="state"><span class="pill neutral">Documental</span></td><td><a class="cats" href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23hallazgos&desde=Hallazgos%20abiertos#f-23" title="Ver la clasificación de F-23"><span class="cat cat-e">E</span></a></td><td>ux-ui.md conserva CREDENCIAL_REVOCADA</td><td><a href="#rf-066">RF-066</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="preguntas">
+      <div class="section-head"><span class="letter">PD</span><h2>Preguntas de negocio abiertas</h2></div>
+      <p class="prose muted">Las 16 preguntas de la sesión de decisiones, pendientes de respuesta. Mientras sigan abiertas, ninguna implementación debe presuponer su resultado. La <a href="clasificacion-hallazgos-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#matriz">matriz de decisiones</a> indica cuáles bloquean el baseline y de cuáles dependen.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nº</th><th>Pregunta</th><th>Decisión</th></tr></thead>
+          <tbody>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-1">1</a></td><td>Modelo de administración de usuarios</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d1">D1</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-2">2</a></td><td>Concesión de alcance limitada al propio</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d1">D1</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-3">3</a></td><td>Visibilidad del listado de usuarios</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d1">D1</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-4">4</a></td><td>Quién bloquea y desbloquea</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d1">D1</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-5">5</a></td><td>Mecanismo del primer administrador</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d2">D2</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-6">6</a></td><td>Alcance inicial del primer administrador</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d2">D2</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-7">7</a></td><td>Principio de aislamiento</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d3">D3</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-8">8</a></td><td>Efecto de inactivar una compañía</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d4">D4</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-9">9</a></td><td>A qué compañía aplica esa regla</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d4">D4</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-10">10</a></td><td>Calendario que define un día</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d5">D5</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-11">11</a></td><td>Qué hacer con los datos ya grabados</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d5">D5</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-12">12</a></td><td>Cambio de TipoCompania con dependientes</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d6">D6</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-13">13</a></td><td>Destino de T116</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d7">D7</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-14">14</a></td><td>Destino de RF-067 a RF-069 y CS-032</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d8">D8</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-15">15</a></td><td>Cierre o no de la decisión #7</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d9">D9</a></td></tr>
+            <tr><td class="id"><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#p-16">16</a></td><td>Confirmación de que #1 y #3 siguen abiertas</td><td><a href="decisiones-etapa1-2026-09-16.html?volver=especificaciones-baseline.html%23preguntas&desde=Preguntas%20de%20negocio%20abiertas#d9">D9</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Catálogo generado el 16/09/2026 a partir de <code>spec.md</code>, <code>contracts/</code> y los enumerados del dominio. Documento local: no está publicado ni depende de ningún servicio externo salvo las tipografías, que tienen alternativa del sistema. La auditoría de cierre enlaza a esta página desde cada identificador.
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Filtro local por texto: oculta fichas que no coinciden y actualiza el contador.
+  for (const clave of ['rf', 'cs']) {
+    const entrada = document.getElementById('filtro-' + clave);
+    const lista = document.querySelector('[data-lista="' + clave + '"]');
+    const conteo = document.getElementById('conteo-' + clave);
+    const fichas = [...lista.querySelectorAll('.ficha')];
+    entrada.addEventListener('input', () => {
+      const q = entrada.value.trim().toLowerCase();
+      let visibles = 0;
+      for (const f of fichas) {
+        const coincide = q === '' || f.textContent.toLowerCase().includes(q);
+        f.hidden = !coincide;
+        if (coincide) visibles++;
+      }
+      conteo.textContent = visibles + ' de ' + fichas.length;
+    });
+  }
+</script>
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    // Solo se acepta un archivo local con ancla: nada de URLs arbitrarias.
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+</body>
+</html>

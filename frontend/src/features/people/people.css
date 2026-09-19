@@ -1,0 +1,103 @@
+.personas {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.personas-encabezado {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.personas-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  max-width: 56ch;
+}
+
+.personas-filtros {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.personas-filtros select {
+  min-width: 12rem;
+  width: auto;
+}
+
+.personas-busqueda input {
+  min-width: 20rem;
+}
+
+.personas-tabla {
+  overflow-x: auto;
+}
+
+.personas-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.personas-acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.personas-acciones button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.personas-telefono {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.personas-paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Dos columnas en el formulario: diez campos en una sola columna obligarían a desplazarse. */
+.personas-rejilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1rem;
+}
+
+@media (max-width: 600px) {
+  .personas-rejilla {
+    grid-template-columns: 1fr;
+  }
+
+  .personas-busqueda input {
+    min-width: 0;
+  }
+}
+
+/* El enlace al histórico se presenta con el mismo peso visual que las acciones de la fila. */
+.personas-enlace {
+  display: inline-block;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: var(--radio);
+  color: var(--text-h);
+  text-decoration: none;
+}
+
+.personas-enlace:hover {
+  background: var(--bg);
+}

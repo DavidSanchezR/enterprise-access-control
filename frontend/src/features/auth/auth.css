@@ -1,0 +1,32 @@
+.auth-pagina {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.auth-tarjeta {
+  width: 100%;
+  max-width: 24rem;
+  padding: 2rem;
+}
+
+.auth-tarjeta h1 {
+  font-size: 1.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.auth-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-tarjeta .aviso {
+  margin-bottom: 1.25rem;
+}
+
+.auth-boton {
+  width: 100%;
+  margin-top: 0.5rem;
+}

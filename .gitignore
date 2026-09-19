@@ -1,0 +1,37 @@
+# --- .NET ---
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+packages/
+TestResults/
+*.trx
+.vs/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.vite/
+
+# --- Entorno y secretos (nunca versionar) ---
+.env
+.env.*
+!.env.example
+appsettings.Development.local.json
+*.pfx
+*.key
+
+# --- Logs y temporales ---
+*.log
+*.tmp
+*.swp
+
+# --- Editor / SO ---
+.idea/
+.DS_Store
+Thumbs.db

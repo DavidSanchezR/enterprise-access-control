@@ -1,0 +1,72 @@
+# Despliegue de producción: SQL Server y la API contenedorizada (plan.md, Target Platform).
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --wait
+#
+# A diferencia de docker-compose.yml, no hay ningún secreto por defecto: si falta una variable
+# obligatoria, compose se niega a arrancar. La guía completa (migraciones, SPA, primer usuario) está en
+# README.md, sección "Despliegue".
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Defina MSSQL_SA_PASSWORD}"
+      # Edición licenciada: Express, Standard, Enterprise o una clave de producto. Developer no se
+      # permite en producción, por eso no hay valor por defecto.
+      MSSQL_PID: "${MSSQL_PID:?Defina MSSQL_PID con la edición licenciada de SQL Server}"
+    # Solo en la interfaz local del host: permite aplicar migraciones y administrar desde el propio
+    # servidor sin exponer SQL Server a la red.
+    ports:
+      - "127.0.0.1:${MSSQL_HOST_PORT:-1433}:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+
+      # Obligatorias.
+      ConnectionStrings__SqlServer: "${SQLSERVER_CONNECTION_STRING:?Defina SQLSERVER_CONNECTION_STRING}"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?Defina JWT_SIGNING_KEY (mínimo 32 caracteres)}"
+
+      # Opcionales: sin valor, se usan los de appsettings.json.
+      Jwt__Issuer: "${JWT_ISSUER:-enterprise-access-control}"
+      Jwt__Audience: "${JWT_AUDIENCE:-enterprise-access-control-spa}"
+      Jwt__AccessTokenMinutos: "${JWT_ACCESS_TOKEN_MINUTOS:-60}"
+      ZonaHoraria__TimeZoneId: "${ZONA_HORARIA_TIME_ZONE_ID:-America/Lima}"
+
+      # Política de contraseñas: umbrales PROVISIONALES pendientes de la Decisión #1 (spec.md). Los
+      # valores por defecto son los de appsettings.json; no los trate como política aprobada.
+      PasswordPolicy__LongitudMinima: "${PASSWORD_LONGITUD_MINIMA:-10}"
+      PasswordPolicy__RequiereMayuscula: "${PASSWORD_REQUIERE_MAYUSCULA:-true}"
+      PasswordPolicy__RequiereMinuscula: "${PASSWORD_REQUIERE_MINUSCULA:-true}"
+      PasswordPolicy__RequiereDigito: "${PASSWORD_REQUIERE_DIGITO:-true}"
+      PasswordPolicy__IntentosFallidosParaBloqueo: "${PASSWORD_INTENTOS_FALLIDOS_PARA_BLOQUEO:-5}"
+      PasswordPolicy__DiasExpiracion: "${PASSWORD_DIAS_EXPIRACION:-90}"
+      PasswordPolicy__HistorialNoReutilizable: "${PASSWORD_HISTORIAL_NO_REUTILIZABLE:-5}"
+    # Solo en la interfaz local: el tráfico externo entra por el proxy inverso que sirve la SPA en el
+    # mismo origen y termina TLS.
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+volumes:
+  sqlserver-data:

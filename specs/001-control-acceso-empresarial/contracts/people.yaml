@@ -1,0 +1,616 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Personas
+  version: "1.0.0"
+  description: >
+    Registro de personas (Historia 4, RF-012, RF-013, RF-041), histórico de compañía de pertenencia e
+    histórico de perfil (Historia 5, RF-014, RF-016, RF-037), y contextos operativos por Compañía Principal
+    (Historia 5, RF-052 a RF-055). Las búsquedas y operaciones quedan limitadas al alcance de compañías del
+    usuario autenticado (RF-005, RF-035). El histórico de compañía (companiaId) representa únicamente la
+    relación laboral/contractual de la persona y puede referenciar indistintamente una compañía
+    PRINCIPAL_MANDANTE o CONTRATISTA (RF-047); NO representa para qué Principal trabaja/accede la persona.
+    Esa relación operativa se modela mediante contexto(s) operativo(s) independientes — una persona puede
+    tener ninguno, uno o varios contextos vigentes simultáneamente, cada uno con su propia unidad
+    organizativa asignada (RF-048, RF-052, CS-013, CS-014). El cese o finalización de una asignación de
+    compañía de pertenencia DEBE revocar automáticamente, en cascada, todos los contextos operativos y
+    asignaciones de unidad organizativa que dependan de ella (RF-061 a RF-065) — ver
+    `historial-companias/{asignacionId}/finalizar` y los campos `estado`/`motivoFin` en los esquemas de
+    respuesta. `fechaHoraFin` es obligatoria desde la creación en toda asociación temporal de persona
+    (RF-071) y las tres asociaciones dependientes de la pertenencia deben quedar contenidas dentro de su
+    vigencia (RF-072). `historial-companias/{asignacionId}/renovar` (RF-073) es la contraparte inversa de
+    `/finalizar`: extiende la vigencia de una pertenencia ACTIVA sin cerrarla ni disparar la cascada.
+tags:
+  - name: Personas
+  - name: HistorialPersona
+  - name: ContextoOperativo
+paths:
+  /api/personas:
+    get:
+      tags: [Personas]
+      summary: Buscar personas dentro del alcance autorizado (RF-035)
+      parameters:
+        - name: pagina
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: tamañoPagina
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - name: texto
+          description: Búsqueda por nombres, apellidos o número de documento
+          in: query
+          schema: { type: string }
+        - name: tipoDocumentoId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: companiaId
+          in: query
+          description: Debe pertenecer al alcance del usuario autenticado
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Página de personas (p95 < 2s para ≥100,000 personas — CS-002)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaPersonas" }
+    post:
+      tags: [Personas]
+      summary: Registrar persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonaRequest" }
+      responses:
+        "201":
+          description: Persona creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Persona" }
+        "409":
+          description: "Combinación (tipoDocumentoId, numeroDocumento) ya registrada (RF-041)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Personas]
+      summary: Obtener persona por ID (404 si su compañía vigente está fuera del alcance del usuario)
+      responses:
+        "200":
+          description: Persona encontrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Persona" }
+        "404":
+          description: No encontrada o fuera de alcance
+    put:
+      tags: [Personas]
+      summary: Actualizar datos de la persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonaRequest" }
+      responses:
+        "200":
+          description: Persona actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Persona" }
+        "409":
+          description: "Combinación (tipoDocumentoId, numeroDocumento) ya registrada (RF-041)"
+  /api/personas/{id}/estado-efectivo:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HistorialPersona]
+      summary: Reconstruir el estado efectivo de una persona en una fecha/hora dada (RF-037)
+      parameters:
+        - name: fechaHora
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: >
+            Estado efectivo: compañía de pertenencia, todos los contextos operativos vigentes en esa fecha
+            (uno por Compañía Principal, cada uno con su propia unidad organizativa vigente) y perfiles
+            vigentes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstadoEfectivoPersona" }
+  /api/personas/{id}/historial-companias:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HistorialPersona]
+      summary: Listar histórico de asignaciones de compañía de pertenencia de la persona
+      responses:
+        "200":
+          description: Histórico ordenado por fecha de inicio descendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AsignacionCompania" }
+    post:
+      tags: [HistorialPersona]
+      summary: >
+        Crear nueva asignación de compañía de pertenencia vigente. Cierra automáticamente (fin de vigencia,
+        estado FINALIZADA, motivoFin REEMPLAZO_ASIGNACION) la asignación activa anterior de la persona en
+        la misma transacción (Historia 5).
+      description: >
+        El cierre de la asignación anterior DISPARA la revocación automática en cascada (RF-061) de todos
+        los contextos operativos, asignaciones de unidad organizativa y credenciales vigentes de la persona
+        que dependían de ella — ver `contextos-operativos`, `contextos-operativos/{id}/unidad-organizativa`
+        y `contracts/credentials.yaml`. La nueva asignación de compañía en sí no crea ningún contexto
+        operativo automáticamente (RF-048); eso requiere una llamada separada a `POST
+        /api/personas/{id}/contextos-operativos`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AsignacionCompaniaRequest" }
+      responses:
+        "201":
+          description: Asignación creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AsignacionCompania" }
+        "409":
+          description: Solapamiento inválido o compañía INACTIVA (RF-032, RF-039)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}/historial-companias/{asignacionId}/finalizar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: asignacionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HistorialPersona]
+      summary: Finalizar explícitamente la pertenencia vigente (cese, sin crear una nueva compañía)
+      description: >
+        Cierra la asignación de compañía de pertenencia vigente (estado FINALIZADA, motivoFin
+        CESE_PERTENENCIA) y dispara la misma revocación automática en cascada que el reemplazo por una
+        nueva asignación (RF-061). Usar este endpoint cuando la persona deja de pertenecer a la compañía
+        sin una nueva compañía de pertenencia que la reemplace (p. ej. desvinculación).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fechaHoraFin]
+              properties:
+                fechaHoraFin:
+                  type: string
+                  format: date-time
+                  description: Fecha efectiva de cese; puede ser futura (RF-064) — no se necesita distinguir fecha administrativa de fecha efectiva
+      responses:
+        "204":
+          description: Pertenencia finalizada y cascada de revocación aplicada
+        "409":
+          description: La asignación no está vigente, o fechaHoraFin es anterior a fechaHoraInicio (RF-039)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}/historial-companias/{asignacionId}/renovar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: asignacionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HistorialPersona]
+      summary: Renovar la pertenencia vigente extendiendo su fechaHoraFin (RF-073)
+      description: >
+        Extiende fechaHoraFin de la AsignacionCompania vigente hacia una fecha posterior a la ya declarada,
+        sin crear una nueva asignación y sin disparar la cascada de revocación de RF-061. No modifica
+        fechaHoraInicio, estado ni motivoFin. No afecta ningún ContextoOperativoPersonaPrincipal,
+        AsignacionUnidadOrganizativa ni AsignacionCredencial ya existente — solo amplía el techo temporal
+        que RF-072 permitirá para asociaciones creadas después de la renovación. Contraparte inversa de
+        /finalizar: esa operación acorta y cierra; esta extiende sin cerrar. Solo aplica si la asignación
+        indicada está en estado ACTIVA Y sigue vigente dinámicamente en el momento de renovar (fecha actual
+        <= fechaHoraFin ya declarada) — una pertenencia ACTIVA pero ya expirada dinámicamente no es
+        renovable, igual que una FINALIZADA; la renovación nunca puentea retroactivamente un vacío temporal
+        ya transcurrido (RF-073).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fechaHoraFin]
+              properties:
+                fechaHoraFin:
+                  type: string
+                  format: date-time
+                  description: Nueva fecha de fin de vigencia; DEBE ser estrictamente posterior a la fechaHoraFin ya vigente
+      responses:
+        "204":
+          description: Pertenencia renovada
+        "409":
+          description: >
+            La asignación no está en estado ACTIVA (una pertenencia FINALIZADA no es renovable — requiere
+            una nueva AsignacionCompania); o ya expiró dinámicamente aunque su estado siga ACTIVA (fecha
+            actual > fechaHoraFin ya declarada — tampoco renovable, requiere una nueva AsignacionCompania);
+            o la fechaHoraFin indicada no es estrictamente posterior a la ya vigente (RF-073)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}/contextos-operativos:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [ContextoOperativo]
+      summary: Listar todos los contextos operativos (vigentes e históricos) de la persona
+      responses:
+        "200":
+          description: Contextos ordenados por fecha de inicio descendente; pueden existir varios vigentes simultáneamente (CS-013)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ContextoOperativo" }
+    post:
+      tags: [ContextoOperativo]
+      summary: Abrir un nuevo contexto operativo con una Compañía Principal (RF-052)
+      description: >
+        Si la compañía de pertenencia vigente de la persona es PRINCIPAL_MANDANTE, companiaPrincipalId DEBE
+        ser exactamente esa misma compañía (RF-053) — el frontend debe pre-fijar/bloquear el selector
+        (Historia 5, Caso A). Si es CONTRATISTA, companiaPrincipalId DEBE tener una
+        RelaciónContratistaPrincipal vigente con esa Contratista (RF-054) — el frontend debe limitar el
+        selector a esas opciones (Historia 5, Caso B). Cierra automáticamente cualquier contexto activo
+        previo para la misma Compañía Principal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContextoOperativoRequest" }
+      responses:
+        "201":
+          description: Contexto operativo creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContextoOperativo" }
+        "400":
+          description: >
+            companiaPrincipalId no es PRINCIPAL_MANDANTE; o la persona pertenece directamente a una
+            Principal y companiaPrincipalId no coincide con ella (RF-053); o la persona pertenece a una
+            Contratista sin relación vigente con companiaPrincipalId (RF-054); o la persona no tiene
+            compañía de pertenencia vigente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: >
+            Solapamiento inválido con un contexto vigente para la misma Compañía Principal (RF-039); o
+            fechaHoraInicio/fechaHoraFin exceden la vigencia de la AsignacionCompania vigente de la persona
+            (RF-072, codigo FUERA_DE_CONTENCION_TEMPORAL)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}/contextos-operativos/{contextoId}/unidad-organizativa:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: contextoId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [ContextoOperativo]
+      summary: Listar histórico de asignaciones de unidad organizativa dentro de este contexto operativo
+      responses:
+        "200":
+          description: Histórico ordenado por fecha de inicio descendente (solo de este contexto)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AsignacionUnidadOrganizativa" }
+    post:
+      tags: [ContextoOperativo]
+      summary: >
+        Asignar una unidad organizativa dentro de este contexto (cierra la anterior de este mismo contexto
+        automáticamente; no afecta asignaciones de otros contextos — RF-015, RF-055, CS-014)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AsignacionUnidadOrganizativaRequest" }
+      responses:
+        "201":
+          description: Asignación creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AsignacionUnidadOrganizativa" }
+        "400":
+          description: >
+            La unidad organizativa indicada no pertenece a la Compañía Principal de este contexto operativo
+            (RF-055)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: >
+            Solapamiento inválido o unidad INACTIVA (RF-032, RF-039); o fechaHoraInicio/fechaHoraFin exceden
+            la vigencia de la AsignacionCompania vigente de la persona (RF-072, codigo
+            FUERA_DE_CONTENCION_TEMPORAL)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/personas/{id}/perfiles:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HistorialPersona]
+      summary: Listar histórico de perfiles (tipos de persona) asignados
+      responses:
+        "200":
+          description: Histórico de perfiles (pueden coexistir varios vigentes, RF-011)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AsignacionTipoPersona" }
+    post:
+      tags: [HistorialPersona]
+      summary: Asignar un perfil adicional a la persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AsignacionTipoPersonaRequest" }
+      responses:
+        "201":
+          description: Perfil asignado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AsignacionTipoPersona" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Persona:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombres: { type: string }
+        apellidos: { type: string }
+        fechaNacimiento: { type: string, format: date }
+        tipoDocumentoId: { type: string, format: uuid }
+        numeroDocumento: { type: string }
+        generoId: { type: string, format: uuid }
+        correoElectronico: { type: string, format: email }
+        tipoSangreId: { type: string, format: uuid }
+        contactoEmergencia: { type: string }
+        numeroEmergencia: { type: string }
+    PersonaRequest:
+      type: object
+      required:
+        - nombres
+        - apellidos
+        - fechaNacimiento
+        - tipoDocumentoId
+        - numeroDocumento
+        - generoId
+        - correoElectronico
+        - tipoSangreId
+        - contactoEmergencia
+        - numeroEmergencia
+      properties:
+        nombres: { type: string, minLength: 1, maxLength: 150 }
+        apellidos: { type: string, minLength: 1, maxLength: 150 }
+        fechaNacimiento: { type: string, format: date }
+        tipoDocumentoId: { type: string, format: uuid }
+        numeroDocumento: { type: string, minLength: 1, maxLength: 20 }
+        generoId: { type: string, format: uuid }
+        correoElectronico: { type: string, format: email }
+        tipoSangreId: { type: string, format: uuid }
+        contactoEmergencia: { type: string, minLength: 1, maxLength: 150 }
+        numeroEmergencia: { type: string, minLength: 1, maxLength: 30 }
+    PaginaPersonas:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Persona" }
+        total: { type: integer }
+        pagina: { type: integer }
+        tamañoPagina: { type: integer }
+    EstadoPertenencia:
+      type: string
+      enum: [ACTIVA, FINALIZADA]
+      description: Administrativo/informativo (RF-063) — la vigencia efectiva siempre se determina por fechaHoraInicio/fechaHoraFin, nunca por este campo en aislamiento.
+    MotivoFinPertenencia:
+      type: string
+      enum: [CESE_PERTENENCIA, REEMPLAZO_ASIGNACION]
+      nullable: true
+      description: Poblado solo cuando estado = FINALIZADA (RF-063).
+    AsignacionCompania:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        personaId: { type: string, format: uuid }
+        companiaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time, description: Nunca se modifica tras la creación (RF-063) }
+        fechaHoraFin:
+          type: string
+          format: date-time
+          description: >
+            Obligatoria desde la creación (RF-071) — ya no admite null ni fecha centinela; no existe
+            pertenencia de vigencia indefinida. Un cierre (reemplazo o cese) solo puede acortarla.
+        estado: { $ref: "#/components/schemas/EstadoPertenencia" }
+        motivoFin: { $ref: "#/components/schemas/MotivoFinPertenencia" }
+    AsignacionCompaniaRequest:
+      type: object
+      required: [companiaId, fechaHoraInicio, fechaHoraFin]
+      description: >
+        fechaHoraFin es obligatoria (RF-071, Sesión 2026-09-14 "vigencia temporal jerárquica") — debe ser
+        una fecha/hora real y conocida, nunca un valor centinela.
+      properties:
+        companiaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
+    EstadoContextoOAsignacion:
+      type: string
+      enum: [ACTIVO, INACTIVO]
+      description: Administrativo/informativo (RF-063) — la vigencia efectiva siempre se determina por fechaHoraInicio/fechaHoraFin, nunca por este campo en aislamiento.
+    MotivoFinRevocacion:
+      type: string
+      enum: [REVOCACION_CESE_PERTENENCIA, REEMPLAZO_ASIGNACION, CIERRE_MANUAL]
+      nullable: true
+      description: Poblado solo cuando estado = INACTIVO (RF-063). REVOCACION_CESE_PERTENENCIA indica revocación automática en cascada (RF-061).
+    ContextoOperativo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        personaId: { type: string, format: uuid }
+        companiaPrincipalId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time, description: Nunca se modifica tras la creación (RF-063) }
+        fechaHoraFin:
+          type: string
+          format: date-time
+          description: >
+            Obligatoria desde la creación (RF-071); debe estar contenida dentro de la vigencia de la
+            AsignacionCompania vigente de la persona (RF-072, contención).
+        estado: { $ref: "#/components/schemas/EstadoContextoOAsignacion" }
+        motivoFin: { $ref: "#/components/schemas/MotivoFinRevocacion" }
+        revocadoPorPertenenciaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: FK a la AsignacionCompania que originó la revocación en cascada; poblado solo si motivoFin = REVOCACION_CESE_PERTENENCIA (RF-061, research.md §14.2)
+    ContextoOperativoRequest:
+      type: object
+      required: [companiaPrincipalId, fechaHoraInicio, fechaHoraFin]
+      description: >
+        fechaHoraFin es obligatoria (RF-071) y debe quedar contenida dentro de la vigencia de la
+        AsignacionCompania vigente de la persona (RF-072) — 409 si la excede.
+      properties:
+        companiaPrincipalId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
+    AsignacionUnidadOrganizativa:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        personaId: { type: string, format: uuid }
+        contextoOperativoId: { type: string, format: uuid }
+        unidadOrganizativaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time, description: Nunca se modifica tras la creación (RF-063) }
+        fechaHoraFin:
+          type: string
+          format: date-time
+          description: >
+            Obligatoria desde la creación (RF-071); debe estar contenida dentro de la vigencia de la
+            AsignacionCompania vigente de la persona (RF-072, contención).
+        estado: { $ref: "#/components/schemas/EstadoContextoOAsignacion" }
+        motivoFin: { $ref: "#/components/schemas/MotivoFinRevocacion" }
+        revocadoPorPertenenciaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: FK a la AsignacionCompania que originó la revocación en cascada (RF-061, research.md §14.2)
+    AsignacionUnidadOrganizativaRequest:
+      type: object
+      required: [unidadOrganizativaId, fechaHoraInicio, fechaHoraFin]
+      description: >
+        fechaHoraFin es obligatoria (RF-071) y debe quedar contenida dentro de la vigencia de la
+        AsignacionCompania vigente de la persona (RF-072) — 409 si la excede.
+      properties:
+        unidadOrganizativaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
+    AsignacionTipoPersona:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        personaId: { type: string, format: uuid }
+        tipoPersonaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin:
+          type: string
+          format: date-time
+          description: Obligatoria desde la creación (RF-071); no sujeta a contención (RF-072 no aplica).
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    AsignacionTipoPersonaRequest:
+      type: object
+      required: [tipoPersonaId, fechaHoraInicio, fechaHoraFin]
+      properties:
+        tipoPersonaId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
+    ContextoOperativoVigente:
+      type: object
+      description: Un contexto vigente en la fecha evaluada, con su unidad organizativa vigente dentro de ese contexto (si existe alguna).
+      properties:
+        contextoOperativoId: { type: string, format: uuid }
+        companiaPrincipalId: { type: string, format: uuid }
+        unidadOrganizativaVigenteId: { type: string, format: uuid, nullable: true }
+    EstadoEfectivoPersona:
+      type: object
+      properties:
+        personaId: { type: string, format: uuid }
+        fechaHoraEvaluada: { type: string, format: date-time }
+        companiaVigenteId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Compañía de pertenencia vigente (RF-014); independiente de los contextos operativos
+        contextosOperativosVigentes:
+          type: array
+          description: Uno por cada Compañía Principal con contexto vigente en la fecha evaluada (CS-013, CS-014)
+          items: { $ref: "#/components/schemas/ContextoOperativoVigente" }
+        perfilesVigentesIds:
+          type: array
+          items: { type: string, format: uuid }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

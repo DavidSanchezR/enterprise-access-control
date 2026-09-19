@@ -1,0 +1,77 @@
+.maestros {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.maestros-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  max-width: 60ch;
+}
+
+.maestros-pestanas ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.maestros-pestanas a {
+  display: block;
+  padding: 0.5rem 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.maestros-pestanas a:hover {
+  color: var(--text-h);
+}
+
+/* La pestaña activa se marca con borde y peso, no solo con color (ux-ui.md §26). */
+.maestros-pestanas a.active {
+  color: var(--accent);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+
+.maestros-barra {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.maestros-barra select {
+  min-width: 12rem;
+  width: auto;
+}
+
+.maestros-tabla {
+  overflow-x: auto;
+}
+
+.maestros-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.maestros-acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.maestros-acciones button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}

@@ -1,0 +1,122 @@
+.shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-salto {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  padding: 0.6rem 1rem;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 0 0 var(--radio) 0;
+}
+
+.shell-salto:focus {
+  left: 0;
+}
+
+.shell-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.shell-marca {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.shell-sesion {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.shell-alcance {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.shell-cuerpo {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+}
+
+.shell-menu {
+  flex: 0 0 13rem;
+  padding: 1.25rem 0.75rem;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.shell-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.shell-menu a {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radio);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.shell-menu a:hover {
+  background: var(--bg);
+}
+
+.shell-menu a.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+  /* El estado activo no se señala sólo con color: el borde lo refuerza (ux-ui.md §26). */
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.shell-contenido {
+  flex: 1;
+  padding: 1.75rem;
+  min-width: 0;
+}
+
+.shell-contenido:focus {
+  outline: none;
+}
+
+@media (max-width: 800px) {
+  .shell-cuerpo {
+    flex-direction: column;
+  }
+
+  .shell-menu {
+    flex: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .shell-menu ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .shell-contenido {
+    padding: 1.25rem;
+  }
+}

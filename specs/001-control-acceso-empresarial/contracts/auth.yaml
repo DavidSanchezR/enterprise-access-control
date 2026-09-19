@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Autenticación
+  version: "1.0.0"
+  description: >
+    Login por correo/contraseña (sin MFA), cambio de contraseña y política de bloqueo/expiración.
+    Corresponde a Historia 1 (RF-001, RF-002, RF-003).
+tags:
+  - name: Auth
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión con correo y contraseña
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "403":
+          description: Usuario INACTIVO o BLOQUEADO (Historia 1, criterio 2)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/auth/cambiar-password:
+    post:
+      tags: [Auth]
+      summary: Cambiar la contraseña del usuario autenticado
+      description: >
+        Rechaza la nueva contraseña si coincide con cualquiera de las últimas N contraseñas del
+        HistorialContraseña del usuario (research.md §2).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambiarPasswordRequest"
+      responses:
+        "204":
+          description: Contraseña actualizada
+        "400":
+          description: La nueva contraseña no cumple la política o fue reutilizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "401":
+          description: Contraseña actual incorrecta
+  /api/auth/sesion:
+    get:
+      tags: [Auth]
+      summary: Obtener el usuario autenticado y su alcance de compañías vigente
+      responses:
+        "200":
+          description: Sesión activa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SesionActual"
+        "401":
+          description: No autenticado
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [correo, password]
+      properties:
+        correo: { type: string, format: email }
+        password: { type: string, format: password }
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        expiraEn: { type: string, format: date-time }
+        requiereCambioPassword: { type: boolean }
+        alcanceCompanias:
+          type: array
+          items: { type: string, format: uuid }
+    CambiarPasswordRequest:
+      type: object
+      required: [passwordActual, passwordNueva]
+      properties:
+        passwordActual: { type: string, format: password }
+        passwordNueva: { type: string, format: password }
+    SesionActual:
+      type: object
+      properties:
+        usuarioId: { type: string, format: uuid }
+        correo: { type: string, format: email }
+        alcanceCompanias:
+          type: array
+          items: { type: string, format: uuid }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

@@ -1,0 +1,440 @@
+# Enterprise Access Control Platform
+
+Solución web para administrar el acceso físico a instalaciones empresariales: jerarquías de compañías y
+unidades organizativas, personas con históricos de pertenencia y contexto operativo, permisos con vigencia
+y bloques horarios, credenciales/fotocheck, y evaluación de acceso con denegación por defecto.
+
+> **Estado del repositorio (2026-09-19):** esta es la primera subida a GitHub. El proyecto corresponde al
+> cierre de la **Etapa 1** de la rama de funcionalidad
+> [`001-control-acceso-empresarial`](specs/001-control-acceso-empresarial/) — implementada y con sus
+> dominios de negocio validados por prueba automatizada — **pero el baseline todavía no está congelado**.
+> Dos auditorías independientes (2026-09-16) concluyeron que el perímetro de autorización tiene un defecto
+> crítico y que 16 preguntas de negocio siguen sin respuesta. Ver [Estado actual del
+> proyecto](#estado-actual-del-proyecto) y [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría)
+> antes de asumir que cualquier parte de esto es definitiva.
+
+## Índice
+
+1. [Objetivo](#objetivo)
+2. [Contexto de negocio](#contexto-de-negocio)
+3. [Capacidades principales](#capacidades-principales)
+4. [Arquitectura](#arquitectura)
+5. [Modelo de autorización](#modelo-de-autorización)
+6. [Principios de seguridad](#principios-de-seguridad)
+7. [Stack tecnológico](#stack-tecnológico)
+8. [Estructura del repositorio](#estructura-del-repositorio)
+9. [Estrategia de testing](#estrategia-de-testing)
+10. [Estado actual de las pruebas](#estado-actual-de-las-pruebas)
+11. [Instrucciones de desarrollo](#instrucciones-de-desarrollo)
+12. [Configuración y ejecución (producción)](#configuración-y-ejecución-producción)
+13. [Estado actual del proyecto](#estado-actual-del-proyecto)
+14. [Decisiones pendientes identificadas en la auditoría](#decisiones-pendientes-identificadas-en-la-auditoría)
+15. [Próximos pasos para cerrar el baseline](#próximos-pasos-para-cerrar-el-baseline)
+
+## Objetivo
+
+Construir una plataforma que centralice, con validación 100% server-side y denegación por defecto, quién
+puede acceder físicamente a qué área de una instalación, en qué horario y bajo qué credencial — reemplazando
+procesos manuales o dispersos de control de acceso con un modelo de datos explícito, auditable y con
+históricos temporales íntegros.
+
+## Contexto de negocio
+
+La solución está orientada principalmente a empresas mineras y otros sectores industriales de gran escala,
+donde coexisten:
+
+- Una o varias **Compañías Principales/Mandantes**: la empresa propietaria de la operación que solicita el
+  control de acceso. Cada una tiene su propio contexto organizacional (unidades organizativas y áreas de
+  acceso) aislado del de cualquier otra Principal.
+- Múltiples **Compañías Contratistas** que prestan servicios dentro de las instalaciones de una o varias
+  Principales simultáneamente, mediante una relación explícita y con vigencia temporal
+  (`RelaciónContratistaPrincipal`).
+
+Una persona (típicamente de una Contratista) puede trabajar simultáneamente para varias Compañías
+Principales, con unidad organizativa, permisos y credencial propios e independientes para cada una
+(`ContextoOperativoPersonaPrincipal`). El histórico de compañía de pertenencia (el empleador) es
+independiente de esos contextos operativos. El cese de la pertenencia de una persona con su empleador
+dispara la **revocación automática en cascada** de todos los contextos, asignaciones de unidad organizativa
+y credenciales que dependían de ella, preservando el histórico íntegro.
+
+El detalle funcional completo, incluidas 12 sesiones de clarificación de negocio que corrigieron y afinaron
+el modelo original, vive en [spec.md](specs/001-control-acceso-empresarial/spec.md).
+
+## Capacidades principales
+
+10 historias de usuario (8 de prioridad P1, 2 de prioridad P2):
+
+| # | Historia | Prioridad |
+|---|---|---|
+| 1 | Inicio de sesión y alcance de gestión por compañía | P1 |
+| 2 | Compañías (Principal/Contratista), sus relaciones y unidades organizativas | P1 |
+| 3 | Datos maestros (tipo de documento, sangre, género, tipo de persona, tipo de credencial) | P1 |
+| 4 | Personas: registro de datos personales, de identificación y contacto | P1 |
+| 5 | Históricos de compañía, contexto operativo por Principal, unidad organizativa y perfil, con revocación automática | P1 |
+| 6 | Árbol de áreas físicas de acceso | P1 |
+| 7 | Tipos de persona autorizados por área | P1 |
+| 8 | Permisos de acceso con vigencia, bloques horarios y evaluación de acceso (motor de 14 pasos) | P1 |
+| 9 | Mantenimiento de credencial/fotocheck por Compañía Principal | P2 |
+| 10 | Auditoría y consultas transversales (histórico, indicadores) | P2 |
+
+Las historias 1 a 8 están implementadas y respaldadas por prueba automatizada. La Historia 9 tiene backend
+completo pero **sin interfaz de usuario** (ver [Estado actual](#estado-actual-del-proyecto)). La Historia 10
+(auditoría/consultas transversales) tiene su necesidad funcional declarada en `spec.md` (RF-067 a RF-069)
+pero **sin contrato de API, código ni pantalla** — es uno de los puntos que la auditoría dejó pendiente de
+decidir (ver [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría)).
+
+## Arquitectura
+
+Aplicación web con frontend y backend separados. El backend sigue una arquitectura en capas:
+
+```
+Dominio → Aplicación → Infraestructura → API
+```
+
+- **Dominio**: entidades, enums y reglas de negocio puras, sin dependencias externas.
+- **Aplicación**: casos de uso por módulo (auth, maestros, compañías, unidades organizativas, personas,
+  áreas de acceso, permisos, evaluación de acceso, credenciales), DTOs y validación con FluentValidation.
+- **Infraestructura**: `DbContext` de EF Core sobre SQL Server, migraciones (incluidos los triggers SQL de
+  no-solapamiento temporal), el interceptor de auditoría automática, y los mecanismos de seguridad
+  (hashing de contraseñas, alcance de compañías).
+- **API**: controladores ASP.NET Core, autenticación JWT, `ProblemDetails` para errores (RFC 7807/9457),
+  health checks, composición de dependencias.
+
+El frontend es una SPA React organizada por *features* (uno por módulo de negocio, más `dashboard`,
+`historicos` y `audit` para las vistas transversales de la Historia 10), con un sistema de diseño propio
+("Enterprise Operations Console") documentado en [ux-ui.md](specs/001-control-acceso-empresarial/ux-ui.md):
+16 pantallas/flujos críticos, accesibilidad WCAG 2.2 AA, y componentes accesibles por teclado para los
+árboles jerárquicos (patrón ARIA `treeview`).
+
+La API y la SPA se despliegan como contenedores Docker independientes, detrás de un proxy inverso propio que
+sirve la SPA como estáticos y reenvía `/api/` y `/health/` a la API (mismo origen, sin CORS). Ver
+[Configuración y ejecución](#configuración-y-ejecución-producción).
+
+Detalle completo de las decisiones de arquitectura, incluidas las correcciones de dominio y sus
+re-chequeos de constitución: [plan.md](specs/001-control-acceso-empresarial/plan.md) y
+[research.md](specs/001-control-acceso-empresarial/research.md) (26 secciones técnicas).
+
+## Modelo de autorización
+
+El sistema separa explícitamente dos mecanismos de autorización (research.md §18):
+
+1. **Autorización de plataforma** (ASP.NET Core Authentication/Authorization): valida la sesión (JWT
+   Bearer) y aplica el **alcance de compañías** del usuario autenticado (`AlcanceUsuarioCompañía`) — el
+   conjunto de compañías que ese usuario puede administrar. El alcance viaja dentro del token; cambiarlo
+   exige volver a iniciar sesión.
+2. **Motor de evaluación de acceso de dominio** (Historia 8): un algoritmo de **14 pasos**, independiente de
+   la autorización de plataforma, que determina si una persona puede acceder físicamente a un área en una
+   fecha/hora dada. Determina primero la Compañía Principal propietaria del área, exige un contexto
+   operativo vigente con esa Principal (y una relación Contratista↔Principal vigente cuando aplica), una
+   credencial vigente para esa misma Principal, elegibilidad de perfil en el área, y finalmente el permiso
+   aplicable con mayor precedencia (`PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA`) dentro de su vigencia y
+   bloque horario. Cualquier paso no satisfecho deniega el acceso por defecto.
+
+**Defecto crítico confirmado, no resuelto todavía:** el mecanismo (1) — el alcance de compañías sobre la
+propia administración de usuarios — **no está aplicado hoy en el código**. `UsuarioService` no filtra
+ninguna de sus 7 operaciones por alcance, lo que permite en ejecución que cualquier usuario autenticado se
+conceda compañías ajenas, liste todos los usuarios del sistema y modifique el alcance de terceros. Este es
+el motivo por el que el baseline de Etapa 1 no puede congelarse todavía; ver
+[Estado actual del proyecto](#estado-actual-del-proyecto).
+
+## Principios de seguridad
+
+El proyecto se gobierna por una [Constitución](.specify/memory/constitution.md) versionada (v1.1.1) con
+siete principios fundamentales, no negociables salvo enmienda explícita:
+
+| Principio | Resumen |
+|---|---|
+| I. Seguridad Server-Side, Denegación por Defecto y Autorización por Compañías | Toda decisión de acceso se evalúa en el servidor; el cliente nunca es frontera de seguridad; sin match válido, se deniega. |
+| II. Identificadores Únicos Autogenerados (UID/UUID) | Toda entidad persistente usa un `Guid` generado por el sistema, nunca aceptado del cliente ni derivado de datos de negocio. |
+| III. Auditoría Automática y Trazabilidad | Toda entidad persistente registra automáticamente quién y cuándo la creó/modificó, sin intervención del cliente. |
+| IV. Integridad Temporal e Históricos | Vigencias con inicio/fin explícitos, sin solapamientos inválidos; los históricos nunca se eliminan físicamente. |
+| V. Jerarquías sin Ciclos | Las jerarquías de unidades organizativas y áreas de acceso se validan server-side para impedir ciclos. |
+| VI. Modelado Explícito del Dominio | Personas, compañías, jerarquías, perfiles y credenciales se modelan como entidades y relaciones explícitas, nunca como campos libres. |
+| VII. Pruebas Automatizadas Obligatorias (NO NEGOCIABLE) | Toda funcionalidad de seguridad, autorización, reglas temporales, jerarquías y auditoría requiere prueba automatizada antes de darse por completa. |
+
+Los principios II a VII están verificados como cumplidos (`PASS`) en el re-chequeo de constitución de
+`plan.md`. El **Principio I tiene una violación activa y confirmada** en el perímetro de administración de
+usuarios (ver [Modelo de autorización](#modelo-de-autorización)); el resto de la superficie del sistema
+(evaluación de acceso, jerarquías, históricos) sí lo cumple.
+
+## Stack tecnológico
+
+**Backend**
+
+- .NET 10 LTS + C# 13, ASP.NET Core 10 Web API
+- Entity Framework Core 10 (`Microsoft.EntityFrameworkCore.SqlServer`) + Migrations
+- SQL Server (motor de base de datos oficial; columnas `datetime2(3)` en UTC)
+- FluentValidation, NodaTime (zona horaria `America/Lima` para bloques horarios)
+- ASP.NET Core Identity (`PasswordHasher<T>`) solo para hashing de contraseñas
+- ASP.NET Core Authentication (JWT Bearer) + Authorization (Policies) para el alcance administrativo
+- `Microsoft.AspNetCore.OpenApi` nativo (documento OpenAPI, solo en `Development`)
+- `ProblemDetails` (RFC 7807/9457) como formato de error HTTP
+- ASP.NET Core Health Checks (`AspNetCore.HealthChecks.SqlServer`)
+
+**Frontend**
+
+- React 18 + TypeScript 5.6+ / Vite
+- TanStack Query (`@tanstack/react-query`) para estado de servidor
+- React Hook Form + Zod para formularios y validación de cliente
+- React Router para enrutamiento de la SPA
+- Axios como cliente HTTP
+
+**Testing**
+
+- Backend: xUnit + FluentAssertions + `Testcontainers.MsSql` (integración contra SQL Server real —
+  imprescindible para el trigger de no-solapamiento, que no tiene representación en el modelo de EF Core) +
+  pruebas de contrato contra el OpenAPI generado
+- Frontend: Vitest + React Testing Library (unitario/componentes) + Playwright (end-to-end)
+
+**Infraestructura**
+
+- Docker / Docker Compose v2 (SQL Server oficial `mcr.microsoft.com/mssql/server` + API contenedorizada)
+- Sin proveedor de identidad externo, sin mensajería/colas, sin caché distribuido, sin microservicios —
+  decisión arquitectónica explícita mientras ningún requisito lo justifique (constitución, Reglas de
+  Arquitectura e Ingeniería).
+
+## Estructura del repositorio
+
+```text
+backend/
+├── src/
+│   ├── EnterpriseAccessControl.Domain/            # Entidades, enums, reglas de dominio puras
+│   ├── EnterpriseAccessControl.Application/       # Casos de uso, DTOs, validación (por módulo)
+│   ├── EnterpriseAccessControl.Infrastructure/    # DbContext, migraciones EF Core, auditoría, seguridad
+│   └── EnterpriseAccessControl.Api/               # Controllers, JWT, ProblemDetails, health checks
+└── tests/
+    ├── EnterpriseAccessControl.UnitTests/         # Dominio + Aplicación, sin base de datos
+    ├── EnterpriseAccessControl.IntegrationTests/  # Testcontainers.MsSql
+    └── EnterpriseAccessControl.ContractTests/     # Verifica la API contra contracts/*.yaml
+
+frontend/
+├── src/
+│   ├── features/                                  # Un módulo por historia de negocio
+│   ├── components/                                # Sistema de diseño (ux-ui.md)
+│   ├── app/                                        # Enrutamiento, providers, guards de sesión
+│   └── lib/                                        # Cliente HTTP tipado, utilidades de zona horaria
+└── tests/
+    ├── unit/                                       # Vitest + React Testing Library
+    └── e2e/                                        # Playwright
+
+specs/001-control-acceso-empresarial/
+├── spec.md            # Especificación funcional (73 RF, 35 criterios de éxito, historial de clarificaciones)
+├── plan.md             # Plan de implementación y re-chequeos de constitución
+├── research.md         # 26 secciones de decisiones técnicas
+├── data-model.md       # 22 entidades de dominio
+├── ux-ui.md            # Especificación de UX/UI (16 pantallas, sistema de diseño)
+├── quickstart.md        # Guía de validación end-to-end
+├── tasks.md             # 168 tareas de implementación, organizadas por historia
+└── contracts/           # 10 contratos OpenAPI (uno por grupo funcional)
+
+docs/auditorias/         # Auditorías de cierre de Etapa 1 (ver Estado actual y Decisiones pendientes)
+scripts/                 # Scripts de verificación (health checks de Docker)
+.specify/                # Constitución del proyecto y plantillas de Spec Kit
+docker-compose.yml        # Entorno de desarrollo local
+docker-compose.prod.yml   # Despliegue de producción
+```
+
+## Estrategia de testing
+
+Conforme al Principio VII (no negociable), cada historia de usuario P1 cuenta con pruebas automatizadas
+independientes, con cobertura explícita de denegación por defecto, ciclos jerárquicos, solapamientos
+temporales inválidos y fuga de datos entre compañías:
+
+- **Unitarias** (xUnit + FluentAssertions): reglas de dominio y casos de uso de Aplicación, sin base de
+  datos.
+- **Integración** (Testcontainers.MsSql): contra una instancia real de SQL Server — necesarias para
+  verificar los triggers de no-solapamiento temporal, que no tienen representación en el modelo de EF Core
+  y no pueden probarse con un proveedor en memoria.
+- **Contrato**: verifican que la API (incluido el formato `ProblemDetails`) coincide con los 10 archivos
+  OpenAPI publicados en `contracts/`.
+- **Frontend unitario/componentes** (Vitest + React Testing Library): incluye accesibilidad WCAG 2.2 AA.
+- **End-to-end** (Playwright): flujos P1 completos contra la API real, con base de datos dedicada
+  (`EnterpriseAccessControl_E2E`).
+
+No hay todavía un pipeline de integración continua configurado en el repositorio (sin `.github/workflows`);
+las suites se ejecutan localmente según [Instrucciones de desarrollo](#instrucciones-de-desarrollo).
+
+## Estado actual de las pruebas
+
+Verificado directamente en este repositorio el 2026-09-19 (build y suites rápidas, sin requerir Docker):
+
+| Suite | Resultado |
+|---|---|
+| `dotnet build` (solución completa) | ✅ 0 errores, 0 advertencias |
+| Backend — Unitarias (`EnterpriseAccessControl.UnitTests`) | ✅ 92/92 |
+| Frontend — `npm run build` (`tsc -b && vite build`) | ✅ sin errores |
+| Frontend — Vitest (`npm run test`) | ✅ 141/141 (16 archivos) |
+
+Las suites que requieren Docker/SQL Server real (integración, contrato) y Playwright (end-to-end) no se
+re-ejecutaron en esta verificación. Según la última auditoría de cierre de Etapa 1
+([`auditoria-final-cierre-2026-09-16.html`](docs/auditorias/auditoria-final-cierre-2026-09-16.html),
+2026-09-16) estaban en:
+
+| Suite | Resultado (auditoría 2026-09-16) |
+|---|---|
+| Backend — Integración (`EnterpriseAccessControl.IntegrationTests`) | 485/485 |
+| Backend — Contrato (`EnterpriseAccessControl.ContractTests`) | 242/242 |
+| Frontend — E2E (Playwright) | 3/3 |
+
+Ningún archivo de `specs/`, `backend/` ni `frontend/` se modificó entre esa auditoría y esta verificación, por
+lo que esos números siguen siendo representativos, pero no fueron re-confirmados en ejecución hoy.
+
+**Importante:** que todas las suites estén en verde no significa que el sistema esté libre de defectos. La
+misma auditoría reprodujo en ejecución una escalada de privilegios y fugas de datos entre compañías (ver
+abajo) que **ninguna prueba automatizada existente cubre todavía** — son huecos de cobertura, no
+regresiones.
+
+## Instrucciones de desarrollo
+
+Prerrequisitos: .NET 10 SDK, Node.js 20+ (validado con Node.js 24), Docker Desktop (o motor compatible),
+herramienta `dotnet-ef` (`dotnet tool install --global dotnet-ef`).
+
+```bash
+# Base de datos y API (contenedorizadas)
+docker compose up -d --build
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Guía paso a paso, incluidos dos escenarios de validación funcional completos (CS-009 y el escenario
+multi-Principal de Pedro García/Servicios ACME): [quickstart.md](specs/001-control-acceso-empresarial/quickstart.md).
+
+Pruebas:
+
+```bash
+cd backend
+dotnet test tests/EnterpriseAccessControl.UnitTests
+dotnet test tests/EnterpriseAccessControl.IntegrationTests   # requiere Docker (Testcontainers)
+dotnet test tests/EnterpriseAccessControl.ContractTests
+
+cd ../frontend
+npm run test        # Vitest
+npm run test:e2e    # Playwright — requiere Docker, dotnet-ef y `npx playwright install chromium`
+```
+
+`npm run test:e2e` levanta una base de datos dedicada `EnterpriseAccessControl_E2E` reutilizando los
+contenedores de desarrollo; tras ejecutarlo, correr `docker compose up -d` de nuevo para que la API vuelva a
+apuntar a la base de desarrollo.
+
+## Configuración y ejecución (producción)
+
+El despliegue de producción usa [docker-compose.prod.yml](docker-compose.prod.yml). Resumen (detalle
+completo, incluidas todas las variables de entorno, en el propio archivo y en `quickstart.md`):
+
+1. **Requisitos**: host Linux con Docker Compose v2, licencia de SQL Server (la edición Developer no se
+   permite en producción), .NET 10 SDK + `dotnet-ef` para aplicar migraciones, Node.js para compilar la SPA,
+   proxy inverso propio con TLS.
+2. **Variables de entorno obligatorias**: `MSSQL_SA_PASSWORD`, `MSSQL_PID`,
+   `SQLSERVER_CONNECTION_STRING`, `JWT_SIGNING_KEY` (≥32 caracteres). Deben definirse en un `.env.prod` fuera
+   de control de versiones o en el gestor de secretos del host; si falta alguna, compose no arranca.
+3. **Política de contraseñas** (`PASSWORD_*`): configurable por variable de entorno, pero **provisional** —
+   depende de la Decisión de negocio #1, todavía abierta. No debe tratarse como política aprobada.
+4. **Migraciones**: la API **no las aplica al arrancar**; se ejecutan manualmente con `dotnet ef database
+   update` apuntando a SQL Server antes de levantar la API.
+5. **Primer usuario administrador**: **el sistema no incluye semilla ni endpoint de alta del primer
+   usuario.** Un despliegue recién migrado tiene la tabla `Usuario` vacía y nadie puede iniciar sesión; hoy
+   el primer administrador debe insertarse directamente en la base de datos (hash `PasswordHasher<T>` de
+   ASP.NET Core Identity V3). Esto es un hueco de implementación, no una decisión cerrada — ver
+   [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría) (D2).
+6. **SPA y proxy inverso**: `npm run build` genera `frontend/dist/`; el proxy debe servir esos estáticos,
+   reenviar `/api/` y `/health/` a la API, y devolver `index.html` para rutas de cliente. La API no configura
+   CORS: la SPA debe consumirla en el mismo origen.
+7. **Verificación**: `GET /health/live` (proceso vivo) y `GET /health/ready` (conecta con SQL Server;
+   `503` si no responde). [scripts/verificar-health-docker.sh](scripts/verificar-health-docker.sh) automatiza
+   esta verificación sobre el compose de desarrollo.
+
+## Estado actual del proyecto
+
+**Etapa 1 implementada, con su dominio validado, pero el baseline NO está congelado.** Dos auditorías
+independientes ([`gate-cierre-etapa1-2026-09-16.html`](docs/auditorias/gate-cierre-etapa1-2026-09-16.html) y
+[`auditoria-final-cierre-2026-09-16.html`](docs/auditorias/auditoria-final-cierre-2026-09-16.html)),
+verificando en ejecución y no solo en código, concluyeron **"No congelable" / "No cerrada"**.
+
+**1. Implementado y validado**
+
+- Las 8 historias P1 (login/alcance, compañías/relaciones, maestros, personas, históricos/contexto
+  operativo/revocación automática, árbol de áreas, elegibilidad por tipo de persona, motor de evaluación de
+  acceso de 14 pasos).
+- Modelo de datos completo (22 entidades, 11 migraciones EF Core aplicadas), reglas temporales
+  (contención, no-solapamiento vía trigger SQL, vigencias obligatorias), cascada de revocación automática,
+  auditoría automática por interceptor, aislamiento de datos entre Compañías Principales.
+- 168/168 tareas de `tasks.md` completadas y verificadas contra el repositorio, salvo dos excepciones
+  documentales (ver "Correcciones pendientes").
+- Los 45 endpoints de los 10 contratos OpenAPI existen y responden en el código — paridad contrato↔código
+  verificada por la auditoría de cierre del 2026-09-16, no re-confirmada en esta subida.
+
+**2. Pendiente de decisión de negocio** (ver sección siguiente para el detalle completo)
+
+- El modelo de administración de usuarios (quién puede ver/crear/bloquear usuarios y conceder alcance) no
+  está definido en `spec.md` — el código de hoy no aplica ninguna regla porque no existe una que aplicar.
+- El mecanismo para dar de alta al primer administrador en un despliegue nuevo.
+- El calendario que define un "día" para las vigencias (UTC vs. hora local).
+- Política de contraseñas definitiva, retención legal de históricos, efecto de inactivar una compañía sobre
+  sus dependientes, y otras decisiones heredadas de `spec.md` (#1, #3, #6, #7).
+
+**3. Correcciones pendientes (defecto técnico, no requieren decisión de negocio)**
+
+- **Crítico**: `UsuarioService` no aplica alcance de compañías en ninguna de sus operaciones — reproducido
+  en ejecución: un usuario con alcance limitado pudo listar todas las compañías y usuarios del sistema,
+  concederse compañías ajenas y modificar el alcance de terceros.
+- Los servicios de histórico de personas validan la persona pero no el objeto/alcance de la operación,
+  permitiendo lectura y escritura fuera del alcance del usuario en ciertos casos.
+- Compañía/Unidad Organizativa `INACTIVA` no bloquea nuevas asignaciones (contradice `data-model.md`).
+- Índice clúster de histórico aplicado solo en 1 de 6 entidades (T019 marcada completa sin respaldo total).
+- Otros defectos menores y de bajo riesgo documentados con detalle en
+  [`gate-cierre-etapa1-2026-09-16.html`](docs/auditorias/gate-cierre-etapa1-2026-09-16.html) (hallazgos
+  F-05 a F-23).
+
+**4. Stage 2 / futuro**
+
+- Historia 10 (auditoría y consultas transversales, RF-067 a RF-069, CS-032): necesidad funcional declarada,
+  sin contrato de API, código ni pantalla — su alcance exacto (forma del endpoint, paginación, límites) está
+  pendiente de especificarse o trasladarse formalmente a Etapa 2.
+- La interfaz de usuario de la Historia 5 (selector de Principal, árbol de asignación de unidad, pantalla de
+  perfiles) está marcada como completada en `tasks.md` pero no tiene implementación de UI — Historia 5 solo
+  es operable hoy vía API.
+
+## Decisiones pendientes identificadas en la auditoría
+
+La auditoría de cierre agrupó 23 hallazgos en 9 decisiones (D1–D9) y una matriz de **16 preguntas de
+negocio**. A la fecha de este README, **las 16 preguntas siguen sin respuesta**. Las preguntas 1–7, 10, 11,
+13 y 14 son bloqueantes para congelar el baseline; las preguntas 8, 9, 12, 15 y 16 pueden quedar
+explícitamente abiertas.
+
+| Decisión | Tema | ¿Bloquea el baseline? |
+|---|---|---|
+| D1 | Modelo de administración de usuarios (quién ve/crea/bloquea usuarios y alcance) | Sí |
+| D2 | Mecanismo de alta del primer administrador | Sí |
+| D3 | Alcance exacto de la visibilidad histórica de una persona fuera del alcance del usuario | Sí |
+| D4 | Efecto de inactivar una Compañía sobre la evaluación de acceso (Decisión #6 de `spec.md`) | No (pero el texto que hoy afirma lo contrario en spec.md/research.md sí debe corregirse) |
+| D5 | Calendario que define un "día" para las vigencias (UTC vs. local) | Sí (al menos para dejarlo escrito) |
+| D6 | Qué ocurre al reclasificar el tipo de una Compañía con dependientes | No |
+| D7 | Destino de la interfaz de Historia 5 (corregir ahora, reabrir, o trasladar a Etapa 2) | Sí (el registro) |
+| D8 | Forma técnica de las consultas transversales de auditoría/histórico (RF-067 a RF-069) | No el código; sí la frontera entre etapas |
+| D9 | Decisiones heredadas #1 (contraseñas), #3 (retención legal), #7 (prioridad Historia 9) | No |
+
+Detalle completo de cada decisión, sus alternativas y consecuencias:
+[`decisiones-etapa1-2026-09-16.html`](docs/auditorias/decisiones-etapa1-2026-09-16.html) (narrativo) y
+[`clasificacion-hallazgos-2026-09-16.html`](docs/auditorias/clasificacion-hallazgos-2026-09-16.html)
+(tabular, con los 23 hallazgos F-01 a F-23 y la matriz de 16 preguntas).
+
+## Próximos pasos para cerrar el baseline
+
+Secuencia acordada en la auditoría de cierre para llegar a un baseline estable de Etapa 1:
+
+1. **Sesión de decisiones de negocio** — responder las 16 preguntas pendientes, sin tocar código todavía.
+2. **Corregir el perímetro de autorización** (F-01, F-02) una vez decidido el modelo de administración de
+   usuarios (D1) y el aislamiento por alcance (D3), con pruebas de integración nuevas por operación.
+3. **Correcciones técnicas que no requieren decisión** (F-05, F-06, F-10, F-12, F-14, F-22, visualización de
+   fechas de F-08, entre otras).
+4. **Sincronizar la documentación** (`spec.md`, `research.md`, `data-model.md`, `contracts/`, `ux-ui.md`,
+   `tasks.md`) con las decisiones tomadas y las correcciones aplicadas.
+5. **Regresión completa** de las cinco suites de prueba y repetición del gate de cierre.
+6. **Congelar la línea base de Etapa 1** y abrir formalmente la Etapa 2 con lo que se haya decidido
+   trasladar (Historia 10, y lo que corresponda de Historia 5).
+
+No se ha ejecutado ningún paso de esta secuencia todavía: este README documenta el punto de partida, no un
+avance sobre él.

@@ -1,0 +1,89 @@
+.companias,
+.unidades {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.companias-encabezado {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.companias-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  max-width: 48ch;
+}
+
+.companias-filtros {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.companias-filtros select {
+  min-width: 12rem;
+  width: auto;
+}
+
+.companias-busqueda input {
+  min-width: 18rem;
+}
+
+.companias-tabla {
+  overflow-x: auto;
+}
+
+.companias-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.companias-acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.companias-acciones button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.companias-paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Clasificación de compañía: color de apoyo, nunca portador único del dato. */
+.etiqueta.tipo-PRINCIPAL_MANDANTE {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.etiqueta.tipo-CONTRATISTA {
+  color: var(--text-muted);
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.relaciones-tabla {
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.relaciones-alta {
+  margin-bottom: 0.75rem;
+}

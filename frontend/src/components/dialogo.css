@@ -1,0 +1,61 @@
+.dialogo {
+  width: min(32rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radio);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.dialogo::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dialogo-encabezado {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dialogo-cerrar {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.dialogo-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.dialogo textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radio);
+  resize: vertical;
+}
+
+.campo-ayuda {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.alcance-resumen {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

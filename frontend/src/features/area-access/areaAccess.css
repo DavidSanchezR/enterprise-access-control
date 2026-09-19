@@ -1,0 +1,81 @@
+.areas-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.areas-selector select {
+  max-width: 24rem;
+}
+
+.areas-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .areas-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.areas-arbol,
+.areas-acciones {
+  padding: 1.25rem;
+}
+
+.areas-acciones h2 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.areas-mover {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.areas-botones {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.areas-vacio {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.areas-tipos {
+  padding: 1.25rem;
+  /* Ocupa el ancho completo bajo el árbol y el panel de acciones: la lista de perfiles crece y
+     encajonarla en la columna estrecha obligaría a desplazarla. */
+  grid-column: 1 / -1;
+}
+
+.areas-tipos h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.areas-tipos-aviso {
+  grid-column: 1 / -1;
+}
+
+.areas-tipos-lista {
+  border: 0;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.areas-tipo-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}

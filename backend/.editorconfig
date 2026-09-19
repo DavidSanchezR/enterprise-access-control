@@ -1,0 +1,67 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.csproj]
+indent_size = 2
+
+[*.cs]
+# Organización de usings
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:warning
+
+# Namespaces de archivo (C# 10+)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Preferencias de lenguaje
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_prefer_braces = true:warning
+csharp_style_prefer_primary_constructors = false:suggestion
+
+# Nullable: los proyectos habilitan <Nullable>enable</Nullable>; tratar advertencias de nulabilidad como errores
+dotnet_diagnostic.CS8600.severity = error
+dotnet_diagnostic.CS8602.severity = error
+dotnet_diagnostic.CS8603.severity = error
+dotnet_diagnostic.CS8618.severity = error
+
+# Analizadores de calidad relevantes para este dominio
+dotnet_diagnostic.CA1062.severity = suggestion
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1848.severity = none
+
+# En los proyectos de prueba, los nombres con guiones bajos son la convención estándar de xUnit y
+# hacen legible el informe de fallos (Escenario_Condicion_ResultadoEsperado). CA1707 se desactiva
+# solo aquí; sigue activo en el código de producción.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+# Las migraciones las genera la herramienta de EF Core, no una persona: aplicarles reglas de estilo
+# y de calidad convertiría cada 'dotnet ef migrations add' en un build roto. Se marcan como código
+# generado; las reglas siguen vigentes para todo el código escrito a mano.
+# `**` cubre cualquier número de segmentos, incluidos cero: el patrón alcanza tanto los archivos
+# directamente en Migrations/ como los de Migrations/Seed/, donde viven las migraciones de semilla
+# versionada de los catálogos maestros (research.md §8).
+[**/Migrations/**.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# Los enums de negocio usan SCREAMING_SNAKE_CASE deliberadamente: ese identificador es, carácter por
+# carácter, el valor persistido en la columna nvarchar (research.md §17) y el valor literal del enum
+# en contracts/*.yaml. Mantenerlos idénticos elimina toda capa de traducción entre especificación,
+# base de datos y contrato HTTP en un dominio de control de acceso auditable. CA1707 se desactiva
+# solo aquí; sigue activo en el resto del código.
+[**/Enums/*.cs]
+dotnet_diagnostic.CA1707.severity = none

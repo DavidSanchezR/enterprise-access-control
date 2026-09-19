@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Compañías
+  version: "1.0.0"
+  description: >
+    Mantenimiento de compañías (Historia 2, RF-006, RF-042) y de sus relaciones Contratista↔Principal
+    (RF-051). Todas las respuestas están filtradas por el alcance de compañías del usuario autenticado
+    (Principio I, research.md §3); un usuario nunca ve una compañía fuera de su alcance, ni siquiera
+    consultando por ID. Toda compañía se clasifica como PRINCIPAL_MANDANTE o CONTRATISTA (RF-042); el
+    sistema admite varias compañías PRINCIPAL_MANDANTE simultáneamente (RF-043). Solo las compañías
+    PRINCIPAL_MANDANTE pueden poseer unidades organizativas (ver contracts/org-units.yaml) y áreas de
+    acceso (ver contracts/area-access.yaml). Una Compañía Contratista puede tener relaciones vigentes
+    simultáneas con varias Compañías Principales (RF-051).
+tags:
+  - name: Companias
+paths:
+  /api/companias:
+    get:
+      tags: [Companias]
+      summary: Listar compañías dentro del alcance del usuario autenticado
+      parameters:
+        - name: pagina
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: tamañoPagina
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - name: estado
+          in: query
+          schema: { type: string, enum: [ACTIVO, INACTIVO] }
+        - name: tipoCompania
+          in: query
+          description: Filtra por clasificación PRINCIPAL_MANDANTE o CONTRATISTA (RF-042)
+          schema: { $ref: "#/components/schemas/TipoCompania" }
+        - name: texto
+          in: query
+          description: Búsqueda por nombre o número de documento
+          schema: { type: string }
+      responses:
+        "200":
+          description: Página de compañías
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaCompanias" }
+    post:
+      tags: [Companias]
+      summary: Crear compañía
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompaniaRequest" }
+      responses:
+        "201":
+          description: Compañía creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Compania" }
+        "409":
+          description: "Combinación (tipoDocumentoId, numeroDocumento) ya registrada"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/companias/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Companias]
+      summary: Obtener compañía por ID (404 si está fuera del alcance del usuario)
+      responses:
+        "200":
+          description: Compañía encontrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Compania" }
+        "404":
+          description: No encontrada o fuera de alcance
+    put:
+      tags: [Companias]
+      summary: Actualizar compañía
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompaniaRequest" }
+      responses:
+        "200":
+          description: Compañía actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Compania" }
+        "404":
+          description: No encontrada o fuera de alcance
+  /api/companias/{contratistaId}/relaciones-principales:
+    parameters:
+      - name: contratistaId
+        in: path
+        required: true
+        description: Debe ser una compañía con tipoCompania = CONTRATISTA
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Companias]
+      summary: Listar relaciones (vigentes e históricas) de la Contratista con Compañías Principales
+      responses:
+        "200":
+          description: Relaciones de la Contratista, filtradas por el alcance del usuario sobre cada Principal
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RelacionContratistaPrincipal" }
+        "404":
+          description: contratistaId no existe o no es CONTRATISTA
+    post:
+      tags: [Companias]
+      summary: Declarar una nueva relación vigente con una Compañía Principal (RF-051)
+      description: >
+        Cierra automáticamente (fin de vigencia) cualquier relación activa previa para el mismo par
+        (Contratista, Principal) en la misma transacción; permite relaciones simultáneas con Principales
+        distintas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RelacionContratistaPrincipalRequest" }
+      responses:
+        "201":
+          description: Relación creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RelacionContratistaPrincipal" }
+        "400":
+          description: companiaPrincipalId no es PRINCIPAL_MANDANTE, o contratistaId no es CONTRATISTA
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "404":
+          description: companiaPrincipalId no existe o está fuera del alcance del usuario
+  /api/companias/{contratistaId}/relaciones-principales/{id}/finalizar:
+    parameters:
+      - name: contratistaId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Companias]
+      summary: Finalizar anticipadamente una relación vigente (fija fechaHoraFin a ahora)
+      responses:
+        "204":
+          description: Relación finalizada
+        "409":
+          description: La relación ya no está vigente
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TipoCompania:
+      type: string
+      enum: [PRINCIPAL_MANDANTE, CONTRATISTA]
+      description: RF-042. PRINCIPAL_MANDANTE puede poseer unidades organizativas y áreas de acceso propias; CONTRATISTA no.
+    Compania:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        tipoDocumentoId: { type: string, format: uuid }
+        numeroDocumento: { type: string }
+        tipoCompania: { $ref: "#/components/schemas/TipoCompania" }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    CompaniaRequest:
+      type: object
+      required: [nombre, tipoDocumentoId, numeroDocumento, tipoCompania, estado]
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        tipoDocumentoId: { type: string, format: uuid }
+        numeroDocumento: { type: string, minLength: 1, maxLength: 20 }
+        tipoCompania: { $ref: "#/components/schemas/TipoCompania" }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    PaginaCompanias:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Compania" }
+        total: { type: integer }
+        pagina: { type: integer }
+        tamañoPagina: { type: integer }
+    RelacionContratistaPrincipal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        companiaContratistaId: { type: string, format: uuid }
+        companiaPrincipalId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time, nullable: true }
+    RelacionContratistaPrincipalRequest:
+      type: object
+      required: [companiaPrincipalId, fechaHoraInicio]
+      properties:
+        companiaPrincipalId: { type: string, format: uuid }
+        fechaHoraInicio: { type: string, format: date-time }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

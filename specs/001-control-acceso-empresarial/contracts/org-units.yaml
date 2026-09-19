@@ -1,0 +1,221 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Unidades Organizativas
+  version: "1.0.0"
+  description: >
+    Jerarquía de unidades organizativas (Historia 2, RF-007, RF-008). Validación server-side de ausencia
+    de ciclos en creación y reubicación (Principio V, RF-038, research.md §4). `UnidadOrganizativa` NO
+    tiene ninguna columna ni FK directa hacia Compañía (RF-044): cada nodo raíz se asocia a exactamente una
+    Compañía PRINCIPAL_MANDANTE mediante una entidad de enlace independiente
+    (`CompañíaPrincipalUnidadOrganizativaRaiz`); los nodos hijos heredan esa pertenencia recorriendo la
+    jerarquía (RF-045). El sistema admite varias Compañías Principales simultáneamente, cada una con su
+    propio árbol de unidades organizativas aislado (RF-043) — por eso `companiaPrincipalId` es obligatorio
+    al listar/consultar el árbol y al crear un nodo raíz.
+tags:
+  - name: UnidadesOrganizativas
+paths:
+  /api/unidades-organizativas:
+    get:
+      tags: [UnidadesOrganizativas]
+      summary: Listar unidades organizativas (plano, con unidadSuperiorId) de una Compañía Principal
+      parameters:
+        - name: companiaPrincipalId
+          in: query
+          required: true
+          description: >
+            Compañía PRINCIPAL_MANDANTE propietaria del árbol a listar. Debe estar dentro del alcance del
+            usuario autenticado (RF-049); 404 si no lo está o si la compañía no es PRINCIPAL_MANDANTE.
+          schema: { type: string, format: uuid }
+        - name: estado
+          in: query
+          schema: { type: string, enum: [ACTIVO, INACTIVO] }
+      responses:
+        "200":
+          description: Lista plana de unidades pertenecientes al árbol de esa Compañía Principal
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UnidadOrganizativa" }
+        "404":
+          description: companiaPrincipalId no existe, no es PRINCIPAL_MANDANTE, o está fuera de alcance
+    post:
+      tags: [UnidadesOrganizativas]
+      summary: Crear unidad organizativa (raíz si unidadSuperiorId es null)
+      description: >
+        Al crear un nodo raíz (unidadSuperiorId = null), companiaPrincipalId es obligatorio y crea la fila
+        de enlace en CompañíaPrincipalUnidadOrganizativaRaiz (RF-045). Al crear un nodo hijo, companiaPrincipalId
+        se ignora si se envía: el nodo hereda automáticamente la Compañía Principal de su unidadSuperiorId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnidadOrganizativaRequest" }
+      responses:
+        "201":
+          description: Unidad creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnidadOrganizativa" }
+        "400":
+          description: Nodo raíz sin companiaPrincipalId, o companiaPrincipalId referencia una compañía CONTRATISTA (RF-045)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: La unidad superior indicada generaría un ciclo o no existe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/unidades-organizativas/arbol:
+    get:
+      tags: [UnidadesOrganizativas]
+      summary: Obtener el árbol anidado de una Compañía Principal (para el control de árbol del frontend, RF-036)
+      parameters:
+        - name: companiaPrincipalId
+          in: query
+          required: true
+          description: Compañía PRINCIPAL_MANDANTE cuyo árbol se solicita; debe estar dentro del alcance del usuario
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Árbol de unidades de esa Compañía Principal (un único árbol raíz, o vacío si aún no tiene unidades)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NodoArbol" }
+        "404":
+          description: companiaPrincipalId no existe, no es PRINCIPAL_MANDANTE, o está fuera de alcance
+  /api/unidades-organizativas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [UnidadesOrganizativas]
+      summary: Obtener unidad organizativa por ID (404 si su Compañía Principal está fuera de alcance)
+      responses:
+        "200":
+          description: Unidad encontrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnidadOrganizativa" }
+        "404":
+          description: No encontrada o fuera de alcance
+    put:
+      tags: [UnidadesOrganizativas]
+      summary: Actualizar nombre/estado de la unidad (no permite cambiar su Compañía Principal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnidadOrganizativaUpdateRequest" }
+      responses:
+        "200":
+          description: Unidad actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnidadOrganizativa" }
+        "409":
+          description: Actualización generaría un ciclo (RF-038)
+  /api/unidades-organizativas/{id}/mover:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [UnidadesOrganizativas]
+      summary: Reubicar la unidad bajo un nuevo padre dentro del mismo árbol (o a raíz si nuevoPadreId es null)
+      description: >
+        Un nodo no puede reubicarse bajo un padre de un árbol de otra Compañía Principal: eso cambiaría
+        implícitamente su Compañía Principal propietaria, lo cual no está permitido (RF-045). Para mover un
+        nodo a raíz (nuevoPadreId = null), companiaPrincipalId no cambia: conserva la que ya tenía asociada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nuevoPadreId:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "204":
+          description: Unidad reubicada
+        "409":
+          description: >
+            Rechazado: nuevoPadreId es descendiente (o el propio nodo, lo que crearía un ciclo — RF-038,
+            Principio V), o pertenece al árbol de una Compañía Principal distinta a la del nodo (RF-045)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UnidadOrganizativa:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        unidadSuperiorId: { type: string, format: uuid, nullable: true }
+        companiaPrincipalId:
+          type: string
+          format: uuid
+          description: >
+            Resuelto por el servidor (no editable directamente): la Compañía Principal propietaria del
+            árbol, obtenida vía CompañíaPrincipalUnidadOrganizativaRaiz sobre el nodo raíz de este árbol.
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    UnidadOrganizativaRequest:
+      type: object
+      required: [nombre, estado]
+      description: companiaPrincipalId es obligatorio únicamente cuando unidadSuperiorId es null (nodo raíz).
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        unidadSuperiorId: { type: string, format: uuid, nullable: true }
+        companiaPrincipalId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Obligatorio si unidadSuperiorId es null; ignorado si se informa junto a un unidadSuperiorId no nulo.
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    UnidadOrganizativaUpdateRequest:
+      type: object
+      required: [nombre, estado]
+      description: A diferencia de la creación, la actualización no acepta companiaPrincipalId ni unidadSuperiorId (usar POST /mover para reubicar).
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+    NodoArbol:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        hijos:
+          type: array
+          items: { $ref: "#/components/schemas/NodoArbol" }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

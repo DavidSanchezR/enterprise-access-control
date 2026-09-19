@@ -1,0 +1,200 @@
+openapi: 3.0.3
+info:
+  title: Control de Acceso Empresarial — Mantenimiento de Usuarios
+  version: "1.0.0"
+  description: >
+    Administración de usuarios y su alcance de compañías administrables (RF-004, RF-005). Distinto del
+    flujo de login (ver auth.yaml).
+tags:
+  - name: Usuarios
+paths:
+  /api/usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios
+      parameters:
+        - $ref: "#/components/parameters/Pagina"
+        - $ref: "#/components/parameters/TamañoPagina"
+        - name: estado
+          in: query
+          schema: { $ref: "#/components/schemas/EstadoUsuario" }
+      responses:
+        "200":
+          description: Página de usuarios
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaUsuarios" }
+    post:
+      tags: [Usuarios]
+      summary: Crear usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CrearUsuarioRequest" }
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usuario" }
+        "400":
+          description: Validación fallida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: Correo ya registrado
+  /api/usuarios/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Usuarios]
+      summary: Obtener usuario por ID
+      responses:
+        "200":
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usuario" }
+        "404":
+          description: No encontrado
+    put:
+      tags: [Usuarios]
+      summary: Actualizar datos de usuario (correo, estado)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActualizarUsuarioRequest" }
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usuario" }
+        "404":
+          description: No encontrado
+  /api/usuarios/{id}/desbloquear:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Usuarios]
+      summary: Desbloquear usuario BLOQUEADO (administrativo)
+      responses:
+        "204":
+          description: Usuario desbloqueado, Estado = ACTIVO
+        "404":
+          description: No encontrado
+  /api/usuarios/{id}/alcance-companias:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Usuarios]
+      summary: Listar compañías administrables por el usuario
+      responses:
+        "200":
+          description: Lista de compañías del alcance
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string, format: uuid }
+    put:
+      tags: [Usuarios]
+      summary: Reemplazar el conjunto de compañías administrables por el usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [companiaIds]
+              properties:
+                companiaIds:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Alcance actualizado
+        "400":
+          description: Alguna compañía no existe o está INACTIVA
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    TamañoPagina:
+      name: tamañoPagina
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+  schemas:
+    EstadoUsuario:
+      type: string
+      enum: [ACTIVO, INACTIVO, BLOQUEADO]
+    Usuario:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        correo: { type: string, format: email }
+        estado: { $ref: "#/components/schemas/EstadoUsuario" }
+        requiereCambioPassword: { type: boolean }
+        alcanceCompanias:
+          type: array
+          items: { type: string, format: uuid }
+    CrearUsuarioRequest:
+      type: object
+      required: [correo, passwordInicial, companiaIds]
+      properties:
+        correo: { type: string, format: email }
+        passwordInicial: { type: string, format: password }
+        companiaIds:
+          type: array
+          items: { type: string, format: uuid }
+          minItems: 1
+    ActualizarUsuarioRequest:
+      type: object
+      required: [correo, estado]
+      properties:
+        correo: { type: string, format: email }
+        estado: { $ref: "#/components/schemas/EstadoUsuario" }
+    PaginaUsuarios:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Usuario" }
+        total: { type: integer }
+        pagina: { type: integer }
+        tamañoPagina: { type: integer }
+    ProblemDetails:
+      type: object
+      description: >
+        RFC 7807/9457 (research.md §21). Único formato de error HTTP del sistema; reemplaza el
+        antiguo ErrorResponse propio. "codigo" es una extensión propia (ProblemDetails.Extensions):
+        código de error de negocio estable y legible por máquina, para que el frontend distinga
+        casos sin parsear "detail" (texto para humanos).
+      properties:
+        type: { type: string, format: uri, example: "https://tools.ietf.org/html/rfc9457" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        codigo: { type: string, description: "Extensión propia: código de error de negocio estable" }
+security:
+  - bearerAuth: []

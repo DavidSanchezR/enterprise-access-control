@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EnterpriseAccessControl.Api/EnterpriseAccessControl.Api.csproj" />
+    <Project Path="src/EnterpriseAccessControl.Application/EnterpriseAccessControl.Application.csproj" />
+    <Project Path="src/EnterpriseAccessControl.Domain/EnterpriseAccessControl.Domain.csproj" />
+    <Project Path="src/EnterpriseAccessControl.Infrastructure/EnterpriseAccessControl.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EnterpriseAccessControl.ContractTests/EnterpriseAccessControl.ContractTests.csproj" />
+    <Project Path="tests/EnterpriseAccessControl.IntegrationTests/EnterpriseAccessControl.IntegrationTests.csproj" />
+    <Project Path="tests/EnterpriseAccessControl.UnitTests/EnterpriseAccessControl.UnitTests.csproj" />
+  </Folder>
+</Solution>

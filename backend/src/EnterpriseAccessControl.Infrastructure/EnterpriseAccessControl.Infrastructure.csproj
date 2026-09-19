@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnterpriseAccessControl.Application\EnterpriseAccessControl.Application.csproj" />
+  </ItemGroup>
+
+  <!--
+    Necesario para IHttpContextAccessor (IUsuarioActualAccessor/IAlcanceCompaniaAccessor, T013) y para
+    IAuthorizationHandler (CompaniaScopeAuthorizationHandler, T014), que viven en Infrastructure/Security.
+    El Dominio NO recibe esta referencia: permanece libre de ASP.NET Core y de EF Core (research.md §15).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <!--
+      PasswordHasher<T> (Microsoft.Extensions.Identity.Core, research.md §2) llega a través del
+      FrameworkReference Microsoft.AspNetCore.App de abajo; referenciar el paquete explícitamente
+      es redundante y NuGet lo rechaza (NU1510).
+    -->
+    <PackageReference Include="NodaTime" Version="3.3.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

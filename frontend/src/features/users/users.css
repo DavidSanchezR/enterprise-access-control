@@ -1,0 +1,65 @@
+.usuarios {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.usuarios-encabezado {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.usuarios-subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.usuarios-filtros {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.usuarios-filtros select {
+  min-width: 12rem;
+  width: auto;
+}
+
+.usuarios-tabla {
+  overflow-x: auto;
+}
+
+.usuarios-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.usuarios-acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.usuarios-acciones button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.usuarios-nota {
+  color: var(--aviso);
+  font-size: 0.8rem;
+}
+
+.usuarios-paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
