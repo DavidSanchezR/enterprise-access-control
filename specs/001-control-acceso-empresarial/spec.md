@@ -561,6 +561,56 @@ respuestas ya existían al iniciar la sesión; no se formuló ninguna pregunta a
   implementa retención ni purga y conserva el comportamiento actual; #7 Historia 9 mantiene P2. Ver la sección
   Decisiones Pendientes.
 
+### Sesión 2026-09-20 (cierre de la desviación D-1 — renovación de `AsignaciónRolAdministrativo`)
+
+Desviación detectada al finalizar `/speckit-implement` sobre T169–T228: el dominio implementa la renovación
+de una `AsignaciónRolAdministrativo` (`RenovarAsync`/`RenovarRolAsync`, con las reglas de vigencia de RF-073
+referenciadas desde RF-075), pero no se expuso ningún endpoint HTTP porque `contracts/users.yaml` no lo
+declaraba — publicar una ruta no declarada habría roto la conformidad contractual que vigilan las pruebas de
+contrato. Sesión de `/speckit-clarify` que no abre ninguna decisión de negocio nueva: cierra esa desviación
+transcribiendo a `spec.md` una decisión de alcance ya aprobada.
+
+- Q: ¿La renovación de una `AsignaciónRolAdministrativo` es una capacidad del Baseline de Etapa 1? → A:
+  **Sí.** Se incorpora al contrato funcional y HTTP del Baseline, reutilizando íntegramente las reglas de
+  vigencia ya aprobadas en RF-073 (referenciadas, sin reabrirlas ni modificar su texto, que sigue siendo
+  específico de `AsignaciónPersonaCompañía`) y aplicando las mismas restricciones de autorización (RF-076) y
+  de alcance/ocultamiento de existencia (RF-077) que el resto de operaciones sobre asignaciones de rol. La
+  operación HTTP (ruta, verbo, cuerpo y códigos de respuesta) se define en la fase de planificación siguiendo
+  el precedente ya vigente de `contracts/people.yaml` (`.../historial-companias/{id}/renovar`) y el patrón ya
+  usado por `.../roles/{asignacionId}/finalizar` en el propio `contracts/users.yaml`; no se declara en esta
+  sesión de clarificación para no adelantar contenido de `research.md`/`contracts/`, que corresponde a
+  `/speckit-plan` (RF-075).
+
+### Sesión 2026-09-20 (cierre de las desviaciones D-4 y D-5 — auditoría de decisión del Baseline)
+
+Auditoría de decisión sobre D-2 a D-5 realizada tras T169–T228 (`/speckit-analyze`, sesión previa). D-2 y D-3
+se cerraron como implementación válida sin cambios de especificación (clasificación A). Esta sesión de
+`/speckit-clarify` formaliza las dos decisiones que sí requerían intervención del usuario, ya tomadas
+explícitamente por el usuario, sin reabrirlas como preguntas.
+
+- Q: ¿La búsqueda de usuarios dentro del alcance autorizado (UX-22) debe operar sobre todo el conjunto
+  autorizado o solo sobre la página ya cargada? → A: **Sobre todo el conjunto autorizado.** La búsqueda es
+  server-side: se aplica sobre el universo de usuarios ya restringido al alcance del actor (RF-077) y el
+  resultado se pagina después, nunca al revés — el filtrado nunca se limita a los registros de la página
+  actualmente visible en el cliente. La búsqueda NO amplía el alcance autorizado bajo ninguna circunstancia:
+  un `COMPANY_ADMINISTRATOR` solo obtiene resultados de su propia compañía y un `GLOBAL_ADMINISTRATOR` busca
+  dentro de su alcance GLOBAL, con las mismas reglas de aislamiento, autorización y ocultamiento de existencia
+  que el listado normal (RF-077); conocer un correo o identificador no concede acceso al recurso. El contrato
+  HTTP actual (`contracts/users.yaml`, `GET /api/usuarios` con `pagina`/`tamañoPagina`/`estado`) no declara
+  todavía un parámetro de búsqueda — su nombre, el soporte de múltiples criterios, los códigos de error
+  asociados y cualquier requisito de ordenamiento o rendimiento se definen en `/speckit-plan`, no en esta
+  sesión. *(Nuevo — Sesión 2026-09-20, cierre de la desviación D-4; precisa RF-077 y UX-22 sin
+  reemplazarlos.)*
+- Q: ¿La contraseña inicial del `GLOBAL_ADMINISTRATOR` de arranque (RF-078) puede tener un valor por defecto
+  en entornos de desarrollo? → A: **No, en ningún entorno.** RF-078 ya exigía que la contraseña NO esté
+  incrustada en archivos de configuración versionados ni en el repositorio, sin distinguir entre desarrollo y
+  producción; esa regla no se relaja por conveniencia de desarrollo. La configuración de desarrollo DEBE
+  requerir la variable de entorno correspondiente igual que producción, y el arranque DEBE fallar
+  explícitamente si no se provee, en lugar de levantar con una contraseña adivinable. Esta sesión no modifica
+  el texto de RF-078 —ya era inequívoco— y cierra la desviación detectada en `docker-compose.yml`, cuya
+  corrección de configuración y documentación se realiza fuera de `spec.md`. *(Cierre de la desviación D-5 —
+  Sesión 2026-09-20; RF-078 sin cambios de texto.)*
+
 ## Historias de Usuario y Pruebas
 
 ### Historia 1 - Inicio de sesión y alcance de gestión (Prioridad P1)
@@ -1225,7 +1275,15 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   `GLOBAL_ADMINISTRATOR` queda fuera de esa restricción de solapamiento (no tiene compañía asociada) y PUEDEN
   coexistir varios usuarios con ese rol simultáneamente. La extensión de la vigencia de una asignación DEBE
   seguir las reglas de renovación ya establecidas en RF-073: solo hacia una fecha posterior y solo mientras la
-  asignación siga vigente dinámicamente. *(Nuevo — Sesión 2026-09-20, D1.)*
+  asignación siga vigente dinámicamente; una asignación `FINALIZADA`, o una vigente cuya `FechaHoraFin` ya
+  expiró dinámicamente, NO es renovable en ningún caso y exige una asignación nueva. La renovación NUNCA
+  modifica `Rol` ni `CompañíaId` de la asignación existente — para cambiar cualquiera de los dos se finaliza la
+  asignación y se crea una distinta (RF-074) — y DEBE quedar expuesta como una operación administrativa propia,
+  análoga a la ya existente para `AsignaciónPersonaCompañía` (RF-073), sujeta a las mismas restricciones de
+  autorización que crear o finalizar esa misma asignación (RF-076) y al mismo régimen de alcance y
+  ocultamiento de existencia que el resto de operaciones sobre `Usuario` (RF-077). *(Nuevo — Sesión 2026-09-20,
+  D1; alcance de la operación de renovación aclarado explícitamente — Sesión 2026-09-20, cierre de la
+  desviación D-1.)*
 - RF-076: Un `COMPANY_ADMINISTRATOR` DEBE poder crear y administrar usuarios únicamente dentro de la compañía
   sobre la que tiene autorización administrativa vigente, y NO DEBE poder: administrar usuarios de otras
   compañías, reasignar usuarios fuera de su alcance, elevar su propio alcance, asignar el rol
@@ -1243,8 +1301,13 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   usuario **o** si tiene al menos un `ContextoOperativoPersonaPrincipal` vigente con una Compañía Principal
   del alcance del usuario. Las operaciones de **lectura** sobre recursos fuera del alcance DEBEN responder
   `404`, sin revelar la existencia del recurso; las de **escritura** DEBEN respetar el contrato específico de
-  cada endpoint, sin asumir `404` automáticamente. *(Nuevo — Sesión 2026-09-20, D1 y D3; precisa RF-005,
-  RF-049 y RF-060 sin reemplazarlos.)*
+  cada endpoint, sin asumir `404` automáticamente. Cualquier operación de **búsqueda o filtrado** sobre un
+  listado —incluida la búsqueda de usuarios de UX-22— DEBE aplicarse sobre el conjunto ya restringido al
+  alcance del actor, nunca sobre un universo mayor, y DEBE evaluarse **antes** de la paginación: el resultado
+  paginado refleja los elementos que coinciden con el criterio de búsqueda dentro de ese alcance, no solo los
+  de la página actualmente cargada en el cliente. *(Nuevo — Sesión 2026-09-20, D1 y D3; precisa RF-005,
+  RF-049 y RF-060 sin reemplazarlos. Semántica de búsqueda/paginación aclarada explícitamente — Sesión
+  2026-09-20, cierre de la desviación D-4.)*
 - RF-078: El sistema DEBE crear automáticamente un primer usuario con rol `GLOBAL_ADMINISTRATOR` durante el
   arranque de la aplicación, mediante una rutina **idempotente** ejecutada después de aplicar las migraciones
   —no mediante datos sembrados en una migración—, y solo si no existe ya ninguna asignación

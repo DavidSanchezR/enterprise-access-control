@@ -700,7 +700,8 @@ Administración de usuarios (§35, Baseline Etapa 1):
 - UX-19 Asignar un rol administrativo a un usuario existente.
 - UX-20 Finalizar o renovar una asignación administrativa cuando esté permitido.
 - UX-21 Intentar una operación fuera del alcance y recibir el rechazo correspondiente.
-- UX-22 Buscar y filtrar usuarios dentro del alcance autorizado.
+- UX-22 Buscar y filtrar usuarios dentro del alcance autorizado, sobre el conjunto completo de ese alcance —
+  no solo sobre los usuarios de la página actualmente visible (RF-077, cierre de la desviación D-4).
 
 ## 31. Criterios de aceptación UX
 
@@ -807,7 +808,10 @@ Reglas de visibilidad (RF-077):
 - un `COMPANY_ADMINISTRATOR` ve únicamente usuarios con alguna asignación en su propia compañía;
 - el listado **no** revela la existencia de usuarios fuera del alcance: no aparecen, no se cuentan en los
   totales y no se insinúan mediante resultados parciales o paginación;
-- el filtro por compañía ofrece solo compañías del alcance del usuario que consulta.
+- el filtro por compañía ofrece solo compañías del alcance del usuario que consulta;
+- la búsqueda por correo se resuelve en el servidor sobre todo el conjunto de usuarios dentro del alcance
+  autorizado, antes de aplicar la paginación: nunca se limita a los usuarios ya cargados en la página visible
+  (RF-077, cierre de la desviación D-4).
 
 Mostrar el rol y el alcance como etiquetas distintas. No fusionar rol, compañía y vigencia en un solo texto:
 son tres dimensiones independientes (coherente con §16).

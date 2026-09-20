@@ -26,9 +26,14 @@ trigger `AFTER INSERT, UPDATE` por tabla, aplicado como parte de las migraciones
 
 ## 2. Backend: restaurar, migrar y ejecutar
 
+El primer arranque crea automáticamente el administrador inicial (RF-078) y exige `Bootstrap__AdminPassword`
+por variable de entorno: no existe ningún valor por defecto en `appsettings.json` ni en
+`appsettings.Development.json`, y la API no arranca sin ella.
+
 ```bash
 cd backend
 dotnet restore
+export Bootstrap__AdminPassword='<contraseña-que-cumpla-la-política-de-contraseñas>'
 dotnet ef database update --project src/EnterpriseAccessControl.Infrastructure \
   --startup-project src/EnterpriseAccessControl.Api
 dotnet run --project src/EnterpriseAccessControl.Api
@@ -234,9 +239,20 @@ Minera ABC / Minera XYZ).
 
 ## 7. Escenarios de validación del cierre de Etapa 1 (Decisiones D1 a D9, Sesión 2026-09-20)
 
-Estos escenarios validan las correcciones planificadas en `research.md` §27-§33 una vez implementadas —
-**no están implementados todavía** (ver plan.md, "Re-chequeo de cierre de Etapa 1"). Referencian los
-mismos usuarios/compañías de las secciones 5 y 6 cuando sea posible.
+Estos escenarios validan las correcciones planificadas en `research.md` §27-§33. **Implementados en la
+sesión del 2026-09-20** (tareas T169 a T228) y cubiertos por pruebas automatizadas, de modo que ejecutarlos
+a mano es una verificación de confirmación y no la única evidencia:
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Aislamiento administrativo (D1, D3) | `RolesAdministrativosTests` (CS-036, CS-037) |
+| 2 — Bootstrap (D2) | `RolesAdministrativosTests.CS038_*` |
+| 3 — Inactivación de Compañía (D4) | `CompaniaInactivaYZonaHorariaTests.CS039_*` |
+| 4 — Zona horaria por compañía (D5) | `CompaniaInactivaYZonaHorariaTests.CS040_*` |
+| 5 — Cambio de TipoCompania (D6) | `CambioTipoCompaniaTests` (CS-041) |
+| 6 — Interfaz de Historia 5 (D7) | `historia5-casos-a-b.spec.ts` (Playwright) |
+
+Referencian los mismos usuarios/compañías de las secciones 5 y 6 cuando sea posible.
 
 1. **Aislamiento administrativo (D1, D3 — cierra F-01/F-02)**: con un usuario `COMPANY_ADMINISTRATOR` cuya
    única asignación de rol es sobre Minera ABC (sección 5), listar `GET /api/usuarios` — resultado esperado:

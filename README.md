@@ -294,6 +294,16 @@ regresiones.
 Prerrequisitos: .NET 10 SDK, Node.js 20+ (validado con Node.js 24), Docker Desktop (o motor compatible),
 herramienta `dotnet-ef` (`dotnet tool install --global dotnet-ef`).
 
+Antes del primer arranque, define `BOOTSTRAP_ADMIN_PASSWORD` con la contraseña del administrador inicial
+(RF-078): la API no arranca sin ella —ni en desarrollo ni en producción— y `docker-compose.yml` no declara
+ningún valor por defecto, para que el secreto nunca quede versionado en el repositorio. La forma más simple es
+un archivo `.env` local junto a `docker-compose.yml` (ya excluido por `.gitignore`), que Docker Compose lee
+automáticamente:
+
+```bash
+echo 'BOOTSTRAP_ADMIN_PASSWORD=<elige-una-contraseña-que-cumpla-la-política-de-contraseñas>' > .env
+```
+
 ```bash
 # Base de datos y API (contenedorizadas)
 docker compose up -d --build
@@ -333,8 +343,10 @@ completo, incluidas todas las variables de entorno, en el propio archivo y en `q
    permite en producción), .NET 10 SDK + `dotnet-ef` para aplicar migraciones, Node.js para compilar la SPA,
    proxy inverso propio con TLS.
 2. **Variables de entorno obligatorias**: `MSSQL_SA_PASSWORD`, `MSSQL_PID`,
-   `SQLSERVER_CONNECTION_STRING`, `JWT_SIGNING_KEY` (≥32 caracteres). Deben definirse en un `.env.prod` fuera
-   de control de versiones o en el gestor de secretos del host; si falta alguna, compose no arranca.
+   `SQLSERVER_CONNECTION_STRING`, `JWT_SIGNING_KEY` (≥32 caracteres), `BOOTSTRAP_ADMIN_EMAIL` y
+   `BOOTSTRAP_ADMIN_PASSWORD` (RF-078; la contraseña **nunca** se versiona y debe cumplir la política
+   vigente). Deben definirse en un `.env.prod` fuera de control de versiones o en el gestor de secretos del
+   host; si falta alguna, compose no arranca y la API tampoco.
 3. **Política de contraseñas** (`PASSWORD_*`): configurable por variable de entorno y **aprobada como
    definitiva** — la Decisión de negocio #1 se cerró el 2026-09-20 ratificando los valores actualmente
    configurados como autoridad única del baseline, sin umbrales especiales para ningún usuario y sin
@@ -347,9 +359,8 @@ completo, incluidas todas las variables de entorno, en el propio archivo y en `q
    `Bootstrap:AdminPassword` (variable de entorno `Bootstrap__AdminPassword` donde no haya gestor de
    secretos). La contraseña **nunca** se versiona en el repositorio, debe cumplir la política de contraseñas
    vigente y su cambio es obligatorio en el primer inicio de sesión. La rutina es idempotente: reiniciar la
-   API no crea un segundo administrador. **Estado de implementación**: la regla está especificada y
-   planificada, pero el código correspondiente todavía no está construido — ver
-   [Estado actual del proyecto](#estado-actual-del-proyecto).
+   API no crea un segundo administrador. **Ambas variables son obligatorias**: sin ellas la API no arranca,
+   en lugar de levantar con un administrador adivinable.
 6. **SPA y proxy inverso**: `npm run build` genera `frontend/dist/`; el proxy debe servir esos estáticos,
    reenviar `/api/` y `/health/` a la API, y devolver `index.html` para rutas de cliente. La API no configura
    CORS: la SPA debe consumirla en el mismo origen.
@@ -359,17 +370,20 @@ completo, incluidas todas las variables de entorno, en el propio archivo y en `q
 
 ## Estado actual del proyecto
 
-**Etapa 1 implementada, con su dominio validado, pero el baseline NO está congelado.** Dos auditorías
-independientes ([`gate-cierre-etapa1-2026-09-16.html`](docs/auditorias/gate-cierre-etapa1-2026-09-16.html) y
-[`auditoria-final-cierre-2026-09-16.html`](docs/auditorias/auditoria-final-cierre-2026-09-16.html)),
-verificando en ejecución y no solo en código, concluyeron **"No congelable" / "No cerrada"**.
+**Etapa 1 implementada, incluido el cierre del baseline.** Dos auditorías independientes
+([`gate-cierre-etapa1-2026-09-16.html`](docs/auditorias/gate-cierre-etapa1-2026-09-16.html) y
+[`auditoria-final-cierre-2026-09-16.html`](docs/auditorias/auditoria-final-cierre-2026-09-16.html))
+concluyeron el 2026-09-16 **"No congelable" / "No cerrada"**, verificando en ejecución y no solo en código.
+Las nueve decisiones que lo bloqueaban se cerraron el 2026-09-20 y las tareas T169 a T228 que las
+implementan están construidas; el gate de cierre debe repetirse contra este código para congelar el
+baseline formalmente.
 
 **1. Implementado y validado**
 
 - Las 8 historias P1 (login/alcance, compañías/relaciones, maestros, personas, históricos/contexto
   operativo/revocación automática, árbol de áreas, elegibilidad por tipo de persona, motor de evaluación de
-  acceso — **14 de los 15 pasos** que hoy especifica Historia 8: la verificación de `Compañía.Estado`
-  (paso 5 y parte del 6, RF-079) está especificada pero todavía no implementada).
+  acceso — **los 15 pasos completos** desde la sesión de implementación del 2026-09-20, incluida la
+  verificación de `Compañía.Estado` en los pasos 5 y 6 (RF-079)).
 - Modelo de datos completo (22 entidades, 11 migraciones EF Core aplicadas), reglas temporales
   (contención, no-solapamiento vía trigger SQL, vigencias obligatorias), cascada de revocación automática,
   auditoría automática por interceptor, aislamiento de datos entre Compañías Principales.
@@ -378,42 +392,41 @@ verificando en ejecución y no solo en código, concluyeron **"No congelable" / 
 - Los 45 endpoints de los 10 contratos OpenAPI existen y responden en el código — paridad contrato↔código
   verificada por la auditoría de cierre del 2026-09-16, no re-confirmada en esta subida.
 
-**2. Decidido y especificado, pendiente de implementar** (ver sección siguiente para el detalle completo)
+**2. Cierre de Etapa 1 — implementado en la sesión del 2026-09-20** (tareas T169 a T228 de `tasks.md`)
 
-Las decisiones de negocio que bloqueaban el baseline se cerraron el 2026-09-20 y ya están formalizadas en
-`spec.md` (RF-074 a RF-081, CS-036 a CS-041). Lo que falta es construirlas:
+Las decisiones de negocio que bloqueaban el baseline se cerraron el 2026-09-20, se formalizaron en `spec.md`
+(RF-074 a RF-081, CS-036 a CS-041) y se construyeron a continuación:
 
 - Modelo de administración de usuarios: RBAC con roles `GLOBAL_ADMINISTRATOR` y `COMPANY_ADMINISTRATOR`,
-  alcance por rol y asignaciones con vigencia auditable (RF-074 a RF-077).
-- Alta automática del primer administrador en un despliegue nuevo (RF-078).
+  alcance por rol y asignaciones con vigencia auditable — entidad `AsignacionRolAdministrativo`, que
+  reemplaza al antiguo `AlcanceUsuarioCompañía` (RF-074 a RF-077).
+- Alta automática del primer administrador en un despliegue nuevo, idempotente y por configuración
+  segura (RF-078).
 - Calendario de vigencias: zona horaria IANA por Compañía Principal, con zona global de respaldo (RF-080).
 - Estado de la compañía como condición dinámica de la evaluación de acceso (RF-079) y dependencias que
   bloquean el cambio de `TipoCompañía` (RF-081).
+- Interfaz de administración de usuarios y roles (UX-17 a UX-22) e interfaz completa de Historia 5
+  —wizard de pertenencia y contexto, árbol de unidad organizativa, perfiles—, que antes solo era
+  operable vía API.
 - Las decisiones heredadas de `spec.md` (#1 política de contraseñas, #3 retención legal, #6 inactivación de
-  compañía, #7 prioridad de Historia 9) quedaron **todas cerradas**; ninguna requiere trabajo técnico salvo
+  compañía, #7 prioridad de Historia 9) quedaron **todas cerradas**; ninguna requirió trabajo técnico salvo
   #6, absorbida por RF-079.
 
-**3. Correcciones pendientes (defecto técnico, no requieren decisión de negocio)**
+**3. Correcciones de la auditoría ya aplicadas**
 
-- **Crítico**: `UsuarioService` no aplica alcance de compañías en ninguna de sus operaciones — reproducido
-  en ejecución: un usuario con alcance limitado pudo listar todas las compañías y usuarios del sistema,
-  concederse compañías ajenas y modificar el alcance de terceros.
-- Los servicios de histórico de personas validan la persona pero no el objeto/alcance de la operación,
-  permitiendo lectura y escritura fuera del alcance del usuario en ciertos casos.
-- Compañía/Unidad Organizativa `INACTIVA` no bloquea nuevas asignaciones (contradice `data-model.md`).
-- Índice clúster de histórico aplicado solo en 1 de 6 entidades (T019 marcada completa sin respaldo total).
-- Otros defectos menores y de bajo riesgo documentados con detalle en
-  [`gate-cierre-etapa1-2026-09-16.html`](docs/auditorias/gate-cierre-etapa1-2026-09-16.html) (hallazgos
-  F-05 a F-23).
+- **Crítico (F-01), corregido**: `UsuarioService` aplica Resource Ownership en todas sus operaciones. Un
+  `COMPANY_ADMINISTRATOR` no lista ni modifica usuarios de otra compañía, no se autoeleva y no puede crear
+  asignaciones `GLOBAL_ADMINISTRATOR`; una lectura fuera de alcance responde `404` (CS-036, CS-037).
+- **F-02, corregido**: el alcance efectivo se deriva del rol vigente, de modo que el control alcanza por
+  igual a los servicios que lo delegaban en `CompaniaService` y a los de histórico de personas, cuyo
+  alcance sobre una `Persona` se resuelve ahora por unión de pertenencia y contexto operativo (RF-077).
+- Una compañía `INACTIVA` deniega el acceso de forma dinámica y reversible, sin cascada de escritura
+  (RF-079).
 
 **4. Stage 2 / futuro**
 
-- Historia 10 (auditoría y consultas transversales, RF-067 a RF-069, CS-032): necesidad funcional declarada,
-  sin contrato de API, código ni pantalla — su alcance exacto (forma del endpoint, paginación, límites) está
-  pendiente de especificarse o trasladarse formalmente a Etapa 2.
-- La interfaz de usuario de la Historia 5 (selector de Principal, árbol de asignación de unidad, pantalla de
-  perfiles) está marcada como completada en `tasks.md` pero no tiene implementación de UI — Historia 5 solo
-  es operable hoy vía API.
+- Historia 10 (auditoría y consultas transversales, RF-067 a RF-069, CS-032): diferida explícitamente a
+  Etapa 2 por la decisión D8. No se generó ninguna tarea ni código para ella en este cierre.
 
 ## Decisiones de la auditoría: todas resueltas
 
