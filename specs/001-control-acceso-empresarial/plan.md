@@ -237,7 +237,9 @@ afirmaba explícitamente lo contrario ("nunca el mecanismo que por sí solo dete
 Esta contradicción se reportó al usuario en vez de resolverse unilateralmente (conforme a instrucción
 explícita), y una sesión dedicada de `/speckit-clarify` la resolvió: **la credencial SÍ gatilla la
 denegación**. `spec.md` fue modificado: nueva sesión de Clarifications, RF-066 (nuevo), Historia 8
-(algoritmo ahora de 14 pasos — nuevo paso 6, `SIN_CREDENCIAL_VIGENTE`), Historia 9 (la afirmación anterior
+(algoritmo de 14 pasos **en aquel momento** — nuevo paso 6, `SIN_CREDENCIAL_VIGENTE`; el algoritmo vigente
+tiene 15 pasos y ese paso es hoy el 7, ver el re-chequeo de cierre de Etapa 1 más abajo y spec.md Historia 8),
+Historia 9 (la afirmación anterior
 queda `[REEMPLAZADA]`, anotada no eliminada), CS-031 (nuevo). `research.md` §7 se reescribió con el paso
 nuevo; `contracts/access-evaluation.yaml` agregó `SIN_CREDENCIAL_VIGENTE` al enum `MotivoDenegacion`.
 `data-model.md` **no cambió** (ningún campo nuevo — la cascada de RF-061 ya escribía `Estado = REVOCADA`;
@@ -425,9 +427,14 @@ Ningún principio de la Constitución requirió enmienda. `research.md` (§27-§
 `AsignaciónRolAdministrativo`, campo `Compañía.ZonaHorariaIana`, validación de dependientes en `Compañía`) y
 `contracts/users.yaml`, `contracts/auth.yaml`, `contracts/companies.yaml`, `contracts/access-evaluation.yaml`
 fueron modificados en esta sesión de planificación. `spec.md` y `tasks.md` **no** fueron modificados por este
-plan — quedan pendientes de una sesión de clarificación (para `spec.md`: nuevos RF/anotaciones de las nueve
-decisiones) y de `/speckit-tasks` (para generar las tareas de corrección, numeración ≥T169, sin renumerar
-T001–T168), ninguna de las dos autorizada todavía.
+plan.
+
+> **Actualización (Sesión 2026-09-20, posterior a este plan)**: la sesión de clarificación pendiente **ya se
+> ejecutó**. `spec.md` incorpora ahora RF-074 a RF-081 y CS-036 a CS-041, la sesión de Clarifications del
+> 2026-09-20, el renombrado de `AlcanceUsuarioCompañía` a `AsignaciónRolAdministrativo`, las anotaciones
+> `[DIFERIDA A ETAPA 2]` de RF-067 a RF-069 y CS-032, la sincronización de Historia 8 a 15 pasos y el cierre de
+> las diez Decisiones Pendientes. Lo único que sigue pendiente de este párrafo es `/speckit-tasks` (tareas de
+> corrección con numeración ≥T169, sin renumerar T001–T168), aún no autorizado.
 
 ## Project Structure
 

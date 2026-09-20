@@ -77,15 +77,27 @@ solapamientos temporales inválidos y fuga de datos entre compañías.
 Reproduce el criterio de éxito CS-009 ("un usuario debe poder crear una jerarquía de tres niveles y
 configurar un permiso horario") usando la API documentada en `contracts/`:
 
-1. **Login** — `POST /api/auth/login` con un usuario `ACTIVO` de prueba cuyo alcance incluya al menos una
-   compañía. Verificar que la respuesta incluye `alcanceCompanias` no vacío. *(Nota, Sesión 2026-09-15: el
-   sistema no incluye una semilla ni un mecanismo de alta del primer usuario administrador; en local ese
-   usuario debe crearse directamente en la base de datos. La automatización E2E de esta sección —T159— lo
-   aprovisiona en su preparación.)*
+1. **Login** — `POST /api/auth/login` con un usuario `ACTIVO` cuyo alcance incluya al menos una compañía.
+   *(Actualizado en la Sesión 2026-09-20, RF-078: el primer administrador ya no se crea a mano.)* El primer
+   arranque de la API crea automáticamente, si no existe ninguno, un usuario con rol `GLOBAL_ADMINISTRATOR`
+   tomando su correo de `Bootstrap:AdminEmail` y su contraseña de `Bootstrap:AdminPassword` (variable de
+   entorno `Bootstrap__AdminPassword` si no hay gestor de secretos; nunca un valor versionado en el
+   repositorio). La rutina es idempotente: reiniciar la API no crea un segundo administrador.
+
+   Ese primer login devuelve `requiereCambioPassword = true`, de modo que el siguiente paso obligatorio es
+   `POST /api/auth/cambiar-password` con una contraseña que cumpla la política vigente; recién después se
+   continúa con el escenario. Verificar también que la respuesta del login indique el rol
+   `GLOBAL_ADMINISTRATOR` (alcance global, sin compañías enumeradas). La automatización E2E de esta
+   sección —T159— aprovisiona su propio usuario en la preparación, sin depender de esta rutina.
 2. **Compañía Principal** — `POST /api/companias` con `tipoCompania = PRINCIPAL_MANDANTE` y `estado =
-   ACTIVO` (RF-042). Crear la compañía no la incorpora automáticamente al alcance del usuario: para operar
-   con ella en los pasos siguientes, añadirla con `PUT /api/usuarios/{id}/alcance-companias` e iniciar
-   sesión de nuevo, porque el alcance viaja en el token (RF-004, RF-005).
+   ACTIVO` (RF-042). *(Actualizado en la Sesión 2026-09-20: el alcance administrativo se expresa mediante
+   `AsignaciónRolAdministrativo`, no mediante una lista plana de compañías — RF-074 a RF-077.)* Si se continúa
+   con el administrador del paso 1, no hace falta ninguna acción: su rol `GLOBAL_ADMINISTRATOR` tiene alcance
+   sobre todas las compañías, incluidas las creadas después de su asignación (RF-074, RF-077). Para ejecutar
+   el resto del escenario como `COMPANY_ADMINISTRATOR` de esta compañía, crear la asignación con
+   `POST /api/usuarios/{id}/roles` —`rol = COMPANY_ADMINISTRATOR`, `companiaId` = la compañía recién creada, y
+   `fechaHoraInicio`/`fechaHoraFin` reales y obligatorias (RF-075)— e iniciar sesión de nuevo, porque el
+   alcance viaja en el token (RF-005, RF-077).
 3. **Jerarquía de 3 niveles de áreas de acceso** — `POST /api/areas-acceso` tres veces encadenadas:
    - Nivel 1 (raíz): `areaSuperiorId = null`, `companiaPrincipalId` = ID de la Compañía Principal del
      paso 2 (RF-046).

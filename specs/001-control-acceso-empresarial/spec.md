@@ -1214,7 +1214,11 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   la asignación. *(Nuevo — Sesión 2026-09-20, D1.)*
 - RF-075: Toda `AsignaciónRolAdministrativo` DEBE tener `FechaHoraInicio` y `FechaHoraFin` obligatorias desde
   su creación, nunca nulas ni expresadas con una fecha centinela — mismo principio que RF-071, aplicado por
-  primera vez a una entidad vinculada a un `Usuario` y no a una `Persona`. NO DEBEN existir asignaciones
+  primera vez a una entidad vinculada a un `Usuario` y no a una `Persona`. **Única excepción**: la asignación
+  `GLOBAL_ADMINISTRATOR` creada por el mecanismo de arranque inicial usa el valor `MAX_VALIDITY_DATE`
+  (`2999-12-31T23:59:59Z`) como `FechaHoraFin`, conforme a la excepción explícita y acotada declarada en
+  RF-078; esa excepción aplica exclusivamente a esa asignación sembrada y NO DEBE extenderse a ninguna otra
+  asignación de rol. NO DEBEN existir asignaciones
   `COMPANY_ADMINISTRATOR` temporalmente solapadas para el mismo par (`UsuarioId`, `CompañíaId`); asignaciones
   consecutivas sin solapamiento sí son válidas. Un mismo usuario PUEDE tener varias asignaciones
   `COMPANY_ADMINISTRATOR` vigentes simultáneamente cuando correspondan a compañías distintas.

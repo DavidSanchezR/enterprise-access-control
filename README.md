@@ -9,8 +9,9 @@ y bloques horarios, credenciales/fotocheck, y evaluación de acceso con denegaci
 > [`001-control-acceso-empresarial`](specs/001-control-acceso-empresarial/) — implementada y con sus
 > dominios de negocio validados por prueba automatizada — **pero el baseline todavía no está congelado**.
 > Dos auditorías independientes (2026-09-16) concluyeron que el perímetro de autorización tiene un defecto
-> crítico y que 16 preguntas de negocio siguen sin respuesta. Ver [Estado actual del
-> proyecto](#estado-actual-del-proyecto) y [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría)
+> crítico. Las 16 preguntas de negocio que ese gate dejó abiertas **ya fueron respondidas** (2026-09-20) y
+> están formalizadas en `spec.md`, pero su implementación todavía no se ha construido. Ver [Estado actual del
+> proyecto](#estado-actual-del-proyecto) y [Decisiones de la auditoría](#decisiones-de-la-auditoría-todas-resueltas)
 > antes de asumir que cualquier parte de esto es definitiva.
 
 ## Índice
@@ -28,7 +29,7 @@ y bloques horarios, credenciales/fotocheck, y evaluación de acceso con denegaci
 11. [Instrucciones de desarrollo](#instrucciones-de-desarrollo)
 12. [Configuración y ejecución (producción)](#configuración-y-ejecución-producción)
 13. [Estado actual del proyecto](#estado-actual-del-proyecto)
-14. [Decisiones pendientes identificadas en la auditoría](#decisiones-pendientes-identificadas-en-la-auditoría)
+14. [Decisiones de la auditoría: todas resueltas](#decisiones-de-la-auditoría-todas-resueltas)
 15. [Próximos pasos para cerrar el baseline](#próximos-pasos-para-cerrar-el-baseline)
 
 ## Objetivo
@@ -73,15 +74,15 @@ el modelo original, vive en [spec.md](specs/001-control-acceso-empresarial/spec.
 | 5 | Históricos de compañía, contexto operativo por Principal, unidad organizativa y perfil, con revocación automática | P1 |
 | 6 | Árbol de áreas físicas de acceso | P1 |
 | 7 | Tipos de persona autorizados por área | P1 |
-| 8 | Permisos de acceso con vigencia, bloques horarios y evaluación de acceso (motor de 14 pasos) | P1 |
+| 8 | Permisos de acceso con vigencia, bloques horarios y evaluación de acceso (motor de 15 pasos) | P1 |
 | 9 | Mantenimiento de credencial/fotocheck por Compañía Principal | P2 |
 | 10 | Auditoría y consultas transversales (histórico, indicadores) | P2 |
 
 Las historias 1 a 8 están implementadas y respaldadas por prueba automatizada. La Historia 9 tiene backend
 completo pero **sin interfaz de usuario** (ver [Estado actual](#estado-actual-del-proyecto)). La Historia 10
 (auditoría/consultas transversales) tiene su necesidad funcional declarada en `spec.md` (RF-067 a RF-069)
-pero **sin contrato de API, código ni pantalla** — es uno de los puntos que la auditoría dejó pendiente de
-decidir (ver [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría)).
+pero **sin contrato de API, código ni pantalla**, y quedó **diferida a la Etapa 2** por la decisión D8 — está
+anotada como tal en `spec.md` (ver [Decisiones de la auditoría](#decisiones-de-la-auditoría-todas-resueltas)).
 
 ## Arquitectura
 
@@ -119,16 +120,19 @@ re-chequeos de constitución: [plan.md](specs/001-control-acceso-empresarial/pla
 El sistema separa explícitamente dos mecanismos de autorización (research.md §18):
 
 1. **Autorización de plataforma** (ASP.NET Core Authentication/Authorization): valida la sesión (JWT
-   Bearer) y aplica el **alcance de compañías** del usuario autenticado (`AlcanceUsuarioCompañía`) — el
-   conjunto de compañías que ese usuario puede administrar. El alcance viaja dentro del token; cambiarlo
+   Bearer) y aplica el **alcance administrativo** del usuario autenticado, derivado de sus
+   `AsignaciónRolAdministrativo` vigentes — rol `GLOBAL_ADMINISTRATOR` (todas las compañías) o
+   `COMPANY_ADMINISTRATOR` (las compañías de sus asignaciones). El alcance viaja dentro del token; cambiarlo
    exige volver a iniciar sesión.
-2. **Motor de evaluación de acceso de dominio** (Historia 8): un algoritmo de **14 pasos**, independiente de
+2. **Motor de evaluación de acceso de dominio** (Historia 8): un algoritmo de **15 pasos**, independiente de
    la autorización de plataforma, que determina si una persona puede acceder físicamente a un área en una
-   fecha/hora dada. Determina primero la Compañía Principal propietaria del área, exige un contexto
-   operativo vigente con esa Principal (y una relación Contratista↔Principal vigente cuando aplica), una
-   credencial vigente para esa misma Principal, elegibilidad de perfil en el área, y finalmente el permiso
-   aplicable con mayor precedencia (`PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA`) dentro de su vigencia y
-   bloque horario. Cualquier paso no satisfecho deniega el acceso por defecto.
+   fecha/hora dada. Determina primero la Compañía Principal propietaria del área y exige que esté `ACTIVA`;
+   luego un contexto operativo vigente con esa Principal —con su compañía de pertenencia también `ACTIVA`, y
+   una relación Contratista↔Principal vigente cuando aplica—, una credencial vigente para esa misma
+   Principal, que el área esté activa, elegibilidad de perfil en el área, y finalmente el permiso aplicable
+   con mayor precedencia (`PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA`) dentro de su vigencia y de su bloque
+   horario, evaluado en la zona horaria de esa Compañía Principal. Cualquier paso no satisfecho deniega el
+   acceso por defecto. El detalle paso a paso está en `spec.md` Historia 8 y `research.md` §7.
 
 **Defecto crítico confirmado, no resuelto todavía:** el mecanismo (1) — el alcance de compañías sobre la
 propia administración de usuarios — **no está aplicado hoy en el código**. `UsuarioService` no filtra
@@ -164,7 +168,8 @@ usuarios (ver [Modelo de autorización](#modelo-de-autorización)); el resto de 
 - .NET 10 LTS + C# 13, ASP.NET Core 10 Web API
 - Entity Framework Core 10 (`Microsoft.EntityFrameworkCore.SqlServer`) + Migrations
 - SQL Server (motor de base de datos oficial; columnas `datetime2(3)` en UTC)
-- FluentValidation, NodaTime (zona horaria `America/Lima` para bloques horarios)
+- FluentValidation, NodaTime (zonas horarias IANA por Compañía Principal para los bloques horarios, con una
+  zona global de respaldo configurable)
 - ASP.NET Core Identity (`PasswordHasher<T>`) solo para hashing de contraseñas
 - ASP.NET Core Authentication (JWT Bearer) + Authorization (Policies) para el alcance administrativo
 - `Microsoft.AspNetCore.OpenApi` nativo (documento OpenAPI, solo en `Development`)
@@ -330,15 +335,21 @@ completo, incluidas todas las variables de entorno, en el propio archivo y en `q
 2. **Variables de entorno obligatorias**: `MSSQL_SA_PASSWORD`, `MSSQL_PID`,
    `SQLSERVER_CONNECTION_STRING`, `JWT_SIGNING_KEY` (≥32 caracteres). Deben definirse en un `.env.prod` fuera
    de control de versiones o en el gestor de secretos del host; si falta alguna, compose no arranca.
-3. **Política de contraseñas** (`PASSWORD_*`): configurable por variable de entorno, pero **provisional** —
-   depende de la Decisión de negocio #1, todavía abierta. No debe tratarse como política aprobada.
+3. **Política de contraseñas** (`PASSWORD_*`): configurable por variable de entorno y **aprobada como
+   definitiva** — la Decisión de negocio #1 se cerró el 2026-09-20 ratificando los valores actualmente
+   configurados como autoridad única del baseline, sin umbrales especiales para ningún usuario y sin
+   mecanismo adicional de recuperación.
 4. **Migraciones**: la API **no las aplica al arrancar**; se ejecutan manualmente con `dotnet ef database
    update` apuntando a SQL Server antes de levantar la API.
-5. **Primer usuario administrador**: **el sistema no incluye semilla ni endpoint de alta del primer
-   usuario.** Un despliegue recién migrado tiene la tabla `Usuario` vacía y nadie puede iniciar sesión; hoy
-   el primer administrador debe insertarse directamente en la base de datos (hash `PasswordHasher<T>` de
-   ASP.NET Core Identity V3). Esto es un hueco de implementación, no una decisión cerrada — ver
-   [Decisiones pendientes](#decisiones-pendientes-identificadas-en-la-auditoría) (D2).
+5. **Primer usuario administrador**: la especificación define un **arranque automático** (RF-078, decisión
+   D2 cerrada el 2026-09-20). En el primer arranque, si no existe ninguna asignación `GLOBAL_ADMINISTRATOR`,
+   la API crea el primer administrador tomando su correo de `Bootstrap:AdminEmail` y su contraseña de
+   `Bootstrap:AdminPassword` (variable de entorno `Bootstrap__AdminPassword` donde no haya gestor de
+   secretos). La contraseña **nunca** se versiona en el repositorio, debe cumplir la política de contraseñas
+   vigente y su cambio es obligatorio en el primer inicio de sesión. La rutina es idempotente: reiniciar la
+   API no crea un segundo administrador. **Estado de implementación**: la regla está especificada y
+   planificada, pero el código correspondiente todavía no está construido — ver
+   [Estado actual del proyecto](#estado-actual-del-proyecto).
 6. **SPA y proxy inverso**: `npm run build` genera `frontend/dist/`; el proxy debe servir esos estáticos,
    reenviar `/api/` y `/health/` a la API, y devolver `index.html` para rutas de cliente. La API no configura
    CORS: la SPA debe consumirla en el mismo origen.
@@ -357,7 +368,8 @@ verificando en ejecución y no solo en código, concluyeron **"No congelable" / 
 
 - Las 8 historias P1 (login/alcance, compañías/relaciones, maestros, personas, históricos/contexto
   operativo/revocación automática, árbol de áreas, elegibilidad por tipo de persona, motor de evaluación de
-  acceso de 14 pasos).
+  acceso — **14 de los 15 pasos** que hoy especifica Historia 8: la verificación de `Compañía.Estado`
+  (paso 5 y parte del 6, RF-079) está especificada pero todavía no implementada).
 - Modelo de datos completo (22 entidades, 11 migraciones EF Core aplicadas), reglas temporales
   (contención, no-solapamiento vía trigger SQL, vigencias obligatorias), cascada de revocación automática,
   auditoría automática por interceptor, aislamiento de datos entre Compañías Principales.
@@ -366,14 +378,20 @@ verificando en ejecución y no solo en código, concluyeron **"No congelable" / 
 - Los 45 endpoints de los 10 contratos OpenAPI existen y responden en el código — paridad contrato↔código
   verificada por la auditoría de cierre del 2026-09-16, no re-confirmada en esta subida.
 
-**2. Pendiente de decisión de negocio** (ver sección siguiente para el detalle completo)
+**2. Decidido y especificado, pendiente de implementar** (ver sección siguiente para el detalle completo)
 
-- El modelo de administración de usuarios (quién puede ver/crear/bloquear usuarios y conceder alcance) no
-  está definido en `spec.md` — el código de hoy no aplica ninguna regla porque no existe una que aplicar.
-- El mecanismo para dar de alta al primer administrador en un despliegue nuevo.
-- El calendario que define un "día" para las vigencias (UTC vs. hora local).
-- Política de contraseñas definitiva, retención legal de históricos, efecto de inactivar una compañía sobre
-  sus dependientes, y otras decisiones heredadas de `spec.md` (#1, #3, #6, #7).
+Las decisiones de negocio que bloqueaban el baseline se cerraron el 2026-09-20 y ya están formalizadas en
+`spec.md` (RF-074 a RF-081, CS-036 a CS-041). Lo que falta es construirlas:
+
+- Modelo de administración de usuarios: RBAC con roles `GLOBAL_ADMINISTRATOR` y `COMPANY_ADMINISTRATOR`,
+  alcance por rol y asignaciones con vigencia auditable (RF-074 a RF-077).
+- Alta automática del primer administrador en un despliegue nuevo (RF-078).
+- Calendario de vigencias: zona horaria IANA por Compañía Principal, con zona global de respaldo (RF-080).
+- Estado de la compañía como condición dinámica de la evaluación de acceso (RF-079) y dependencias que
+  bloquean el cambio de `TipoCompañía` (RF-081).
+- Las decisiones heredadas de `spec.md` (#1 política de contraseñas, #3 retención legal, #6 inactivación de
+  compañía, #7 prioridad de Historia 9) quedaron **todas cerradas**; ninguna requiere trabajo técnico salvo
+  #6, absorbida por RF-079.
 
 **3. Correcciones pendientes (defecto técnico, no requieren decisión de negocio)**
 
@@ -397,37 +415,43 @@ verificando en ejecución y no solo en código, concluyeron **"No congelable" / 
   perfiles) está marcada como completada en `tasks.md` pero no tiene implementación de UI — Historia 5 solo
   es operable hoy vía API.
 
-## Decisiones pendientes identificadas en la auditoría
+## Decisiones de la auditoría: todas resueltas
 
 La auditoría de cierre agrupó 23 hallazgos en 9 decisiones (D1–D9) y una matriz de **16 preguntas de
-negocio**. A la fecha de este README, **las 16 preguntas siguen sin respuesta**. Las preguntas 1–7, 10, 11,
-13 y 14 son bloqueantes para congelar el baseline; las preguntas 8, 9, 12, 15 y 16 pueden quedar
-explícitamente abiertas.
+negocio**. **Las 16 quedaron respondidas el 2026-09-20** y las nueve decisiones están formalizadas en
+`spec.md` (RF-074 a RF-081, CS-036 a CS-041, y las diez Decisiones Pendientes cerradas). Ninguna sigue
+bloqueando el baseline: lo que resta es implementación, no decisión.
 
-| Decisión | Tema | ¿Bloquea el baseline? |
+| Decisión | Tema | Resolución |
 |---|---|---|
-| D1 | Modelo de administración de usuarios (quién ve/crea/bloquea usuarios y alcance) | Sí |
-| D2 | Mecanismo de alta del primer administrador | Sí |
-| D3 | Alcance exacto de la visibilidad histórica de una persona fuera del alcance del usuario | Sí |
-| D4 | Efecto de inactivar una Compañía sobre la evaluación de acceso (Decisión #6 de `spec.md`) | No (pero el texto que hoy afirma lo contrario en spec.md/research.md sí debe corregirse) |
-| D5 | Calendario que define un "día" para las vigencias (UTC vs. local) | Sí (al menos para dejarlo escrito) |
-| D6 | Qué ocurre al reclasificar el tipo de una Compañía con dependientes | No |
-| D7 | Destino de la interfaz de Historia 5 (corregir ahora, reabrir, o trasladar a Etapa 2) | Sí (el registro) |
-| D8 | Forma técnica de las consultas transversales de auditoría/histórico (RF-067 a RF-069) | No el código; sí la frontera entre etapas |
-| D9 | Decisiones heredadas #1 (contraseñas), #3 (retención legal), #7 (prioridad Historia 9) | No |
+| D1 | Modelo de administración de usuarios | RBAC con catálogo cerrado de dos roles, alcance GLOBAL o por compañía, asignaciones con vigencia auditable (RF-074 a RF-077) |
+| D2 | Alta del primer administrador | Arranque automático idempotente con credenciales por configuración segura y cambio forzado en el primer login (RF-078) |
+| D3 | Aislamiento por alcance | Cadena de autorización con verificación del recurso concreto; una `Persona` está en alcance por su compañía de pertenencia o por un contexto operativo vigente (RF-077) |
+| D4 | Inactivación de una Compañía | Denegación por evaluación dinámica, sin cascada de escritura, reversible (RF-079; cierra la Decisión #6) |
+| D5 | Calendario de vigencias | Zona horaria IANA por Compañía Principal, con zona global de respaldo; UTC siempre persistido (RF-080) |
+| D6 | Reclasificar el tipo de una Compañía | Rechazo si hay dependencias incompatibles, simétrico en ambas direcciones, sin cascada (RF-081) |
+| D7 | Interfaz de Historia 5 | Se corrige y completa dentro de Etapa 1, no se traslada |
+| D8 | Consultas transversales (RF-067 a RF-069, CS-032) | Diferidas a Etapa 2, anotadas en `spec.md`, sin tareas de baseline |
+| D9 | Heredadas #1, #3 y #7 | Política de contraseñas actual ratificada; sin retención ni purga en el baseline; Historia 9 se mantiene en P2 |
 
-Detalle completo de cada decisión, sus alternativas y consecuencias:
-[`decisiones-etapa1-2026-09-16.html`](docs/auditorias/decisiones-etapa1-2026-09-16.html) (narrativo) y
+Detalle de cada decisión, sus alternativas y su análisis de impacto:
+[`decisiones-etapa1-2026-09-16.html`](docs/auditorias/decisiones-etapa1-2026-09-16.html) (narrativo),
 [`clasificacion-hallazgos-2026-09-16.html`](docs/auditorias/clasificacion-hallazgos-2026-09-16.html)
-(tabular, con los 23 hallazgos F-01 a F-23 y la matriz de 16 preguntas).
+(tabular, con los 23 hallazgos F-01 a F-23 y la matriz) y
+[`analisis-consistencia-2026-09-20.html`](docs/auditorias/analisis-consistencia-2026-09-20.html) (análisis de
+consistencia posterior). **Las dos páginas del 16/09 conservan a propósito el estado previo a las respuestas**,
+como registro histórico.
 
 ## Próximos pasos para cerrar el baseline
 
 Secuencia acordada en la auditoría de cierre para llegar a un baseline estable de Etapa 1:
 
-1. **Sesión de decisiones de negocio** — responder las 16 preguntas pendientes, sin tocar código todavía.
-2. **Corregir el perímetro de autorización** (F-01, F-02) una vez decidido el modelo de administración de
-   usuarios (D1) y el aislamiento por alcance (D3), con pruebas de integración nuevas por operación.
+1. ~~**Sesión de decisiones de negocio** — responder las 16 preguntas pendientes.~~ **Completado el
+   2026-09-20**: las 16 respondidas, las nueve decisiones formalizadas en `spec.md` (RF-074 a RF-081) y el
+   diseño técnico en `plan.md`/`research.md`/`data-model.md`/`contracts/`.
+2. **Corregir el perímetro de autorización** (F-01, F-02) aplicando el modelo de administración de
+   usuarios ya decidido (D1) y el aislamiento por alcance (D3), con pruebas de integración nuevas por
+   operación. ← **siguiente paso**
 3. **Correcciones técnicas que no requieren decisión** (F-05, F-06, F-10, F-12, F-14, F-22, visualización de
    fechas de F-08, entre otras).
 4. **Sincronizar la documentación** (`spec.md`, `research.md`, `data-model.md`, `contracts/`, `ux-ui.md`,
