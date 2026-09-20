@@ -220,8 +220,51 @@ RF-051 a RF-060, RF-071 y RF-072 (fechas obligatorias y contención temporal en 
 el escenario de ejemplo completo de la corrección Contexto Operativo (Pedro García / Servicios ACME /
 Minera ABC / Minera XYZ).
 
-## 7. Próximos pasos
+## 7. Escenarios de validación del cierre de Etapa 1 (Decisiones D1 a D9, Sesión 2026-09-20)
+
+Estos escenarios validan las correcciones planificadas en `research.md` §27-§33 una vez implementadas —
+**no están implementados todavía** (ver plan.md, "Re-chequeo de cierre de Etapa 1"). Referencian los
+mismos usuarios/compañías de las secciones 5 y 6 cuando sea posible.
+
+1. **Aislamiento administrativo (D1, D3 — cierra F-01/F-02)**: con un usuario `COMPANY_ADMINISTRATOR` cuya
+   única asignación de rol es sobre Minera ABC (sección 5), listar `GET /api/usuarios` — resultado esperado:
+   solo usuarios con alguna asignación vigente en Minera ABC, nunca la lista completa del sistema.
+   `POST /api/usuarios/{id}/roles` intentando asignar `GLOBAL_ADMINISTRATOR`, o `COMPANY_ADMINISTRATOR` para
+   Minera XYZ (sección 6) — resultado esperado: `403`. `PUT /api/unidades-organizativas/{id}` sobre una
+   unidad de Minera XYZ — resultado esperado: `404` (no `403`, para no confirmar existencia fuera de
+   alcance).
+2. **Bootstrap (D2)**: desde una base recién migrada, arrancar la API sin ningún `Usuario` existente —
+   resultado esperado: se crea automáticamente un único `Usuario` con `Rol = GLOBAL_ADMINISTRATOR`,
+   correo/contraseña provenientes de `Bootstrap:AdminEmail`/`Bootstrap:AdminPassword`,
+   `requiereCambioPassword = true`. Reiniciar la API — resultado esperado: no se crea un segundo Global
+   Administrator (idempotencia).
+3. **Inactivación de Compañía (D4)**: repetir el paso 10 de la sección 5 (evaluación `CONCEDIDO`) y luego
+   `PUT /api/companias/{id}` sobre Minera ABC con `estado = INACTIVO`; repetir la evaluación — resultado
+   esperado: `DENEGADO`, `motivoDenegacion = COMPANIA_INACTIVA`, sin que ningún contexto/UO/credencial de la
+   persona cambie de estado. Reactivar (`estado = ACTIVO`) y repetir — resultado esperado: `CONCEDIDO` de
+   nuevo, sin ninguna acción adicional.
+4. **Zona horaria por compañía (D5)**: configurar `zonaHorariaIana` distinta en Minera ABC y Minera XYZ
+   (sección 6, p. ej. `America/Lima` y `America/Santiago`); evaluar acceso a un área de cada una a la misma
+   `fechaHora` UTC, con bloques horarios que solo cubran la hora local de una de las dos zonas — resultado
+   esperado: `CONCEDIDO` en la que coincide con su hora local, `DENEGADO`/`FUERA_DE_BLOQUE_HORARIO` en la
+   otra, confirmando que cada Compañía Principal usa su propia zona.
+5. **Cambio de TipoCompania con dependientes (D6)**: intentar `PUT /api/companias/{id}` cambiando Minera ABC
+   (con áreas/UO ya creadas en la sección 5) a `CONTRATISTA` — resultado esperado: `409`,
+   `codigo = CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS`. Repetir con una compañía recién creada sin dependientes
+   — resultado esperado: `200`, cambio aceptado en cualquier dirección.
+6. **Interfaz de Historia 5 (D7)**: desde la UI (no la API), para una persona de una Contratista sin
+   pertenencia previa, completar el wizard de asignación: crear pertenencia → Caso B, seleccionar Principal
+   entre las relaciones vigentes de su Contratista → abrir contexto → seleccionar unidad organizativa
+   mediante el árbol → asociar perfil — resultado esperado: los mismos efectos de dominio que crear cada
+   recurso por API (secciones 5 y 6), verificables con `GET /api/personas/{id}/estado-efectivo`.
+
+Decisiones sin escenario de validación funcional (no requieren uno): D8 (fuera de alcance de Etapa 1, sin
+funcionalidad que probar) y D9 (ratifican comportamiento ya cubierto por las suites existentes de política de
+contraseñas y de `CredencialService`).
+
+## 8. Próximos pasos
 
 Este quickstart valida el comportamiento end-to-end una vez implementado. La secuencia de construcción
 (entidades → migraciones → casos de uso → endpoints → UI) se define en `tasks.md`, generado por el comando
-`/speckit-tasks` a partir de este plan.
+`/speckit-tasks` a partir de este plan. Las tareas de corrección del cierre de Etapa 1 (D1-D9) se agregarán
+como tareas nuevas (numeración ≥T169) en una futura ejecución de `/speckit-tasks`, sin renumerar T001–T168.

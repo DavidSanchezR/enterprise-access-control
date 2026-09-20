@@ -87,13 +87,19 @@ components:
         password: { type: string, format: password }
     LoginResponse:
       type: object
+      description: >
+        Sesión 2026-09-20 (D1, research.md §27): reemplaza `alcanceCompanias` (lista plana) por `rol` y,
+        cuando aplica, la lista de compañías administrables. Un GLOBAL_ADMINISTRATOR no enumera
+        compañías (alcance sobre todas); `companiaIds` solo aplica a COMPANY_ADMINISTRATOR.
       properties:
         accessToken: { type: string }
         expiraEn: { type: string, format: date-time }
         requiereCambioPassword: { type: boolean }
-        alcanceCompanias:
+        rol: { $ref: "#/components/schemas/RolAdministrativo" }
+        companiaIds:
           type: array
           items: { type: string, format: uuid }
+          description: Compañías administrables por el usuario cuando tiene alguna asignación COMPANY_ADMINISTRATOR vigente; vacío o ausente si es GLOBAL_ADMINISTRATOR
     CambiarPasswordRequest:
       type: object
       required: [passwordActual, passwordNueva]
@@ -105,9 +111,15 @@ components:
       properties:
         usuarioId: { type: string, format: uuid }
         correo: { type: string, format: email }
-        alcanceCompanias:
+        rol: { $ref: "#/components/schemas/RolAdministrativo" }
+        companiaIds:
           type: array
           items: { type: string, format: uuid }
+          description: Igual que en LoginResponse — vacío/ausente si es GLOBAL_ADMINISTRATOR
+    RolAdministrativo:
+      type: string
+      enum: [GLOBAL_ADMINISTRATOR, COMPANY_ADMINISTRATOR]
+      description: Ver contracts/users.yaml, research.md §27. Catálogo cerrado, no versionado.
     ProblemDetails:
       type: object
       description: >

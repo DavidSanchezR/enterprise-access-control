@@ -100,6 +100,16 @@
 > requieren una nueva `AsignaciónPersonaCompañía`, ya soportado sin cambios (no hay solapamiento posible).
 > Se amplía el punto (a) de la regla de renovación en la sección `AsignaciónPersonaCompañía`. Ningún campo,
 > entidad ni migración nueva.
+>
+> **Nota de revisión (Sesión 2026-09-20, cierre de Etapa 1 — Decisiones D1 a D9)**: décima revisión. Cierra
+> las 16 preguntas de la matriz de auditoría de cierre de Etapa 1 (research.md, sección "Cierre de Etapa 1 —
+> Decisiones D1 a D9"). Cambios a este documento: `AlcanceUsuarioCompañía` queda **reemplazada** por
+> [`AsignaciónRolAdministrativo`](#asignaciónroladministrativo) (D1 — modelo RBAC con `Rol`
+> `GLOBAL_ADMINISTRATOR`/`COMPANY_ADMINISTRATOR`, alcance `GLOBAL`/`COMPANY`, vigencia obligatoria); se agrega
+> el campo `ZonaHorariaIana` a [`Compañía`](#compañía) (D5); se agrega una validación de dependientes al
+> cambiar `TipoCompañía` en la misma sección (D6). D2 (bootstrap), D3 (aislamiento por alcance), D4
+> (inactivación de Compañía) y D7 (interfaz de Historia 5) no requieren ningún cambio de modelo de datos —
+> ver research.md §28-30 y §33. D8 y D9 no requieren cambio alguno en este documento.
 
 Convenciones aplicadas a todas las entidades (no repetidas por entidad):
 
@@ -116,7 +126,7 @@ Convenciones aplicadas a todas las entidades (no repetidas por entidad):
 
 1. [Usuario](#usuario)
 2. [HistorialContraseña](#historialcontraseña)
-3. [AlcanceUsuarioCompañía](#alcanceusuariocompañía)
+3. [AsignaciónRolAdministrativo](#asignaciónroladministrativo)
 4. [Compañía](#compañía)
 5. [RelaciónContratistaPrincipal](#relacióncontratistaprincipal)
 6. [UnidadOrganizativa](#unidadorganizativa)
@@ -152,8 +162,9 @@ Usuario autorizado a iniciar sesión y administrar dentro de su alcance de compa
 | IntentosFallidosConsecutivos | int | Se resetea a 0 en login exitoso; ≥ umbral configurado ⇒ `Estado = BLOQUEADO` |
 | FechaUltimoCambioPassword | datetime2(3) | Usado para calcular expiración (research.md §2) |
 
-**Relaciones**: 1—N `AlcanceUsuarioCompañía`; 1—N `HistorialContraseña`; referenciado por `CreatedById`/
-`UpdatedById` de toda entidad auditable.
+**Relaciones**: 1—N `AsignaciónRolAdministrativo`; 1—N `HistorialContraseña`; referenciado por
+`CreatedById`/`UpdatedById` de toda entidad auditable (nullable — el `Usuario` creado por la rutina de
+bootstrap, D2, tiene `CreatedById = NULL`: creado por el sistema, no por otro `Usuario`).
 
 **Transiciones de estado**: `ACTIVO ⇄ INACTIVO` (administrativo) · `ACTIVO → BLOQUEADO` (intentos fallidos,
 automático) · `BLOQUEADO → ACTIVO` (desbloqueo administrativo). Un usuario `INACTIVO` o `BLOQUEADO` no puede
@@ -176,19 +187,45 @@ Histórico de hashes de contraseña por usuario, para impedir reutilización (re
 **Validaciones clave**: al establecer una nueva contraseña, se rechaza si coincide con cualquiera de las
 últimas N (configurable, valor de trabajo = 5) entradas de este historial para el mismo `UsuarioId`.
 
-## AlcanceUsuarioCompañía
+## AsignaciónRolAdministrativo
 
-Compañías que un usuario tiene habilitadas para administrar (RF-004, RF-005).
+**Reemplaza a `AlcanceUsuarioCompañía`** (Sesión 2026-09-20, cierre de Etapa 1, D1 — modelo RBAC de
+administración de usuarios; research.md §27). Representa la asignación temporal y auditable de un rol
+administrativo a un `Usuario`, con alcance `GLOBAL` (todo el sistema) o `COMPANY` (una compañía específica).
+Distinta, y conceptualmente separada, de la relación operacional Persona→Compañía→UnidadOrganizativa del
+dominio de control de acceso físico (RF-050, sin cambios): que un `Usuario` tenga una asignación
+administrativa con una compañía no implica ninguna pertenencia empresarial de ninguna `Persona`.
 
 | Campo | Tipo | Reglas |
 |---|---|---|
 | UsuarioId | Guid (FK → Usuario) | — |
-| CompañíaId | Guid (FK → Compañía) | — |
+| Rol | enum: `GLOBAL_ADMINISTRATOR`, `COMPANY_ADMINISTRATOR` | Catálogo **cerrado** — agregar un rol nuevo exige modificar el modelo de autorización, no es un dato maestro versionado (mismo patrón que `EstadoUsuario`/`TipoCompañía`) |
+| CompañíaId | Guid? (FK → Compañía, nullable) | **Regla fundamental**: `NULL` si y solo si `Rol = GLOBAL_ADMINISTRATOR`; obligatoria y válida si `Rol = COMPANY_ADMINISTRATOR` |
+| FechaHoraInicio | datetime2(3) | Obligatoria, sin excepción |
+| FechaHoraFin | datetime2(3) | **NOT NULL** desde la creación — mismo patrón que RF-071, aplicado aquí por primera vez a una entidad ligada a `Usuario` en vez de a `Persona`. **Única excepción documentada**: la asignación `GLOBAL_ADMINISTRATOR` creada por la rutina de bootstrap (D2, research.md §28) usa `FechaHoraFin = MAX_VALIDITY_DATE` (`2999-12-31T23:59:59Z`) — excepción explícita y acotada exclusivamente a esa asignación, nunca generalizable a otra fila de esta entidad ni a ninguna entidad ligada a `Persona` |
 
-**Relaciones**: N—1 `Usuario`; N—1 `Compañía`. Único `(UsuarioId, CompañíaId)`.
+**Relaciones**: N—1 `Usuario`; N—1 `Compañía` (solo cuando `Rol = COMPANY_ADMINISTRATOR`).
 
-**Validaciones clave**: toda consulta/operación que exponga datos ligados a una compañía DEBE filtrar por el
-conjunto de `CompañíaId` de este alcance para el usuario autenticado (research.md §3).
+**Restricción de base de datos**: trigger `AFTER INSERT, UPDATE` particionado por `(UsuarioId, CompañíaId)`,
+aplicado **únicamente** a filas `Rol = COMPANY_ADMINISTRATOR` — impide asignaciones `COMPANY_ADMINISTRATOR`
+solapadas para el mismo par (Usuario, Compañía); secuenciales sin solapamiento sí se permiten. Un usuario
+puede tener varias asignaciones `COMPANY_ADMINISTRATOR` vigentes simultáneas si son de compañías distintas.
+`GLOBAL_ADMINISTRATOR` queda **exento** de esta partición (no tiene `CompañíaId`); pueden coexistir varias
+asignaciones `GLOBAL_ADMINISTRATOR`, de uno o varios usuarios, sin restricción de solapamiento entre ellas.
+
+**Renovación**: sigue las mismas reglas ya establecidas para `AsignaciónPersonaCompañía` (RF-073): solo
+extiende `FechaHoraFin` hacia una fecha posterior, solo mientras la asignación siga vigente dinámicamente
+(`fecha actual <= FechaHoraFin` ya declarada) — nunca puentea un vacío temporal ya transcurrido.
+
+**Validaciones clave**: toda consulta/operación administrativa DEBE resolver el alcance efectivo del usuario
+autenticado a partir de sus asignaciones vigentes de esta entidad (research.md §27, §29) — `GLOBAL_ADMINISTRATOR`
+vigente ⇒ alcance sobre todas las compañías; en caso contrario, alcance limitado a las `CompañíaId` de sus
+asignaciones `COMPANY_ADMINISTRATOR` vigentes. Un `COMPANY_ADMINISTRATOR` NO puede crear, asignar ni elevar
+ninguna asignación de rol fuera de su propio nivel y compañía (no puede asignar `GLOBAL_ADMINISTRATOR`, no
+puede elevar su propio rol, no puede asignar `COMPANY_ADMINISTRATOR` para una compañía distinta de la suya);
+sí puede crear nuevas asignaciones `COMPANY_ADMINISTRATOR` para su propia compañía. Crear o modificar
+cualquier asignación de rol fuera de esos límites requiere un `GLOBAL_ADMINISTRATOR` vigente, o el mecanismo
+de bootstrap (D2) para la primera asignación del sistema.
 
 ## Compañía
 
@@ -200,10 +237,19 @@ conjunto de `CompañíaId` de este alcance para el usuario autenticado (research
 | TipoCompañía | enum: `PRINCIPAL_MANDANTE`, `CONTRATISTA` | RF-042. Clasifica la compañía; determina si puede
   poseer unidades organizativas propias (solo `PRINCIPAL_MANDANTE`, vía la entidad de enlace de raíz) y
   áreas de acceso propias (RF-045, RF-046) |
-| Estado | enum: `ACTIVO`, `INACTIVO` | RF-006, RF-032 |
+| Estado | enum: `ACTIVO`, `INACTIVO` | RF-006, RF-032. Consultado dinámicamente por `EvaluadorDeAcceso`
+  desde la Sesión 2026-09-20 (D4, research.md §30): una Compañía `INACTIVO` deniega el acceso de forma
+  inmediata y reversible en la evaluación, sin cascada de escritura sobre ningún dependiente |
+| ZonaHorariaIana | string | **Nuevo (Sesión 2026-09-20, D5, research.md §31)**. Identificador IANA (p. ej.
+  `America/Lima`). Obligatorio y validado (zona reconocida) cuando `TipoCompañía = PRINCIPAL_MANDANTE`; sin
+  uso funcional para `CONTRATISTA` (no poseen áreas, contextos ni bloques horarios propios). Rige la
+  interpretación/presentación de fechas y la evaluación de bloques horarios de los permisos de las áreas de
+  esta Principal. Cambiarla nunca reinterpreta instantes UTC ya persistidos; sí cambia la representación
+  local en consultas/presentaciones futuras (sin versionado histórico de la zona) |
 
-**Relaciones**: 1—N `AlcanceUsuarioCompañía`; 1—N `AsignaciónPersonaCompañía`; 1—N `PermisoAcceso` (cuando
-`Alcance = COMPAÑÍA`); si `TipoCompañía = PRINCIPAL_MANDANTE`: 0—N `CompañíaPrincipalUnidadOrganizativaRaiz`
+**Relaciones**: 1—N `AsignaciónRolAdministrativo` (cuando `Rol = COMPANY_ADMINISTRATOR`); 1—N
+`AsignaciónPersonaCompañía`; 1—N `PermisoAcceso` (cuando `Alcance = COMPAÑÍA`); si
+`TipoCompañía = PRINCIPAL_MANDANTE`: 0—N `CompañíaPrincipalUnidadOrganizativaRaiz`
 (sus árboles de unidades organizativas), 1—N `ÁreaAcceso` (sus áreas de acceso), 0—N
 `RelaciónContratistaPrincipal` (como Principal) y 0—N `ContextoOperativoPersonaPrincipal`; si
 `TipoCompañía = CONTRATISTA`: 0—N `RelaciónContratistaPrincipal` (como Contratista).
@@ -212,6 +258,12 @@ conjunto de `CompañíaId` de este alcance para el usuario autenticado (research
 documento aplicada a `Persona`, RF-041). `Estado = INACTIVO` ⇒ no puede recibir nuevas asignaciones activas de
 persona ni nuevos permisos activos (RF-032, Historia 2 criterio 6). El sistema admite múltiples compañías con
 `TipoCompañía = PRINCIPAL_MANDANTE` simultáneamente; no debe asumirse una única Principal global (RF-043).
+
+**Cambio de `TipoCompañía` (Sesión 2026-09-20, D6, research.md §32)**: rechazado con `409 Conflict`
+(`CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS`) si la compañía tiene alguna dependencia incompatible con el tipo
+destino: áreas de acceso propias, raíces de unidad organizativa, `RelaciónContratistaPrincipal` vigentes
+(como Contratista o como Principal — simétrico en ambas direcciones), contextos operativos, o credenciales.
+Nunca se resuelven automáticamente en cascada; deben cerrarse/resolverse explícitamente antes del cambio.
 
 ## RelaciónContratistaPrincipal
 

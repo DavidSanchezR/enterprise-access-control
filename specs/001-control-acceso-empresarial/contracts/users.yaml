@@ -1,17 +1,23 @@
 openapi: 3.0.3
 info:
   title: Control de Acceso Empresarial — Mantenimiento de Usuarios
-  version: "1.0.0"
+  version: "2.0.0"
   description: >
-    Administración de usuarios y su alcance de compañías administrables (RF-004, RF-005). Distinto del
-    flujo de login (ver auth.yaml).
+    Administración de usuarios y su alcance administrativo mediante RBAC (RF-004, RF-005; Sesión
+    2026-09-20, cierre de Etapa 1, D1 — research.md §27). Reemplaza el modelo anterior de
+    `alcanceCompanias` (lista plana de compañías) por asignaciones de rol auditable con vigencia
+    temporal: `GLOBAL_ADMINISTRATOR` (alcance GLOBAL, sin compañía) o `COMPANY_ADMINISTRATOR` (alcance
+    limitado a una compañía). Distinto del flujo de login (ver auth.yaml).
 tags:
   - name: Usuarios
 paths:
   /api/usuarios:
     get:
       tags: [Usuarios]
-      summary: Listar usuarios
+      summary: Listar usuarios dentro del alcance del usuario autenticado
+      description: >
+        Un GLOBAL_ADMINISTRATOR ve todos los usuarios; un COMPANY_ADMINISTRATOR ve únicamente usuarios
+        con alguna asignación de rol vigente en su propia compañía (Resource Ownership, research.md §29).
       parameters:
         - $ref: "#/components/parameters/Pagina"
         - $ref: "#/components/parameters/TamañoPagina"
@@ -26,7 +32,12 @@ paths:
               schema: { $ref: "#/components/schemas/PaginaUsuarios" }
     post:
       tags: [Usuarios]
-      summary: Crear usuario
+      summary: Crear usuario con su primera asignación de rol
+      description: >
+        Quien crea el usuario debe tener autorización para asignar el rol solicitado: un
+        GLOBAL_ADMINISTRATOR puede asignar cualquier rol y compañía; un COMPANY_ADMINISTRATOR solo puede
+        asignar COMPANY_ADMINISTRATOR para su propia compañía (nunca GLOBAL_ADMINISTRATOR, nunca una
+        compañía distinta de la suya).
       requestBody:
         required: true
         content:
@@ -39,7 +50,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Usuario" }
         "400":
-          description: Validación fallida
+          description: Validación fallida, o rol/compañía inconsistentes (CompañíaId debe ser NULL para GLOBAL_ADMINISTRATOR, obligatorio para COMPANY_ADMINISTRATOR)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "403":
+          description: El usuario autenticado no tiene autorización para asignar el rol/compañía solicitados
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ProblemDetails" }
@@ -53,7 +69,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [Usuarios]
-      summary: Obtener usuario por ID
+      summary: Obtener usuario por ID (404 si está fuera del alcance del usuario autenticado)
       responses:
         "200":
           description: Usuario encontrado
@@ -61,10 +77,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Usuario" }
         "404":
-          description: No encontrado
+          description: No encontrado o fuera de alcance
     put:
       tags: [Usuarios]
-      summary: Actualizar datos de usuario (correo, estado)
+      summary: Actualizar datos de usuario (correo, estado) — nunca su rol/alcance, ver /roles
       requestBody:
         required: true
         content:
@@ -77,7 +93,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Usuario" }
         "404":
-          description: No encontrado
+          description: No encontrado o fuera de alcance
   /api/usuarios/{id}/desbloquear:
     parameters:
       - name: id
@@ -91,8 +107,8 @@ paths:
         "204":
           description: Usuario desbloqueado, Estado = ACTIVO
         "404":
-          description: No encontrado
-  /api/usuarios/{id}/alcance-companias:
+          description: No encontrado o fuera de alcance
+  /api/usuarios/{id}/roles:
     parameters:
       - name: id
         in: path
@@ -100,34 +116,74 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [Usuarios]
-      summary: Listar compañías administrables por el usuario
+      summary: Listar asignaciones de rol administrativo del usuario (vigentes e históricas)
       responses:
         "200":
-          description: Lista de compañías del alcance
+          description: Asignaciones de rol
           content:
             application/json:
               schema:
                 type: array
-                items: { type: string, format: uuid }
-    put:
+                items: { $ref: "#/components/schemas/AsignacionRolAdministrativo" }
+        "404":
+          description: No encontrado o fuera de alcance
+    post:
       tags: [Usuarios]
-      summary: Reemplazar el conjunto de compañías administrables por el usuario
+      summary: Crear una nueva asignación de rol administrativo para el usuario
+      description: >
+        No reemplaza el conjunto existente: agrega una asignación auditable con vigencia propia. Un
+        COMPANY_ADMINISTRATOR no puede delegar, asignar ni elevar ningún rol fuera de su propio nivel y
+        compañía — no puede asignar GLOBAL_ADMINISTRATOR, no puede elevar su propio rol, y no puede
+        asignar COMPANY_ADMINISTRATOR para una compañía distinta de la suya; sí puede crear asignaciones
+        COMPANY_ADMINISTRATOR para su propia compañía.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [companiaIds]
-              properties:
-                companiaIds:
-                  type: array
-                  items: { type: string, format: uuid }
+            schema: { $ref: "#/components/schemas/AsignarRolRequest" }
+      responses:
+        "201":
+          description: Asignación creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AsignacionRolAdministrativo" }
+        "400":
+          description: CompañíaId inconsistente con el rol (debe ser NULL para GLOBAL_ADMINISTRATOR, obligatoria y válida para COMPANY_ADMINISTRATOR), o compañía inexistente/INACTIVA
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "403":
+          description: El usuario autenticado no tiene autorización para asignar ese rol/compañía
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: Solapamiento de vigencia con otra asignación COMPANY_ADMINISTRATOR para el mismo (usuario, compañía)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+  /api/usuarios/{id}/roles/{asignacionId}/finalizar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: asignacionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Usuarios]
+      summary: Finalizar anticipadamente una asignación de rol vigente (fija fechaHoraFin a ahora)
       responses:
         "204":
-          description: Alcance actualizado
-        "400":
-          description: Alguna compañía no existe o está INACTIVA
+          description: Asignación finalizada
+        "403":
+          description: El usuario autenticado no tiene autorización para finalizar esa asignación
+        "404":
+          description: No encontrada o fuera de alcance
+        "409":
+          description: La asignación ya no está vigente
 components:
   securitySchemes:
     bearerAuth:
@@ -147,6 +203,43 @@ components:
     EstadoUsuario:
       type: string
       enum: [ACTIVO, INACTIVO, BLOQUEADO]
+    RolAdministrativo:
+      type: string
+      enum: [GLOBAL_ADMINISTRATOR, COMPANY_ADMINISTRATOR]
+      description: >
+        Catálogo cerrado (research.md §27) — no es un dato maestro versionado; agregar un rol nuevo
+        exige una modificación explícita del modelo de autorización.
+    AsignacionRolAdministrativo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        usuarioId: { type: string, format: uuid }
+        rol: { $ref: "#/components/schemas/RolAdministrativo" }
+        companiaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: NULL si y solo si rol = GLOBAL_ADMINISTRATOR
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
+        vigente:
+          type: boolean
+          description: Derivado — fechaHoraInicio <= ahora <= fechaHoraFin
+    AsignarRolRequest:
+      type: object
+      required: [rol, fechaHoraInicio, fechaHoraFin]
+      properties:
+        rol: { $ref: "#/components/schemas/RolAdministrativo" }
+        companiaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Obligatorio si rol = COMPANY_ADMINISTRATOR; debe omitirse o ser NULL si rol = GLOBAL_ADMINISTRATOR
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin:
+          type: string
+          format: date-time
+          description: Obligatoria — nunca NULL ni fecha centinela (mismo patrón que RF-071)
     Usuario:
       type: object
       properties:
@@ -154,19 +247,24 @@ components:
         correo: { type: string, format: email }
         estado: { $ref: "#/components/schemas/EstadoUsuario" }
         requiereCambioPassword: { type: boolean }
-        alcanceCompanias:
+        asignacionesRol:
           type: array
-          items: { type: string, format: uuid }
+          items: { $ref: "#/components/schemas/AsignacionRolAdministrativo" }
+          description: Solo las vigentes, para uso general del listado/detalle; el histórico completo vive en GET .../roles
     CrearUsuarioRequest:
       type: object
-      required: [correo, passwordInicial, companiaIds]
+      required: [correo, passwordInicial, rol, fechaHoraInicio, fechaHoraFin]
       properties:
         correo: { type: string, format: email }
         passwordInicial: { type: string, format: password }
-        companiaIds:
-          type: array
-          items: { type: string, format: uuid }
-          minItems: 1
+        rol: { $ref: "#/components/schemas/RolAdministrativo" }
+        companiaId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Obligatorio si rol = COMPANY_ADMINISTRATOR; debe omitirse o ser NULL si rol = GLOBAL_ADMINISTRATOR
+        fechaHoraInicio: { type: string, format: date-time }
+        fechaHoraFin: { type: string, format: date-time }
     ActualizarUsuarioRequest:
       type: object
       required: [correo, estado]

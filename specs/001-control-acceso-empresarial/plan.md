@@ -386,6 +386,48 @@ asignación). Ninguna entidad, columna, estado, migración ni endpoint nuevo. `s
 acotada), `data-model.md` y `contracts/credentials.yaml` fueron modificados; `ux-ui.md` no contenía la
 cláusula. Sin decisiones pendientes nuevas.
 
+**Re-chequeo de cierre de Etapa 1 (Sesión 2026-09-20, Decisiones D1 a D9 — planificación de corrección de
+baseline, sin implementar todavía)**: confirmado, sin violaciones nuevas. Este re-chequeo cubre
+**exclusivamente** el plan de cierre y corrección del baseline ya implementado (T001–T168) — no replantea ni
+reabre esas 168 tareas, que permanecen completas y válidas tal como están. Las nueve decisiones que cierran
+las 16 preguntas de la matriz de auditoría de cierre (`docs/auditorias/decisiones-etapa1-2026-09-16.html`):
+
+- **D1** (RBAC de administración de usuarios) y **D3** (aislamiento por alcance, Resource Ownership)
+  **refuerzan el Principio I**: cierran F-01 (`UsuarioService` sin ningún control de alcance) y F-02
+  (`AsignacionUnidadOrganizativaService`, `EstadoEfectivoService`, `RevocacionService`,
+  `UnidadOrganizativaService`, `AreaAccesoService` verificados sin ningún control de alcance) — el defecto
+  crítico que impedía congelar el baseline. `AlcanceUsuarioCompañía` es reemplazada por
+  `AsignaciónRolAdministrativo` (research.md §27, data-model.md). Ninguna entidad de `Persona` ni regla de
+  cardinalidad/aislamiento entre Principales cambia.
+- **D2** (bootstrap del primer administrador) no introduce entidades ni migraciones nuevas — una rutina de
+  arranque idempotente crea la primera `AsignaciónRolAdministrativo` (`GLOBAL_ADMINISTRATOR`) desde
+  configuración/secrets (research.md §28). Único punto de atención: `FechaHoraFin = MAX_VALIDITY_DATE` es
+  una **excepción explícita y acotada** a RF-071, exclusiva de esa fila — no debilita el Principio IV en
+  ningún otro registro.
+- **D4** (inactivación de Compañía) y **D5** (zona horaria por Compañía Principal) modifican
+  `EvaluadorDeAcceso` (research.md §7) en el mismo tramo del algoritmo (pasos 4-5 y 12), que pasa de 14 a 15
+  pasos — coordinados, no en conflicto. El Principio I se refuerza (nueva verificación de denegación por
+  defecto); el Principio IV se mantiene (D4 no cierra ni modifica ningún registro dependiente; D5 nunca
+  reinterpreta instantes UTC ya persistidos).
+- **D6** (validación de dependientes al cambiar `TipoCompañía`) refuerza RF-044/045/046, ya vigentes,
+  cerrando un vacío de validación — sin cascada automática, consistente con el patrón de D4.
+- **D7** (interfaz de Historia 5, Casos A/B) es exclusivamente frontend — cero cambios de dominio, modelo de
+  datos, autorización o contrato; reutiliza entidades, endpoints y el componente `Tree` ya existentes.
+- **D8** (consultas transversales, RF-067 a RF-069) queda explícitamente **fuera del alcance de Etapa 1** —
+  no se planifica ningún cambio de arquitectura, contrato ni dato para esta decisión en este re-chequeo.
+- **D9** (decisiones heredadas #1 política de contraseñas, #3 retención legal, #7 prioridad de Historia 9)
+  no requiere ningún cambio técnico — ratifica comportamiento ya implementado y verificado
+  (`PasswordPolicyValidator`/`AutenticacionService`, ausencia de purga física ya exigida por el Principio
+  IV, `CredencialService`/`CredencialesController` ya completos).
+
+Ningún principio de la Constitución requirió enmienda. `research.md` (§27-§33), `data-model.md` (entidad
+`AsignaciónRolAdministrativo`, campo `Compañía.ZonaHorariaIana`, validación de dependientes en `Compañía`) y
+`contracts/users.yaml`, `contracts/auth.yaml`, `contracts/companies.yaml`, `contracts/access-evaluation.yaml`
+fueron modificados en esta sesión de planificación. `spec.md` y `tasks.md` **no** fueron modificados por este
+plan — quedan pendientes de una sesión de clarificación (para `spec.md`: nuevos RF/anotaciones de las nueve
+decisiones) y de `/speckit-tasks` (para generar las tareas de corrección, numeración ≥T169, sin renumerar
+T001–T168), ninguna de las dos autorizada todavía.
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -424,7 +466,10 @@ backend/
 │   │   ├── Persistence/                           # no-solapamiento vía SQL crudo), interceptor de auditoría,
 │   │   ├── Auditing/                              # value conversions de enums, configuraciones IEntityTypeConfiguration<T>
 │   │   └── Security/                              # hashing de contraseñas, filtros globales de alcance de compañías,
-│   │                                               # CompaniaScopeAuthorizationHandler (Policy de ASP.NET Core)
+│   │                                               # CompaniaScopeAuthorizationHandler (Policy de ASP.NET Core;
+│   │                                               # redefinido para RBAC — D1, research.md §27),
+│   │                                               # RelojEmpresarial (resuelve zona por Compañía Principal — D5,
+│   │                                               # research.md §31, en vez de un único DateTimeZone global)
 │   └── EnterpriseAccessControl.Api/               # Composición DI, Controllers, ProblemDetails, Options Pattern,
 │       ├── Controllers/                           # HealthChecks (/health/live, /health/ready), OpenAPI nativo,
 │       └── Program.cs                             # autenticación JWT
