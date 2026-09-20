@@ -115,6 +115,7 @@ Sidebar persistente en desktop y breadcrumb en pantallas profundas.
 - **Históricos**
 - **Auditoría**
 - **Configuración**
+  - Usuarios y roles administrativos → §35
 
 ## 8. Dashboard
 
@@ -692,6 +693,15 @@ ASP.NET Core Web API / .NET 10
 - UX-15 Evaluar acceso denegado.
 - UX-16 Consultar auditoría.
 
+Administración de usuarios (§35, Baseline Etapa 1):
+
+- UX-17 Crear usuario con su primera asignación de rol.
+- UX-18 Consultar usuario y sus asignaciones con su vigencia.
+- UX-19 Asignar un rol administrativo a un usuario existente.
+- UX-20 Finalizar o renovar una asignación administrativa cuando esté permitido.
+- UX-21 Intentar una operación fuera del alcance y recibir el rechazo correspondiente.
+- UX-22 Buscar y filtrar usuarios dentro del alcance autorizado.
+
 ## 31. Criterios de aceptación UX
 
 La implementación debe permitir:
@@ -710,7 +720,12 @@ La implementación debe permitir:
 12. distinguir estados sin depender únicamente del color;
 13. exigir confirmación para acciones críticas;
 14. soportar teclado;
-15. cubrir UX-01 a UX-16 mediante pruebas apropiadas.
+15. cubrir UX-01 a UX-16 mediante pruebas apropiadas;
+16. visualizar y operar únicamente dentro del alcance autorizado del usuario administrativo;
+17. representar sin ambigüedad `GLOBAL_ADMINISTRATOR` y `COMPANY_ADMINISTRATOR`, y su alcance;
+18. exigir inicio y fin en toda asignación administrativa;
+19. impedir —o informar con precisión— las operaciones que violan RF-074 a RF-077, y cubrir UX-17 a UX-22
+    mediante pruebas apropiadas.
 
 ## 32. Regla de no desviación
 
@@ -744,3 +759,176 @@ No es necesario volver a `/speckit-clarify` únicamente por decisiones visuales.
 ## 34. Estado
 
 Documento preparado para incorporación al proyecto y para servir como fuente explícita de UX/UI durante planificación e implementación.
+
+## 35. Administración de usuarios
+
+> Incorporada en la Sesión 2026-09-20 para cubrir la operación de RF-074 a RF-077 (decisión D1) en el
+> Baseline de Etapa 1. Se numera al final, después de §34, para no alterar la numeración de §22 a §34, que
+> está referenciada desde `plan.md`. Esta sección **solo describe cómo se representan en la interfaz** reglas
+> ya definidas en `spec.md`: no introduce ninguna regla de negocio nueva (§32).
+
+Entrada de navegación: **Configuración → Usuarios y roles administrativos** (§7).
+
+### Modelo que la interfaz representa
+
+Dos roles, catálogo cerrado (RF-074):
+
+- `GLOBAL_ADMINISTRATOR` — alcance GLOBAL, sin compañía asociada;
+- `COMPANY_ADMINISTRATOR` — alcance limitado a una compañía.
+
+El alcance no es un atributo del usuario sino de cada **asignación** (`AsignaciónRolAdministrativo`), con
+vigencia propia. Un usuario puede tener varias asignaciones y su alcance efectivo es el que resulta de las
+**vigentes** (RF-077).
+
+La interfaz nunca presenta el rol como una lista editable de valores: son exactamente dos, fijos (RF-074).
+
+### Listado
+
+Columnas:
+
+- correo;
+- estado del usuario (`ACTIVO`, `INACTIVO`, `BLOQUEADO`);
+- roles vigentes;
+- compañías de esas asignaciones;
+- vigencia de la asignación más próxima a vencer;
+- acciones.
+
+Filtros:
+
+- búsqueda por correo;
+- estado del usuario;
+- rol;
+- compañía;
+- solo con asignaciones vigentes.
+
+Reglas de visibilidad (RF-077):
+
+- un `GLOBAL_ADMINISTRATOR` ve todos los usuarios;
+- un `COMPANY_ADMINISTRATOR` ve únicamente usuarios con alguna asignación en su propia compañía;
+- el listado **no** revela la existencia de usuarios fuera del alcance: no aparecen, no se cuentan en los
+  totales y no se insinúan mediante resultados parciales o paginación;
+- el filtro por compañía ofrece solo compañías del alcance del usuario que consulta.
+
+Mostrar el rol y el alcance como etiquetas distintas. No fusionar rol, compañía y vigencia en un solo texto:
+son tres dimensiones independientes (coherente con §16).
+
+### Detalle de usuario
+
+Tabs:
+
+- Resumen — correo, estado, si tiene cambio de contraseña pendiente;
+- Asignaciones — todas, vigentes e históricas, con rol, compañía, inicio, fin y si está vigente hoy;
+- Histórico — trazabilidad de altas, finalizaciones y renovaciones de asignaciones.
+
+En Asignaciones, distinguir visualmente **estado de la asignación** de **vigencia efectiva por fechas**, sin
+combinarlos (§16): una asignación puede figurar como registrada y no estar vigente hoy.
+
+### Crear usuario
+
+Wizard, porque un usuario nace siempre con su primera asignación (RF-074):
+
+#### Paso 1 — Identidad
+- correo electrónico;
+- contraseña inicial.
+
+El correo es el identificador de acceso. La contraseña inicial se rige por la política vigente y el titular
+deberá cambiarla en su primer ingreso: indicarlo en el formulario, no como sorpresa posterior.
+
+#### Paso 2 — Rol
+Elegir entre los dos roles disponibles **para quien crea**:
+
+- un `GLOBAL_ADMINISTRATOR` puede elegir cualquiera de los dos;
+- un `COMPANY_ADMINISTRATOR` solo puede elegir `COMPANY_ADMINISTRATOR` (RF-076).
+
+La opción no disponible **no se ofrece deshabilitada sin motivo**: se omite o se muestra con la razón
+explícita. La interfaz nunca ofrece una acción que la autorización va a rechazar (§32, RF-076).
+
+#### Paso 3 — Compañía
+- obligatoria si el rol es `COMPANY_ADMINISTRATOR`;
+- ausente si el rol es `GLOBAL_ADMINISTRATOR` — el formulario oculta el campo y explica que el alcance GLOBAL
+  cubre todas las compañías, incluidas las que se creen después (RF-074).
+
+El selector de compañía ofrece únicamente compañías del alcance de quien crea. Para un
+`COMPANY_ADMINISTRATOR` eso significa su propia compañía, ya preseleccionada y no modificable (RF-076).
+
+#### Paso 4 — Vigencia
+- `FechaHoraInicio` obligatoria;
+- `FechaHoraFin` obligatoria.
+
+Ninguna de las dos admite vacío ni un valor "sin fin" (RF-075). No ofrecer casilla de "indefinido".
+
+#### Paso 5 — Confirmación
+Mostrar:
+
+`Correo → Rol → Compañía (si aplica) → Vigencia`
+
+### Asignar un rol a un usuario existente
+
+Mismo contenido que los pasos 2 a 4, sobre un usuario ya creado. No reemplaza las asignaciones existentes:
+**agrega** una nueva. La interfaz debe dejarlo explícito, porque el efecto sobre el alcance es acumulativo
+mientras varias estén vigentes (RF-077).
+
+### Modificar una asignación
+
+Operaciones disponibles sobre una asignación existente:
+
+- **finalizar** — cierra la vigencia;
+- **renovar** — extiende `FechaHoraFin` hacia una fecha posterior, solo mientras la asignación siga vigente
+  (RF-075, con las reglas de RF-073).
+
+No se ofrece editar el rol ni la compañía de una asignación ya creada: para eso se finaliza y se crea otra.
+Ambas acciones son críticas y exigen confirmación (§31.13).
+
+### Restricciones por rol
+
+`GLOBAL_ADMINISTRATOR`:
+
+- ve y administra usuarios de cualquier compañía;
+- asigna cualquiera de los dos roles;
+- finaliza y renueva cualquier asignación.
+
+`COMPANY_ADMINISTRATOR` — la interfaz **no ofrece** (RF-076):
+
+- usuarios de otras compañías;
+- asignar `GLOBAL_ADMINISTRATOR`;
+- asignar `COMPANY_ADMINISTRATOR` para una compañía distinta de la suya;
+- elevar su propio alcance;
+- reasignar un usuario fuera de su alcance.
+
+Sí ofrece crear asignaciones `COMPANY_ADMINISTRATOR` para su propia compañía (RF-076).
+
+Ocultar o explicar, nunca ofrecer y luego fallar. Cuando una acción se omite por alcance insuficiente,
+indicarlo con una razón legible en lugar de dejar un hueco sin explicación.
+
+### Validaciones y errores
+
+Resolver en el formulario, antes de enviar:
+
+- compañía requerida cuando el rol es `COMPANY_ADMINISTRATOR`;
+- compañía ausente cuando el rol es `GLOBAL_ADMINISTRATOR`;
+- inicio y fin presentes;
+- fin posterior al inicio.
+
+Errores que provienen del servidor y deben mostrarse con mensaje propio, no genérico:
+
+| Situación | Mensaje orientado a la acción |
+|---|---|
+| Rol o compañía no permitidos para quien opera | Explicar que su rol no autoriza esa asignación, sin detallar recursos ajenos |
+| Alcance insuficiente sobre el usuario destino | Indicar que el usuario no pertenece a su alcance |
+| Correo ya registrado | Señalar el campo correo y proponer buscar el usuario existente |
+| Solapamiento de vigencias para el mismo usuario y compañía | Mostrar la asignación vigente en conflicto y sus fechas |
+| Vigencia inválida | Señalar el campo de fecha correspondiente |
+| Contraseña que no cumple la política | Señalar el campo y enumerar los requisitos incumplidos |
+
+Ningún mensaje de error revela datos de compañías o usuarios fuera del alcance: al operar sobre un recurso
+fuera de alcance, la interfaz se comporta como si no existiera (RF-077) y ofrece volver al listado. Formato
+general de mensajes y estados conforme a §23 y §27.
+
+### Aislamiento
+
+Aplica a toda la pantalla, no solo al listado (RF-077):
+
+- acceder por URL directa al detalle de un usuario fuera del alcance muestra "no encontrado", nunca un
+  "no autorizado" que confirme su existencia;
+- los selectores de compañía, los filtros y los contadores se limitan al alcance;
+- conocer un identificador no habilita nada.
