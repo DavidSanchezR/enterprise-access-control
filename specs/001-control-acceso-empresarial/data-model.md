@@ -118,8 +118,10 @@ Convenciones aplicadas a todas las entidades (no repetidas por entidad):
 - **Auditoría**: `CreatedAt` (`datetime2(3)`), `UpdatedAt` (`datetime2(3)`), `CreatedById` (`Guid` → `Usuario`),
   `UpdatedById` (`Guid` → `Usuario`). Estampados exclusivamente por el `SaveChangesInterceptor` (research.md
   §6); nunca presentes en DTOs de entrada ni editables en UI (Principio III, RF-026, RF-027).
-- **Fechas/horas**: persistidas en UTC (`datetime2(3)`); conversión a `America/Lima` solo en evaluación de
-  bloques horarios y presentación (Principio IV).
+- **Fechas/horas**: persistidas en UTC (`datetime2(3)`); la conversión a hora local ocurre solo en la
+  evaluación de bloques horarios y en la presentación (Principio IV), usando la zona de la Compañía Principal
+  correspondiente (`Compañía.ZonaHorariaIana`, RF-080) o la zona global de respaldo cuando el registro no es
+  resoluble a una única Principal. *(Antes de la Sesión 2026-09-20 esta convención fijaba `America/Lima`.)*
 - Salvo indicación contraria, todos los campos de negocio listados son obligatorios (RF-028).
 
 ## Índice de entidades
@@ -630,14 +632,16 @@ Bloques horarios por día de semana dentro de un permiso (Historia 8, RF-022).
 |---|---|---|
 | PermisoAccesoId | Guid (FK → PermisoAcceso) | — |
 | DíaSemana | enum: `LUNES`…`DOMINGO` | — |
-| HoraInicio | time (local, interpretada en `America/Lima`) | — |
-| HoraFin | time (local, interpretada en `America/Lima`) | Debe ser posterior a `HoraInicio` |
+| HoraInicio | time (local, interpretada en la zona de la Compañía Principal del área — RF-080) | — |
+| HoraFin | time (local, misma zona que `HoraInicio`) | Debe ser posterior a `HoraInicio` |
 
 **Relaciones**: N—1 `PermisoAcceso`.
 
 **Validaciones clave**: `HoraFin > HoraInicio` (RF-039); dentro del mismo `(PermisoAccesoId, DíaSemana)` los
-bloques no pueden solaparse entre sí. La evaluación de acceso convierte la fecha/hora UTC evaluada a
-`America/Lima` antes de comparar contra estos bloques (research.md §5, §7).
+bloques no pueden solaparse entre sí. La evaluación de acceso convierte la fecha/hora UTC evaluada a la hora
+local de la **Compañía Principal propietaria del área** (`Compañía.ZonaHorariaIana`, RF-080; zona global de
+respaldo si no fuera resoluble) antes de comparar contra estos bloques (research.md §5, §7 paso 13, §31).
+*(Antes de la Sesión 2026-09-20 esta conversión usaba `America/Lima` de forma fija.)*
 
 ## TipoCredencial
 

@@ -123,11 +123,16 @@ components:
         horaInicio:
           type: string
           pattern: '^([01]\d|2[0-3]):[0-5]\d$'
-          description: Hora local America/Lima, formato HH:mm
+          description: >
+            Hora local en la zona horaria de la Compañía Principal propietaria del área del permiso
+            (Compania.zonaHorariaIana — RF-080, Sesión 2026-09-20), formato HH:mm. Antes de esa sesión el
+            sistema interpretaba estas horas en America/Lima de forma fija para todas las compañías.
         horaFin:
           type: string
           pattern: '^([01]\d|2[0-3]):[0-5]\d$'
-          description: Hora local America/Lima, formato HH:mm, debe ser posterior a horaInicio
+          description: >
+            Hora local en la zona horaria de la Compañía Principal propietaria del área del permiso
+            (RF-080), formato HH:mm; debe ser posterior a horaInicio.
     PermisoAcceso:
       type: object
       properties:

@@ -27,8 +27,8 @@ info:
     unidad organizativa y credenciales dependientes (RF-061 a RF-064, ver contracts/people.yaml y
     contracts/credentials.yaml); esta evaluación, además, sigue re-validando dinámicamente la legitimidad de
     cada contexto operativo contra la compañía de pertenencia vigente de la persona en la fecha evaluada
-    como defensa adicional, no como sustituto de esa revocación (RF-065, research.md §7 paso 5, §14), y
-    consulta directamente el Estado ya escrito por esa misma cascada para el gate de credencial (paso 6).
+    como defensa adicional, no como sustituto de esa revocación (RF-065, research.md §7 paso 6, §14), y
+    consulta directamente el Estado ya escrito por esa misma cascada para el gate de credencial (paso 7).
 tags:
   - name: EvaluacionAcceso
 paths:
@@ -88,13 +88,13 @@ components:
         - PERMISO_FUERA_DE_VIGENCIA
         - FUERA_DE_BLOQUE_HORARIO
       description: >
-        SIN_CONTEXTO_OPERATIVO_VIGENTE reemplaza al antiguo SIN_COMPANIA_VIGENTE (research.md §7, paso 5):
+        SIN_CONTEXTO_OPERATIVO_VIGENTE reemplaza al antiguo SIN_COMPANIA_VIGENTE (research.md §7, paso 6):
         la persona no tiene un ContextoOperativoPersonaPrincipal vigente con la Principal propietaria del
         área, o tiene uno pero ya no es legítimo porque su compañía de pertenencia vigente cambió (RF-061)
         — ambos casos se reportan con este mismo motivo, sin distinguirse en la respuesta.
         RELACION_CONTRATISTA_PRINCIPAL_VENCIDA aplica cuando la persona es de una Contratista y la
         RelaciónContratistaPrincipal correspondiente no está vigente en la fecha evaluada (RF-059).
-        SIN_CREDENCIAL_VIGENTE (RF-066, RF-070, research.md §7 paso 6 y §24) cubre por igual: la persona
+        SIN_CREDENCIAL_VIGENTE (RF-066, RF-070, research.md §7 paso 7 y §24) cubre por igual: la persona
         nunca tuvo una AsignacionCredencial para esa Principal; la más reciente está en Estado DEVUELTO,
         ELIMINADO o REVOCADA; o está en Estado ASIGNADO pero temporalmente expirada (FechaHoraFin ya pasado
         respecto a la fecha evaluada, sin que ello cambie su Estado) — los cuatro casos se reportan con este

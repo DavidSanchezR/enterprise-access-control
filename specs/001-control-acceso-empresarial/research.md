@@ -179,7 +179,9 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
   Estos umbrales deben quedar configurables (no hardcodeados) para ajuste sin despliegue de código.
 - **Mecanismo de configuración (Sesión 2026-09-14, Stack Tecnológico Oficial)**: los umbrales de política de
   contraseña, la configuración de JWT (emisor, audiencia, clave de firma, tiempo de vida del token) y la
-  zona horaria empresarial (`America/Lima`) se exponen mediante el **Options Pattern** de ASP.NET Core
+  zona horaria **global de respaldo** del sistema (por defecto `America/Lima`; la zona operativa de cada
+  Compañía Principal vive en `Compañía.ZonaHorariaIana`, no en configuración — RF-080, §31) se exponen
+  mediante el **Options Pattern** de ASP.NET Core
   (`IOptions<PasswordPolicyOptions>`, `IOptions<JwtOptions>`), enlazados desde `appsettings.json`/variables de
   entorno y validados al inicio con `ValidateOnStart()` + `IValidateOptions<T>` (o `DataAnnotations` sobre la
   clase de opciones) para fallar rápido si falta configuración obligatoria, en vez de fallar en el primer
@@ -322,8 +324,12 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
   administrativa), `REVOCADA` (exclusivamente la cascada de §14) — y no existe un estado ni motivo de
   "reemplazo" (§23, §24). En todos los casos el trigger es la última línea de defensa, no el mecanismo
   primario de UX (la aplicación valida primero y devuelve 409 con `ProblemDetails` legible; el trigger solo
-  debería dispararse ante una condición de carrera genuina). La conversión a `America/Lima` (NodaTime `DateTimeZoneProviders.Tzdb["America/Lima"]`)
-  ocurre únicamente en la evaluación de bloques horarios (Historia 8) y en la capa de presentación.
+  debería dispararse ante una condición de carrera genuina). La conversión de UTC a hora local ocurre
+  únicamente en la evaluación de bloques horarios (Historia 8) y en la capa de presentación, y usa la zona
+  horaria **de la Compañía Principal correspondiente** (`Compañía.ZonaHorariaIana`, NodaTime
+  `DateTimeZoneProviders.Tzdb`), con la zona global de respaldo cuando el registro no es resoluble a una única
+  Principal — RF-080, §31. *(Antes de la Sesión 2026-09-20 esta frase fijaba `America/Lima` para todo el
+  sistema.)*
 - **Rationale**: Un trigger a nivel de base de datos es la última línea de defensa contra condiciones de
   carrera (dos requests concurrentes) que la validación de aplicación por sí sola no puede garantizar,
   preservando exactamente la garantía que exigía el Principio IV con `EXCLUDE USING gist` en PostgreSQL —
@@ -376,15 +382,30 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
 > **Revisado de nuevo (Sesión 2026-09-14, integración `ux-ui.md`)**: se agrega el paso 6 (credencial
 > vigente), llevando el total de 13 a 14 pasos — ver RF-066 y spec.md Clarifications para el razonamiento
 > completo de por qué se resolvió a favor de que la credencial sí gatille la denegación.
+>
+> **Revisado de nuevo (Sesión 2026-09-20, cierre de Etapa 1 — D4 y D5)**: se inserta el paso 5 (Compañía
+> Principal `ACTIVO`, RF-079), llevando el total de 14 a **15 pasos**; el antiguo paso 5 (contexto operativo)
+> pasa a ser el 6 y absorbe la verificación de que la compañía de pertenencia vigente de la persona también
+> esté `ACTIVO`; y el paso de bloque horario (antiguo 12, ahora 13) deja de usar `America/Lima` de forma fija
+> para resolver la zona de la Compañía Principal propietaria del área (RF-080). Los pasos 1 a 4 conservan su
+> número; todos los posteriores se desplazan en uno. **Las referencias a números de paso escritas antes de
+> esta sesión** —en las notas de revisión de este archivo, en las sesiones previas de spec.md y en los
+> contratos— **deben leerse contra esa correspondencia**: antiguo 5 → 6 (contexto operativo), 6 → 7
+> (credencial), 7 → 8 (área activa), 8 → 9 (perfil), 9 → 10 (unidad organizativa), 10 → 11 (permisos),
+> 11 → 12 (vigencia), 12 → 13 (bloque horario), 13 → 14 (precedencia), 14 → 15 (conceder/denegar).
 
-- **Decision**: Un servicio de dominio `EvaluadorDeAcceso` implementa, en orden, los siguientes 14 pasos:
+- **Decision**: Un servicio de dominio `EvaluadorDeAcceso` implementa, en orden, los siguientes 15 pasos:
   1. Verificar que el usuario autenticado que solicita la evaluación tenga, en su
      `AlcanceUsuarioCompañía`, la Compañía Principal que se determinará en el paso 4 (RF-005, RF-049;
      preservado de la lista anterior).
   2. Identificar a la persona evaluada.
   3. Identificar el `ÁreaAcceso` evaluada.
   4. Determinar la Compañía Principal propietaria del área vía `ÁreaAcceso.CompañíaPrincipalId`.
-  5. Verificar que exista un `ContextoOperativoPersonaPrincipal` vigente entre la persona y esa Principal en
+  5. Verificar que esa Compañía Principal tenga `Estado = ACTIVO` (RF-079, §30). Si está `INACTIVO` ⇒
+     DENEGADO (`COMPANIA_INACTIVA`), sin evaluar el resto. Comprobación dinámica de solo lectura: no escribe
+     ni modifica ningún registro dependiente, por lo que reactivar la compañía restablece el acceso sin
+     ninguna otra operación.
+  6. Verificar que exista un `ContextoOperativoPersonaPrincipal` vigente entre la persona y esa Principal en
      la fecha evaluada, **y que esa relación siga siendo legítima según la compañía de pertenencia vigente
      de la persona en esa misma fecha** (RF-061, §13 — auditoría de consistencia, cierra Decisión Pendiente
      #4): si esa compañía vigente es exactamente la Principal evaluada, la legitimidad es automática
@@ -394,8 +415,12 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
      distinta) el contexto se considera no legítimo. Sin contexto vigente o sin legitimidad vigente ⇒
      DENEGADO (`SIN_CONTEXTO_OPERATIVO_VIGENTE`), sin evaluar el resto de los pasos. Esta re-validación es
      dinámica (recalculada en cada evaluación) y **no** cierra ni modifica el registro de
-     `ContextoOperativoPersonaPrincipal` en sí.
-  6. Verificar que exista una `AsignaciónCredencial` **vigente** para la persona y la Compañía Principal
+     `ContextoOperativoPersonaPrincipal` en sí. **Además** (Sesión 2026-09-20, D4, RF-079): la compañía de
+     pertenencia vigente identificada en este mismo paso DEBE tener `Estado = ACTIVO`; si está `INACTIVO` ⇒
+     DENEGADO con el mismo motivo `COMPANIA_INACTIVA` del paso 5 — también dinámico, sin escritura y
+     reversible. Se agrupa aquí, y no como paso propio, porque este paso ya resuelve esa compañía para
+     determinar la legitimidad del contexto.
+  7. Verificar que exista una `AsignaciónCredencial` **vigente** para la persona y la Compañía Principal
      determinada en el paso 4, en la fecha evaluada (RF-066, RF-070, RF-071 — Sesión 2026-09-14, integración
      `ux-ui.md` y correcciones posteriores). "Vigente" es la conjunción de **ambas** condiciones, evaluadas
      dinámicamente en cada llamada: (a) `Estado = ASIGNADO`, y (b) `FechaHoraInicio <= fecha evaluada <=
@@ -408,44 +433,52 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
      de fechas pura, igual que en cualquier otra entidad con vigencia temporal (§5) — ninguno de los dos
      escribe nada. Una credencial `ASIGNADO` cuya `FechaHoraFin` ya pasó **no** se transiciona
      automáticamente a otro `Estado` por este chequeo ni por el mero paso del tiempo (§24).
-  7. Verificar que el área esté `ACTIVA`.
-  8. Verificar que algún perfil (`TipoPersona`) vigente de la persona esté autorizado en el área (RF-024,
+  8. Verificar que el área esté `ACTIVA`.
+  9. Verificar que algún perfil (`TipoPersona`) vigente de la persona esté autorizado en el área (RF-024,
      Historia 7; preservado de la lista anterior).
-  9. Determinar la unidad organizativa vigente de la persona dentro de ese contexto operativo (vía
-     `AsignaciónPersonaUnidadOrganizativa` particionada por `ContextoOperativoId` — §5, §13).
-  10. Recolectar permisos aplicables en los tres niveles: PERSONA (directo), UNIDAD_ORGANIZATIVA (la del
-      paso 9) y COMPAÑÍA (la compañía de pertenencia vigente de la persona, sea Principal o Contratista —
+  10. Determinar la unidad organizativa vigente de la persona dentro de ese contexto operativo (vía
+      `AsignaciónPersonaUnidadOrganizativa` particionada por `ContextoOperativoId` — §5, §13).
+  11. Recolectar permisos aplicables en los tres niveles: PERSONA (directo), UNIDAD_ORGANIZATIVA (la del
+      paso 10) y COMPAÑÍA (la compañía de pertenencia vigente de la persona, sea Principal o Contratista —
       research.md §12).
-  11. Filtrar por vigencia del permiso en la fecha evaluada.
-  12. Filtrar por día de semana y bloque horario en `America/Lima`.
-  13. Si hay permisos aplicables en más de un nivel, aplicar precedencia PERSONA > UNIDAD_ORGANIZATIVA >
+  12. Filtrar por vigencia del permiso en la fecha evaluada.
+  13. Filtrar por día de semana y bloque horario en la **zona horaria de la Compañía Principal propietaria
+      del área** determinada en el paso 4 (`Compañía.ZonaHorariaIana`, RF-080, §31); si no fuera resoluble a
+      una Principal, en la zona global de respaldo (`ZonaHoraria:TimeZoneId`). *(Antes de la Sesión
+      2026-09-20 este paso usaba `America/Lima` de forma fija para todas las compañías.)*
+  14. Si hay permisos aplicables en más de un nivel, aplicar precedencia PERSONA > UNIDAD_ORGANIZATIVA >
       COMPAÑÍA.
-  14. Conceder o denegar. Ante cualquier paso sin resultado inequívoco, el resultado es DENEGADO
+  15. Conceder o denegar. Ante cualquier paso sin resultado inequívoco, el resultado es DENEGADO
       (Principio I).
 
   El resultado y sus factores determinantes se pueden loguear para auditoría, sin bloquear la respuesta p95
   requerida por CS-003.
 - **Rationale**: Un único servicio de dominio con pasos ordenados y explícitos permite pruebas unitarias
-  aisladas por cada corte (sin contexto operativo, relación Contratista-Principal vencida, sin credencial
-  vigente, área inactiva, perfil no autorizado, permiso vencido, fuera de bloque horario, conflicto de
-  precedencia) tal como exige el Principio VII. Determinar la Principal en el paso 4 **antes** de tocar
-  cualquier permiso (paso 10) garantiza que un permiso de la Principal B nunca pueda satisfacer una
+  aisladas por cada corte (compañía inactiva, sin contexto operativo, relación Contratista-Principal vencida,
+  sin credencial vigente, área inactiva, perfil no autorizado, permiso vencido, fuera de bloque horario,
+  conflicto de precedencia) tal como exige el Principio VII. Determinar la Principal en el paso 4 **antes** de
+  tocar cualquier permiso (paso 11) garantiza que un permiso de la Principal B nunca pueda satisfacer una
   evaluación sobre un área de la Principal A (CS-018), porque los permisos ni siquiera se consultan hasta
-  que el contexto operativo y la credencial con la Principal correcta fueron confirmados. Colocar el paso 6
-  (credencial) inmediatamente después del paso 5 (contexto operativo) agrupa todas las verificaciones de
+  que el contexto operativo y la credencial con la Principal correcta fueron confirmados. Colocar el paso 7
+  (credencial) inmediatamente después del paso 6 (contexto operativo) agrupa todas las verificaciones de
   legitimidad/identidad de la persona frente a esa Principal antes de entrar a evaluar elegibilidad de
-  perfil/área y permisos — evita, por ejemplo, calcular la unidad organizativa vigente (paso 9) para una
-  persona que de todas formas será denegada por falta de credencial.
+  perfil/área y permisos — evita, por ejemplo, calcular la unidad organizativa vigente (paso 10) para una
+  persona que de todas formas será denegada por falta de credencial. El paso 5 (Compañía Principal `ACTIVO`)
+  se coloca inmediatamente después de determinar la Principal porque es el corte más barato de todos: una
+  sola lectura de estado que evita resolver contexto, credencial, perfil y permisos de una compañía que no
+  puede conceder acceso en absoluto.
 - **Alternatives considered**: Reglas de precedencia implícitas por orden de consulta SQL (`ORDER BY` +
   `LIMIT 1`) sin servicio de dominio explícito (descartado: dificulta probar unitariamente cada corte y oculta
   la lógica de negocio en la capa de infraestructura); omitir el paso 1 (autorización de la propia consulta)
-  y el paso 8 (elegibilidad de perfil/área) por no estar en la lista original de 13 pasos de negocio
+  y el paso 9 (elegibilidad de perfil/área) por no estar en la lista original de 13 pasos de negocio
   (descartado: ambos siguen siendo RF vigentes — RF-005 y RF-024 — que la lista de negocio no derogó
-  explícitamente); colocar el nuevo paso 6 (credencial) al final del algoritmo, justo antes de conceder/
+  explícitamente); colocar el paso de credencial al final del algoritmo, justo antes de conceder/
   denegar (descartado: dispersaría las verificaciones de legitimidad de identidad entre el principio y el
-  final del algoritmo sin beneficio, y obligaría a calcular unidad organizativa y permisos — pasos 9 a 13 —
+  final del algoritmo sin beneficio, y obligaría a calcular unidad organizativa y permisos — pasos 10 a 14 —
   para personas que de todas formas serán denegadas por falta de credencial, sin ganancia de claridad ni de
-  rendimiento).
+  rendimiento); plegar la verificación de `Compañía.Estado` dentro de los pasos 4 y 6 sin numerarla
+  (descartado: la deja invisible en un algoritmo cuyo valor principal es que cada corte sea nombrable y
+  probable por separado).
 
 ## 8. Semilla de datos maestros versionada (Perú)
 
@@ -563,7 +596,9 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
   campo `PrincipalId` único dentro de `Compañía` Contratista (descartado explícitamente por negocio: una
   Contratista puede prestar servicios a varias Principales simultáneamente — sección 3 de la corrección).
   Se mantiene sin cambios la decisión de no restringir `PermisoAcceso.CompañíaId` (alcance COMPAÑÍA) a solo
-  compañías `PRINCIPAL_MANDANTE` — sigue siendo un caso de uso legítimo (research.md §7, paso 9).
+  compañías `PRINCIPAL_MANDANTE` — sigue siendo un caso de uso legítimo (research.md §7, paso 11, donde se
+  recolectan los permisos de nivel COMPAÑÍA; la referencia anterior apuntaba al paso 9, que resuelve la unidad
+  organizativa — corregido en la Sesión 2026-09-20).
 
 ## 13. Contexto Operativo Persona↔Principal y Relación Contratista↔Principal (Sesión 2026-09-14)
 
@@ -785,15 +820,31 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
 
 ### 14.5 Fuera de alcance de esta corrección
 
-- **Decision**: Esta corrección NO extiende la cascada de escritura a: (a) el fin de una
-  `RelaciónContratistaPrincipal` (protegido solo por la re-validación dinámica de §7 paso 5/RF-059, sin
-  escritura equivalente); (b) una `Compañía` marcada `INACTIVO` administrativamente, lo que podría afectar a
-  todo su personal simultáneamente. Ambos quedan como Decisión Pendiente #6 en spec.md.
-- **Rationale**: Negocio especificó esta regla exclusivamente para el cese de pertenencia Persona–Compañía;
-  extender el mismo mecanismo a estos otros dos disparadores sin que negocio lo haya pedido sería modelado
-  especulativo. La re-validación dinámica ya existente cubre ambos casos como red de seguridad mínima
-  (deniega acceso correctamente), aunque sin el beneficio de auditoría explícita ni de reflejar el estado
-  "revocado" en los registros dependientes hasta que negocio confirme que también lo requiere.
+> **Corregida (Sesión 2026-09-20, cierre de Etapa 1 — D4)**. La versión original de esta subsección afirmaba
+> que la re-validación dinámica «ya existente» cubría ambos disparadores y «deniega acceso correctamente».
+> **Eso era falso para el caso de la `Compañía` marcada `INACTIVO`**: el algoritmo de §7 nunca consultaba
+> `Compañía.Estado` en ningún paso, por lo que inactivar una compañía no denegaba nada. La auditoría de
+> cierre de Etapa 1 lo detectó y D4 lo resolvió. El texto se reescribe abajo para reflejar qué quedó resuelto
+> y qué sigue realmente fuera de alcance.
+
+- **Decision (vigente)**: La cascada de escritura de §14.1 sigue limitada al cese de una pertenencia
+  Persona–Compañía. De los dos disparadores que esta subsección dejaba fuera:
+  - **(a) Fin de una `RelaciónContratistaPrincipal`** — sigue **fuera de alcance**: no tiene cascada de
+    escritura equivalente y permanece protegido únicamente por la re-validación dinámica del paso 6 de §7
+    (RF-059, RF-065), que sí está implementada y sí deniega correctamente cuando la relación no está vigente
+    en la fecha evaluada. Extender la cascada a este caso seguiría requiriendo una decisión de negocio
+    explícita (Decisión Pendiente #6, parte no resuelta).
+  - **(b) `Compañía` marcada `INACTIVO`** — **resuelto por D4 (RF-079, §30)**: tampoco lleva cascada de
+    escritura, pero ya no depende de una protección inexistente. La evaluación de acceso verifica
+    explícitamente `Estado = ACTIVO` de la Compañía Principal propietaria del área (paso 5) y de la compañía
+    de pertenencia vigente de la persona (paso 6), denegando con `COMPANIA_INACTIVA`. El efecto es inmediato,
+    reversible y sin escritura alguna sobre registros dependientes.
+- **Rationale**: Negocio especificó la cascada de §14.1 exclusivamente para el cese de pertenencia
+  Persona–Compañía, y extenderla a otros disparadores sin pedido explícito sería modelado especulativo — eso
+  no ha cambiado. Lo que cambió es la honestidad del texto: la ausencia de cascada solo es aceptable si existe
+  de verdad un mecanismo alternativo que deniegue, y para la compañía inactivada ese mecanismo no existía
+  hasta RF-079. La lección queda registrada: afirmar que «la evaluación dinámica ya lo cubre» exige
+  verificar que el algoritmo consulte efectivamente el campo en cuestión.
 
 ## 15. Motor de base de datos oficial: SQL Server (Sesión 2026-09-14, Stack Tecnológico Oficial)
 
@@ -881,17 +932,17 @@ rationale explícito, marcadas para confirmación de negocio antes de producció
      usuario (RF-005, RF-049, RF-060) — como gate de primera línea a nivel de endpoint, ANTES de tocar la
      base de datos. El filtro de consulta global de EF Core (research.md §3) sigue siendo la segunda línea
      de defensa (defensa en profundidad ya establecida, sin cambios).
-  2. El **motor de evaluación de acceso** (`EvaluadorDeAcceso`, el servicio de dominio de 14 pasos —
+  2. El **motor de evaluación de acceso** (`EvaluadorDeAcceso`, el servicio de dominio de 15 pasos —
      research.md §7) es un servicio de **Domain/Application** invocado explícitamente por el endpoint
      `POST /api/evaluacion-acceso`; NO se modela como una `AuthorizationPolicy` de ASP.NET Core, porque
      evalúa si una **Persona** (una entidad de negocio evaluada, nunca el `ClaimsPrincipal` de la request
-     HTTP) tiene acceso físico a un área — una decisión de negocio con su propio flujo de 14 pasos,
+     HTTP) tiene acceso físico a un área — una decisión de negocio con su propio flujo de 15 pasos,
      precedencia y denegación por defecto, no una decisión de "¿puede este usuario llamar a este endpoint?".
 - **Rationale**: ASP.NET Core Authorization está diseñado para responder "¿puede el `ClaimsPrincipal` actual
   de la request realizar esta acción?" — encaja naturalmente para el alcance administrativo (1), donde el
   actor evaluado ES el usuario autenticado. No encaja para (2): ahí el actor evaluado es una `Persona` de
   negocio, casi siempre *distinta* del `Usuario` administrativo que dispara la consulta, con un algoritmo de
-  14 pasos que ya tiene sus propias pruebas unitarias por corte (research.md §7). Forzar (2) dentro de
+  15 pasos que ya tiene sus propias pruebas unitarias por corte (research.md §7). Forzar (2) dentro de
   `AuthorizationPolicy` mezclaría dos conceptos con ciclos de vida y pruebas distintas, y complicaría (sin
   necesidad) razonar sobre CS-003 (evaluación p95 < 500ms), ya que las políticas de ASP.NET Core no están
   pensadas para lógica de negocio de esa complejidad ni para ser invocadas fuera del pipeline HTTP (p. ej.
@@ -1065,7 +1116,8 @@ de consistencia RF-066; corregida en la Sesión "vigencia temporal jerárquica")
   (p. ej. una "Credencial Temporal", Historia 9, o cualquier duración que negocio determine) — nunca `null`.
   Una `AsignaciónCredencial` es **vigente** para efectos de RF-066 si y solo si se cumple la conjunción:
   `Estado = ASIGNADO` **y** `FechaHoraInicio <= fecha evaluada <= FechaHoraFin`. Si `Estado = ASIGNADO` y
-  `FechaHoraFin` ya pasó, la credencial está temporalmente expirada — deniega el paso 6 de §7 — pero el
+  `FechaHoraFin` ya pasó, la credencial está temporalmente expirada — deniega el paso 7 de §7 (paso 6 antes de
+  la renumeración de la Sesión 2026-09-20) — pero el
   sistema **NO** transiciona su `Estado` automáticamente por el mero paso del tiempo; solo una acción
   administrativa explícita (devolución, baja lógica, o la cascada de revocación de §14) cambia `Estado`, y
   esa acción sigue siendo la única que puede acortar `FechaHoraFin` por cierre (nunca extenderla) y la única
@@ -1330,12 +1382,14 @@ AsignaciónPersonaCompañía")
 ## 30. Inactivación de Compañía en la evaluación de acceso (D4)
 
 - **Decision**: `EvaluadorDeAcceso` (research.md §7) pasa de 14 a **15 pasos**, mismo tipo de ampliación ya
-  ocurrida de 13 a 14 por RF-066. Se amplía el **paso 4** (determinar la Compañía Principal propietaria del
-  área) para exigir `Compañía.Estado = ACTIVO` de esa Principal inmediatamente después de determinarla; sin
-  ello, `DENEGADO` (nuevo motivo `COMPANIA_INACTIVA`) sin evaluar el resto. Se amplía el **paso 5** (que ya
-  re-valida dinámicamente la compañía de pertenencia vigente de la persona para determinar legitimidad del
-  contexto operativo, RF-061) para exigir además que esa compañía de pertenencia tenga
-  `Estado = ACTIVO`; sin ello, `DENEGADO` (mismo motivo `COMPANIA_INACTIVA`) sin evaluar el resto. Ambos
+  ocurrida de 13 a 14 por RF-066. Se **inserta un paso 5 nuevo**: verificar que la Compañía Principal
+  propietaria del área, determinada en el paso 4, tenga `Compañía.Estado = ACTIVO`; sin ello, `DENEGADO`
+  (nuevo motivo `COMPANIA_INACTIVA`) sin evaluar el resto. Y se **amplía el paso 6** —el antiguo paso 5, que
+  ya re-valida dinámicamente la compañía de pertenencia vigente de la persona para determinar la legitimidad
+  del contexto operativo (RF-061)— para exigir además que esa compañía de pertenencia tenga
+  `Estado = ACTIVO`; sin ello, `DENEGADO` (mismo motivo `COMPANIA_INACTIVA`) sin evaluar el resto. La
+  verificación de la Principal se numera como paso propio porque es un corte independiente y barato; la de la
+  compañía de pertenencia se pliega en el paso que ya la resuelve, para no calcularla dos veces. Ambos
   casos comparten un único valor de `MotivoDenegacion` (`COMPANIA_INACTIVA`), consistente con el patrón ya
   establecido por `SIN_CONTEXTO_OPERATIVO_VIGENTE`/`SIN_CREDENCIAL_VIGENTE` (varias causas subyacentes, un
   solo código, detalle en texto libre si se expone vía `ProblemDetails`). Ningún campo, entidad ni migración
@@ -1371,8 +1425,9 @@ AsignaciónPersonaCompañía")
   `IRelojEmpresarial` (`DiaSemanaLocal(instanteUtc)`, `HoraLocal(instanteUtc)`) se redefine para recibir
   además la Compañía Principal cuya zona debe resolverse (p. ej. `DiaSemanaLocal(instanteUtc, companiaPrincipalId)`),
   reemplazando el `DateTimeZone` único construido una vez en el constructor de `RelojEmpresarial` desde
-  `IOptions<ZonaHorariaOptions>`. `EvaluadorDeAcceso` (paso de bloque horario, hoy paso 12, futuro paso 13 tras
-  la inserción de D4) pasa la Compañía Principal propietaria del área determinada en el paso 4.
+  `IOptions<ZonaHorariaOptions>`. `EvaluadorDeAcceso` (paso de bloque horario, **paso 13** en la numeración
+  vigente de 15 pasos; era el 12 antes de la inserción del paso 5 por D4) pasa la Compañía Principal
+  propietaria del área determinada en el paso 4.
   `IRelojSistema` (misma clase, solo `UtcNow`) no cambia. La configuración global existente
   (`ZonaHoraria:TimeZoneId`) se conserva como **zona de repaldo**, usada únicamente para entidades cuya
   vigencia (RF-016) no es resoluble a una única Compañía Principal: `AsignaciónPersonaCompañía` cuando
