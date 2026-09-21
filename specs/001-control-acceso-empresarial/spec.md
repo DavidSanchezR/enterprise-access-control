@@ -42,6 +42,16 @@ historial de credenciales/fotocheck.
 
 ## Clarifications
 
+> **Nomenclatura — leer antes de esta sección**: las etiquetas `D1`–`D9` (sin guion) identifican las
+> **decisiones de negocio** del cierre de Etapa 1, provenientes de la matriz de 16 preguntas, y son las que
+> se registran y desarrollan en este documento. Las etiquetas `D-1`, `D-2`, `D-3`, `D-4` y `D-5` (con guion)
+> que aparecen en este documento y en artefactos posteriores —`research.md` §34, `plan.md`, `quickstart.md`
+> §8 y `tasks.md`— identifican las **desviaciones de implementación** detectadas al terminar T169–T228 y
+> auditadas con `/speckit-analyze`. La coincidencia de letra es accidental y los contenidos no se
+> corresponden (p. ej. `D4` = inactivación de compañía; `D-4` = búsqueda server-side de usuarios). Una
+> etiqueta con guion NUNCA renumera ni sustituye a una decisión `D1`–`D9`: la trazabilidad histórica de ambas
+> series se conserva intacta y por separado.
+
 ### Session 2026-09-14
 
 - Q: ¿Una persona puede pertenecer activamente a más de una compañía al mismo tiempo, o solo a una compañía a la vez? → A: Una sola compañía activa a la vez (histórico secuencial, sin solapamiento). **[ÁMBITO ACLARADO — ver Sesión 2026-09-14 (corrección Modelo de Cardinalidad Definitivo): esta respuesta limita exclusivamente la relación laboral/contractual de pertenencia (`AsignaciónPersonaCompañía`, RF-014); NO limita, ni por analogía ni por extensión, el número de `ContextoOperativoPersonaPrincipal` vigentes simultáneos de la persona (RF-052), que se rige por su propia regla de cardinalidad independiente.]**
@@ -1249,9 +1259,17 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   permite para asociaciones futuras; (e) NUNCA puede usarse para acortar `FechaHoraFin` ni para modificarla
   hacia una fecha anterior — esa operación sigue siendo exclusiva de la cascada de cese/reemplazo; (f) queda
   registrada mediante los mecanismos de auditoría ya existentes (`UpdatedAt`/`UpdatedById`, RF-026/RF-027),
-  sin necesitar un campo o entidad nueva. *(Nuevo — Sesión 2026-09-14, "renovación de
+  sin necesitar un campo o entidad nueva. (g) **Clasificación del rechazo, normativa y única**: intentar
+  renovar con una fecha que no sea estrictamente posterior a la vigente, o renovar algo que ya no está
+  vigente, NO son errores de validación de entrada sino **conflictos con el estado actual del recurso**: la
+  petición está bien formada y el rechazo depende de contra qué se compara. Esta clasificación es la misma
+  para toda entidad que herede estas reglas de renovación —incluida `AsignaciónRolAdministrativo` por
+  RF-075—, de modo que un mismo código de negocio no puede corresponder a categorías distintas según la
+  entidad; la traducción de cada categoría a un código de estado HTTP concreto vive en `contracts/`, que es
+  su fuente normativa. *(Nuevo — Sesión 2026-09-14, "renovación de
   AsignaciónPersonaCompañía", cierra Decisión Pendiente #9; punto (a) ampliado en la Sesión "cierre Decisión
-  Pendiente #10" con la exigencia de vigencia dinámica.)*
+  Pendiente #10" con la exigencia de vigencia dinámica; punto (g) añadido en la Sesión 2026-09-21 al cerrar
+  los hallazgos documentales del gate — documenta la clasificación ya vigente, sin alterarla.)*
 - RF-074: La administración de usuarios DEBE controlarse mediante un catálogo **cerrado** de roles
   administrativos con exactamente dos valores: `GLOBAL_ADMINISTRATOR` (alcance GLOBAL sobre todo el sistema)
   y `COMPANY_ADMINISTRATOR` (alcance limitado a una compañía específica). Incorporar un rol administrativo
@@ -1274,9 +1292,15 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   `COMPANY_ADMINISTRATOR` vigentes simultáneamente cuando correspondan a compañías distintas.
   `GLOBAL_ADMINISTRATOR` queda fuera de esa restricción de solapamiento (no tiene compañía asociada) y PUEDEN
   coexistir varios usuarios con ese rol simultáneamente. La extensión de la vigencia de una asignación DEBE
-  seguir las reglas de renovación ya establecidas en RF-073: solo hacia una fecha posterior y solo mientras la
-  asignación siga vigente dinámicamente; una asignación `FINALIZADA`, o una vigente cuya `FechaHoraFin` ya
-  expiró dinámicamente, NO es renovable en ningún caso y exige una asignación nueva. La renovación NUNCA
+  seguir las reglas de renovación ya establecidas en RF-073, con una diferencia de modelo que debe hacerse
+  explícita: `AsignaciónRolAdministrativo` **no tiene campo `Estado`** —a diferencia de
+  `AsignaciónPersonaCompañía`, donde RF-073 sí puede distinguir `ACTIVA` de `FINALIZADA`—, de modo que aquí la
+  renovabilidad se determina **exclusivamente por la vigencia temporal**: una asignación es renovable solo
+  mientras `FechaHoraInicio <= ahora < FechaHoraFin` en el instante de renovar, y la nueva `FechaHoraFin` DEBE
+  ser estrictamente posterior a la ya declarada. Una asignación cuya vigencia ya expiró —incluida aquella que
+  se cerró anticipadamente fijando su `FechaHoraFin` al instante de la finalización— NO es renovable en ningún
+  caso y exige una asignación nueva: la renovación nunca puentea retroactivamente un intervalo en el que el
+  usuario no tuvo autorización. La renovación NUNCA
   modifica `Rol` ni `CompañíaId` de la asignación existente — para cambiar cualquiera de los dos se finaliza la
   asignación y se crea una distinta (RF-074) — y DEBE quedar expuesta como una operación administrativa propia,
   análoga a la ya existente para `AsignaciónPersonaCompañía` (RF-073), sujeta a las mismas restricciones de
@@ -1294,18 +1318,48 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 - RF-077: El alcance efectivo de un usuario autenticado DEBE resolverse a partir de sus
   `AsignaciónRolAdministrativo` vigentes: con una asignación `GLOBAL_ADMINISTRATOR` vigente, el alcance
   comprende todas las compañías; en caso contrario, comprende exactamente las compañías de sus asignaciones
-  `COMPANY_ADMINISTRATOR` vigentes. Toda operación DEBE verificar además que el **recurso concreto**
+  `COMPANY_ADMINISTRATOR` vigentes. La autorización se evalúa siempre sobre las asignaciones **vigentes del
+  solicitante** en el instante de la operación, nunca sobre las del recurso destino ni sobre asignaciones ya
+  expiradas. Un usuario autenticado que **no tenga ninguna asignación vigente** —porque nunca tuvo, porque
+  todas expiraron o porque todas fueron finalizadas— NO tiene alcance alguno: no se le concede acceso parcial
+  ni de solo lectura, y toda operación administrativa protegida DEBE rechazarse por denegación por defecto
+  (Constitución, Principio I). Ese rechazo es distinto del `404` por recurso fuera de alcance que se describe
+  más abajo: aquí el solicitante no está autorizado a operar en absoluto, con independencia del recurso, de
+  modo que no hay existencia de recurso que ocultar. Toda operación DEBE verificar además que el **recurso concreto**
   pertenezca a ese alcance, no solo que el alcance no esté vacío; conocer o poseer el identificador de un
   recurso NO otorga autorización sobre él. Para una `Persona` —que no tiene una única compañía propietaria—
   el recurso se considera dentro del alcance si su compañía de pertenencia vigente está en el alcance del
   usuario **o** si tiene al menos un `ContextoOperativoPersonaPrincipal` vigente con una Compañía Principal
   del alcance del usuario. Las operaciones de **lectura** sobre recursos fuera del alcance DEBEN responder
   `404`, sin revelar la existencia del recurso; las de **escritura** DEBEN respetar el contrato específico de
-  cada endpoint, sin asumir `404` automáticamente. Cualquier operación de **búsqueda o filtrado** sobre un
+  cada endpoint, sin asumir `404` automáticamente. Toda operación denegada por alcance —sea lectura o
+  escritura— DEBE ser **libre de efectos**: la verificación de alcance precede a cualquier escritura, de modo
+  que el recurso ajeno y todo lo que dependa de él quedan exactamente como estaban. Esto es especialmente
+  exigible en las operaciones que, de haberse autorizado, habrían disparado lógica en cascada: una denegación
+  que igualmente revocara, cerrara o modificara registros dependientes sería peor que un rechazo explícito,
+  porque dejaría un efecto irreversible detrás de una respuesta que afirma que el recurso no existe. Cualquier operación de **búsqueda o filtrado** sobre un
   listado —incluida la búsqueda de usuarios de UX-22— DEBE aplicarse sobre el conjunto ya restringido al
   alcance del actor, nunca sobre un universo mayor, y DEBE evaluarse **antes** de la paginación: el resultado
   paginado refleja los elementos que coinciden con el criterio de búsqueda dentro de ese alcance, no solo los
-  de la página actualmente cargada en el cliente. *(Nuevo — Sesión 2026-09-20, D1 y D3; precisa RF-005,
+  de la página actualmente cargada en el cliente. Esa composición es normativa y su orden no es
+  intercambiable: **alcance → filtros → total → orden → página**. De ella se derivan cuatro reglas que DEBEN
+  cumplirse y son objetivamente verificables:
+  (a) **criterio de coincidencia** — la búsqueda de `Usuario` se resuelve por **subcadena sobre el correo**
+  (coincidencia parcial en cualquier posición, no solo por prefijo), con el término de búsqueda recortado de
+  espacios al inicio y al final; la comparación la resuelve el motor de base de datos y su sensibilidad a
+  mayúsculas y acentos es la de la colación de la base, que la aplicación no normaliza. No existe búsqueda
+  por nombre, fonética ni aproximada;
+  (b) **combinación de filtros** — cuando se proporciona más de un filtro, todos DEBEN cumplirse
+  conjuntamente (AND), nunca de forma alternativa, y todos se aplican antes de calcular el total y de paginar;
+  (c) **ordenamiento** — el listado de usuarios se ordena por **correo ascendente**, y el orden se aplica
+  después de los filtros y **antes** de la paginación, de modo que las páginas de un mismo resultado son
+  disjuntas y reproducibles;
+  (d) **ausencia de coincidencias** — una búsqueda o filtrado que no encuentra elementos DEBE responder con
+  una **colección vacía** y un total de cero, conservando la estructura de página válida. NUNCA DEBE
+  responder `404`: el `404` de este requisito significa exclusivamente "recurso individual fuera de alcance o
+  inexistente", de modo que un filtro sin resultados y un recurso ajeno son situaciones distintas y no deben
+  producir la misma respuesta. Esto es además lo que impide que la búsqueda sirva como oráculo de
+  enumeración: un correo ajeno y un correo inexistente devuelven exactamente el mismo resultado vacío. *(Nuevo — Sesión 2026-09-20, D1 y D3; precisa RF-005,
   RF-049 y RF-060 sin reemplazarlos. Semántica de búsqueda/paginación aclarada explícitamente — Sesión
   2026-09-20, cierre de la desviación D-4.)*
 - RF-078: El sistema DEBE crear automáticamente un primer usuario con rol `GLOBAL_ADMINISTRATOR` durante el
@@ -1486,8 +1540,19 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   operación, listar ni modificar usuarios de otra compañía, asignarse a sí mismo un alcance mayor, ni crear
   una asignación `GLOBAL_ADMINISTRATOR`; sí puede crear otra asignación `COMPANY_ADMINISTRATOR` para su propia
   compañía (RF-074, RF-076).
-- CS-037: Una lectura de cualquier recurso fuera del alcance del usuario autenticado responde `404` y no
-  revela la existencia del recurso, incluso cuando el identificador es correcto y conocido (RF-077).
+- CS-037: Una lectura fuera del alcance del usuario autenticado responde `404` y no revela la existencia del
+  recurso, incluso cuando el identificador es correcto y conocido (RF-077). El criterio se considera
+  satisfecho cuando esa propiedad queda verificada sobre los **siete tipos de recurso** que el sistema expone
+  con identificador propio: (1) `Usuario`, (2) `Compañía`, (3) `UnidadOrganizativa`, (4) `ÁreaAcceso`,
+  (5) `Persona`, (6) `ContextoOperativoPersonaPrincipal` y (7) `AsignaciónCredencial`. La enumeración es
+  **cerrada y exhaustiva**: "fuera del alcance" no admite lectura como cobertura parcial o discrecional, y
+  cualquier tipo de recurso nuevo que se exponga con identificador propio queda sujeto a este mismo criterio
+  desde su incorporación. Las **operaciones y proyecciones que no tienen recurso propio** —el estado efectivo
+  de una persona, que es una proyección suya, y la cascada de revocación, que es un efecto interno de
+  finalizar una pertenencia— no constituyen tipos de recurso adicionales: heredan el alcance del recurso a
+  través del cual se invocan y DEBEN aplicar el mismo control server-side, de modo que tampoco son
+  alcanzables cuando ese recurso está fuera del alcance del solicitante. *(Enumeración explícita — Sesión
+  2026-09-21; precisa el criterio sin ampliarlo, conforme a la cobertura verificada en T237, T238 y T242.)*
 - CS-038: Un despliegue desde cero, sin ningún usuario en la base de datos, queda operable tras el primer
   arranque: existe exactamente un `GLOBAL_ADMINISTRATOR` creado automáticamente, con cambio de contraseña
   obligatorio pendiente; reiniciar la aplicación no crea un segundo (RF-078).

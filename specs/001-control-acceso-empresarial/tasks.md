@@ -1320,6 +1320,25 @@ para repetirlas; solo se incluye documentación cuando es consecuencia directa d
 
 ---
 
+## Trazabilidad de requisitos transversales (bloque histórico T001 a T168)
+
+Estos requisitos son **transversales**: ninguna tarea los cita por su identificador porque no existe una
+tarea que "los implemente" de forma aislada — se satisfacen en la estructura misma del sistema. Su cobertura
+era hasta ahora solo inferible, lo que no es aceptable para un criterio de cierre. Esta tabla la hace
+rastreable **sin modificar ninguna tarea histórica**: cita tareas ya existentes y ya completadas, y no
+atribuye a ninguna una cobertura que no entregue.
+
+| Requisito | Dónde queda cubierto | Tareas existentes |
+|---|---|---|
+| RF-002 (estados `ACTIVO`/`INACTIVO`/`BLOQUEADO` del usuario) | El campo `Estado` forma parte de la entidad `Usuario`; el login los distingue y la administración permite desbloquear | T032, T028, T039, T042 |
+| RF-003 (historial de contraseñas; nunca en texto plano) | Entidad `HistorialContraseña` dedicada y `PasswordHash` en `Usuario`; la autenticación valida contra el hash | T032, T033, T036 |
+| RF-028 (campos de negocio obligatorios salvo declaración explícita) | Validadores FluentValidation por cada petición de escritura, más la obligatoriedad declarada en el modelo de datos | T040, T078 |
+| RF-029 (manejo de fecha **y** hora) | Todos los instantes se persisten en UTC con precisión de hora y se convierten solo al presentarlos; el reloj empresarial resuelve la zona | T018, T211 |
+| RF-034 (toda operación protegida exige autorización) | Política `CompaniaScope` aplicada a los controladores, alimentada por el token; redefinida para RBAC en el bloque siguiente | T014, T037, T183, T184 |
+| RF-040 (contrato de API por grupo funcional) | Documento OpenAPI generado y una prueba de contrato por cada grupo de `contracts/` | T024, T026, T027, T043, T044, T063, T071, T080, T081, T117, T126, T220, T235 |
+
+---
+
 ## Trazabilidad RF/CS → tareas (bloque T169 a T228)
 
 | Requisito | Tareas |
@@ -1333,7 +1352,7 @@ para repetirlas; solo se incluye documentación cuando es consecuencia directa d
 | RF-080 (zona horaria por Principal) | T174, T179, T180, T181, T196, T197, T211, T218, T220 |
 | RF-081 (dependencias que bloquean el cambio de tipo) | T176, T177, T196, T219, T220 |
 | CS-036 | T214 |
-| CS-037 | T215 |
+| CS-037 | T215 (parcial: solo el recurso `Usuario`); cobertura efectiva en **T237, T238 y T242** |
 | CS-038 | T216 |
 | CS-039 | T217 |
 | CS-040 | T218 |
@@ -1362,6 +1381,11 @@ para repetirlas; solo se incluye documentación cuando es consecuencia directa d
   mecanismos de prueba/seed correspondientes.
 - **Documentación**: solo se incluyen T193 y T227, ambas consecuencia directa de implementar tareas de este
   bloque. Las correcciones documentales I4 a I8 y las dos posteriores ya se aplicaron y no se repiten.
+- **Trazabilidad de CS-037 corregida (2026-09-21)**: la fila de la tabla anterior atribuía CS-037 a T215 sin
+  matizar. T215 se ejecutó y su registro histórico **no se modifica**, pero la verificación que entregó
+  alcanza únicamente al recurso `Usuario`; los otros seis recursos que CS-037 enumera quedaron cubiertos por
+  T237, T238 y T242. La fila se anota para que refleje la cobertura efectiva sin reescribir la tarea ni
+  borrar el registro de lo que sí hizo.
 
 ---
 

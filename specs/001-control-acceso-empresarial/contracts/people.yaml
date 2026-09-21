@@ -253,9 +253,13 @@ paths:
         "409":
           description: >
             La asignación no está en estado ACTIVA (una pertenencia FINALIZADA no es renovable — requiere
-            una nueva AsignacionCompania); o ya expiró dinámicamente aunque su estado siga ACTIVA (fecha
-            actual > fechaHoraFin ya declarada — tampoco renovable, requiere una nueva AsignacionCompania);
-            o la fechaHoraFin indicada no es estrictamente posterior a la ya vigente (RF-073)
+            una nueva AsignacionCompania), o ya expiró dinámicamente aunque su estado siga ACTIVA (fecha
+            actual > fechaHoraFin ya declarada — tampoco renovable, requiere una nueva AsignacionCompania):
+            codigo = PERTENENCIA_NO_RENOVABLE. O la fechaHoraFin indicada no es estrictamente posterior a la
+            ya vigente: codigo = RENOVACION_NO_POSTERIOR. Ambos son conflictos con el estado actual del
+            recurso, no errores de validación de entrada, y esa clasificación es la misma para toda entidad
+            que herede las reglas de renovación de RF-073 — incluida AsignacionRolAdministrativo en
+            users.yaml (RF-073 punto g, RF-075)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ProblemDetails" }

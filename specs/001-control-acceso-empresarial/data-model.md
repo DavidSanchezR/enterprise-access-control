@@ -215,9 +215,13 @@ puede tener varias asignaciones `COMPANY_ADMINISTRATOR` vigentes simultáneas si
 `GLOBAL_ADMINISTRATOR` queda **exento** de esta partición (no tiene `CompañíaId`); pueden coexistir varias
 asignaciones `GLOBAL_ADMINISTRATOR`, de uno o varios usuarios, sin restricción de solapamiento entre ellas.
 
-**Renovación**: sigue las mismas reglas ya establecidas para `AsignaciónPersonaCompañía` (RF-073): solo
-extiende `FechaHoraFin` hacia una fecha posterior, solo mientras la asignación siga vigente dinámicamente
-(`fecha actual <= FechaHoraFin` ya declarada) — nunca puentea un vacío temporal ya transcurrido. Es una
+**Renovación**: sigue las mismas reglas ya establecidas para `AsignaciónPersonaCompañía` (RF-073), con una
+diferencia de modelo: esta entidad **no tiene campo `Estado`** —la tabla de campos de arriba es completa—, así
+que la renovabilidad se determina únicamente por la vigencia temporal. Solo extiende `FechaHoraFin` hacia una
+fecha estrictamente posterior, y solo mientras `FechaHoraInicio <= ahora < FechaHoraFin` en el instante de
+renovar — nunca puentea un vacío temporal ya transcurrido. Finalizar una asignación consiste en fijar su
+`FechaHoraFin` al instante de la finalización; a partir de ese momento deja de ser renovable por la misma
+regla temporal, sin que exista ningún estado administrativo que lo declare. Es una
 **operación administrativa expuesta**, no solo una regla de dominio: `contracts/users.yaml`
 (`POST .../roles/{asignacionId}/renovar`, contraparte inversa de `/finalizar`), sujeta a las mismas
 restricciones de autorización que crear o finalizar la asignación (RF-076) y al mismo régimen de alcance y
