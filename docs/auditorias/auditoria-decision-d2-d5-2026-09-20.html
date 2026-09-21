@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditoría de decisión — D-2 a D-5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--success);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--success);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+
+  /* ---------- Fases ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage { min-width: 0; }
+  }
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .fase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .fase-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+  .fase-card .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fase-card h3 { font-size: 14px; }
+  .fase-card .rango { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--primary); }
+  .metrica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+  .metrica { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; }
+  .metrica .valor { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metrica .etiqueta { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .metrica.ok .valor { color: var(--success); }
+  .check-list { display: grid; gap: 8px; }
+  .check-item { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 10px; align-items: start; font-size: 14px; }
+  .check-item .tick { color: var(--success); font-weight: 700; }
+  .trace td:nth-child(2) { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+</style>
+<style>
+  /* Reutiliza el tono neutral del informe de D-1: esta auditoría no recomienda una alternativa
+     sobre las decisiones C, así que evita el borde verde de "veredicto". */
+  .pending {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--warning);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .pending-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .pending-head .status { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--warning); }
+
+  /* Clasificación A/B/C/D como chips de color distinto por letra. */
+  .clase {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 5px;
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 700;
+    flex: none;
+  }
+  .clase.a { background: var(--success-soft); color: var(--success); }
+  .clase.b { background: var(--info-soft); color: var(--primary); }
+  .clase.c { background: var(--warning-soft); color: var(--warning); }
+  .clase.d { background: var(--danger-soft); color: var(--danger); }
+
+  table.cons td:first-child, table.cons th:first-child { white-space: nowrap; }
+  table.cons td:nth-child(5) { text-align: center; }
+
+  /* Bloques de evidencia por desviación, dos columnas (normativa / implementación). */
+  .evid-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .evid-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; display: grid; gap: 10px; align-content: start;
+  }
+  .evid-card .evid-tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+  }
+  .evid-card ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; }
+  @media (max-width: 900px) { .evid-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .veredicto-linea {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--ground); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; font-size: 13.5px;
+  }
+  .veredicto-linea .clase { width: 26px; height: 26px; font-size: 14px; }
+
+  /* Alternativas de decisión, mismo patrón de dos columnas simétricas que D-1. */
+  .alt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .alt-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 18px 20px; display: grid; gap: 10px; align-content: start;
+  }
+  .alt-card .alt-tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+  }
+  .alt-card h3 { font-size: 15px; }
+  @media (max-width: 900px) { .alt-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  table.cierre td:nth-child(2) { text-align: center; white-space: nowrap; }
+</style>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Auditoría de decisión · Solo lectura · Sin ejecución de comandos Speckit</p>
+    <h1>Desviaciones D-2, D-3, D-4 y D-5</h1>
+    <div class="meta">
+      <span>Feature <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Rama <b class="mono">feature/baseline-decisions</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Origen <b class="mono">/speckit-implement</b> (T169–T228)</span>
+      <span>Estado <b>Ningún archivo modificado</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#tabla"><span>Σ</span><span>Tabla consolidada</span></a></li>
+      <li><a href="#d2"><span>D2</span><span>Scope control</span></a></li>
+      <li><a href="#d3"><span>D3</span><span>Orden de migración</span></a></li>
+      <li><a href="#d4"><span>D4</span><span>Búsqueda de usuarios</span></a></li>
+      <li><a href="#d5"><span>D5</span><span>Bootstrap password</span></a></li>
+      <li><a href="#decisiones"><span>?</span><span>Requieren decisión</span></a></li>
+      <li><a href="#cierre"><span>✓</span><span>Criterio de cierre</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ===================== TABLA CONSOLIDADA ===================== -->
+    <section id="tabla">
+      <div class="section-head"><span class="letter">Σ</span><h2>Tabla consolidada</h2></div>
+
+      <p class="prose">Cuatro desviaciones detectadas al finalizar <code>/speckit-implement</code> sobre
+      T169–T228, auditadas por separado. Dos se cierran sin más trabajo (<span class="clase a">A</span>),
+      una es exclusivamente de pruebas (<span class="clase d">D</span>, sin tocar código), y tres fragmentos
+      requieren una decisión explícita (<span class="clase c">C</span>) antes de continuar.</p>
+
+      <div class="table-wrap">
+        <table class="cons">
+          <thead>
+            <tr><th>ID</th><th>Hallazgo</th><th>Requisito</th><th>Estado real</th><th>Clase</th><th>¿Bloquea?</th><th>Acción</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">D-2</td>
+              <td>T186/T187 asumían "sin control de alcance"; el código ya delegaba y ahora es GLOBAL-aware</td>
+              <td>RF-077</td>
+              <td>Código correcto; 0 pruebas ejercitan GLOBAL_ADMINISTRATOR sobre estos 5 servicios</td>
+              <td><span class="clase d">D</span></td>
+              <td>No</td>
+              <td>Añadir pruebas GLOBAL vs. COMPANY</td>
+            </tr>
+            <tr>
+              <td class="id">D-3</td>
+              <td>Migración EF generada al final de T171/T172, tras el código</td>
+              <td>Ninguno (sin orden exigido)</td>
+              <td>Sin drift; 511/511 tests aplicándola contra SQL Server real</td>
+              <td><span class="clase a">A</span></td>
+              <td>No</td>
+              <td>Ninguna</td>
+            </tr>
+            <tr>
+              <td class="id">D-4</td>
+              <td>Búsqueda de usuarios es local a la página cargada</td>
+              <td>UX-22, §35 (sin RF)</td>
+              <td>Falla silenciosamente si el resultado está en otra página</td>
+              <td><span class="clase c">C</span></td>
+              <td>No, sola</td>
+              <td>Decisión: aceptar límite o ampliar contrato</td>
+            </tr>
+            <tr>
+              <td class="id">D-5a</td>
+              <td><code>docker-compose.yml</code> versiona un valor por defecto de la contraseña de arranque</td>
+              <td>RF-078</td>
+              <td>Nunca llega a producción ni a código fuente; sí a un archivo versionado</td>
+              <td><span class="clase c">C</span></td>
+              <td>No, bajo riesgo</td>
+              <td>Decisión: endurecer o enmendar RF-078</td>
+            </tr>
+            <tr>
+              <td class="id">D-5b</td>
+              <td><code>quickstart.md</code>/<code>README.md</code> afirman "nunca un valor versionado" — hoy es falso</td>
+              <td>Consistencia documental</td>
+              <td>Contradicción directa con D-5a</td>
+              <td><span class="clase b">B</span></td>
+              <td>No</td>
+              <td>Corregir tras resolver D-5a</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== D-2 ===================== -->
+    <section id="d2">
+      <div class="section-head"><span class="letter">D2</span><h2>T186/T187 — Scope control</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="clase d">D</span>
+        <span>Solo pruebas — <strong>el código no requiere ningún cambio</strong>.</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia normativa</span>
+          <ul>
+            <li><b>RF-077</b> (spec.md): el alcance efectivo se resuelve por asignaciones vigentes;
+            <code>GLOBAL_ADMINISTRATOR</code> alcanza todas las compañías; toda operación debe verificar el
+            <b>recurso concreto</b>, no solo que el alcance no esté vacío.</li>
+            <li>Texto original de T186/T187 (tasks.md): «Aplicar Resource Ownership… hoy sin ningún control
+            de alcance».</li>
+          </ul>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia de implementación</span>
+          <ul>
+            <li><code>UnidadOrganizativaService</code>: <b>6/6</b> métodos públicos resuelven vía
+            <code>companias.ObtenerEnAlcanceAsync</code>.</li>
+            <li><code>AreaAccesoService</code>: <b>8/8</b> métodos vía el mismo helper.</li>
+            <li><code>AsignacionUnidadOrganizativaService</code>: <b>2/2</b> vía
+            <code>PersonaService.ExigirAlcanceHistoricoAsync</code>.</li>
+            <li><code>EstadoEfectivoService</code>: <b>3/3</b>, igual.</li>
+            <li><code>RevocacionService</code>: sin alcance propio — recibe una entidad ya cargada; su único
+            invocador (<code>HistorialPersonaService</code>) filtra en sus <b>4/4</b> métodos antes de
+            llegar a él.</li>
+            <li>Cadena verificada: <code>EstaEnAlcance</code> → <code>EsGlobal || CompaniaIds.Contains(id)</code>;
+            <code>ExigirAlcanceHistoricoAsync</code> tiene <code>if (alcance.EsGlobal) return;</code> explícito.</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="prose"><strong>Diferencia.</strong> La premisa de las tareas («hoy sin ningún control») era
+      imprecisa: el control existía pero no era consciente del alcance GLOBAL. Lo implementado corrige
+      exactamente eso, con una arquitectura distinta a la literal de la tarea —delegación en un punto único
+      en vez de comprobación duplicada en cada servicio.</p>
+
+      <p class="prose"><strong>Riesgo.</strong> El código es correcto por análisis estático, pero
+      <b>ningún test de integración ejercita un <code>GLOBAL_ADMINISTRATOR</code></b> contra estos 5
+      servicios. Los tests de aislamiento existentes (<code>AislamientoMultiPrincipalTests</code>,
+      <code>AislamientoAreasMultiPrincipalTests</code>, <code>AislamientoPertenenciasTests</code>) usan
+      exclusivamente clientes <code>COMPANY</code>-scoped. Vacío de regresión real.</p>
+
+      <p class="prose"><strong>Acción exacta.</strong> Añadir pruebas de integración nuevas: un
+      <code>GLOBAL_ADMINISTRATOR</code> puede operar sobre unidades y áreas de <b>dos</b> Principales
+      distintas sin restricción; un <code>COMPANY_ADMINISTRATOR</code> de la Principal A recibe
+      <code>404</code> al intentar lo mismo sobre la Principal B, en los 5 servicios.</p>
+    </section>
+
+    <!-- ===================== D-3 ===================== -->
+    <section id="d3">
+      <div class="section-head"><span class="letter">D3</span><h2>T171/T172 — Orden de generación de migración</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="clase a">A</span>
+        <span>Implementación válida — <strong>sin cambios</strong>.</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia normativa</span>
+          <p>T171/T172 especifican <b>contenido</b> (tabla, <code>CHECK</code>, índice clúster, trigger) —
+          ningún texto exige un orden temporal de generación respecto a otras tareas.</p>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia de implementación</span>
+          <ul>
+            <li>Migración leída completa: tabla <code>AsignacionRolAdministrativo</code> con
+            <code>CHECK CK_..._RolCompania</code>, índice clúster
+            <code>IX_..._CreatedAt_Clustered</code>, trigger
+            <code>trg_AsignacionRolAdministrativo_NoSolapamiento</code> — los tres elementos exigidos,
+            verbatim.</li>
+            <li><code>dotnet ef migrations has-pending-model-changes</code> →
+            <b>«No changes have been made to the model since the last migration.»</b> Cero drift.</li>
+            <li><code>Down()</code> revierte limpiamente, sin residuos.</li>
+            <li>511/511 tests de integración pasaron aplicando esta migración contra SQL Server real.</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="prose"><strong>Diferencia.</strong> Ninguna funcional. El orden —código primero, migración
+      al final— es una necesidad técnica de <code>dotnet ef migrations add</code> (exige que la solución
+      compile con el modelo final) y no deja rastro observable en el resultado.</p>
+
+      <p class="prose"><strong>Riesgo.</strong> Ninguno detectado. <strong>Acción exacta.</strong> Ninguna —
+      queda como nota histórica.</p>
+    </section>
+
+    <!-- ===================== D-4 ===================== -->
+    <section id="d4">
+      <div class="section-head"><span class="letter">D4</span><h2>Búsqueda por email en usuarios</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="clase c">C</span>
+        <span>Requiere decisión explícita — ningún RF viola, pero la brecha es real.</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia normativa</span>
+          <ul>
+            <li><code>contracts/users.yaml</code>, <code>GET /api/usuarios</code>: parámetros son
+            <code>pagina</code>, <code>tamañoPagina</code>, <code>estado</code>. No existe parámetro de
+            búsqueda.</li>
+            <li><code>ux-ui.md</code> §35: «búsqueda por correo» — sin especificar client/server-side ni
+            alcance frente a paginación.</li>
+            <li>UX-22: «Buscar y filtrar usuarios dentro del alcance autorizado» — «alcance autorizado»
+            cualifica a quién se puede ver, no cuántas páginas cubre la búsqueda.</li>
+            <li><b>Ningún RF</b> gobierna la búsqueda de <code>Usuario</code> (RF-035 rige
+            <code>Persona</code>, entidad distinta).</li>
+          </ul>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia de implementación</span>
+          <p><code>UsuariosPage.tsx</code> filtra con <code>.filter()</code> sobre
+          <code>consulta.data?.items</code> — la página ya recibida, no el universo completo.</p>
+          <p class="muted">Demostrado con datos reales: «Página 1 de 2 · 24 usuarios en su alcance» en el
+          entorno E2E.</p>
+        </div>
+      </div>
+
+      <p class="prose"><strong>Diferencia.</strong> Con más resultados que una página, buscar un correo que
+      está en la página 2 mientras se ve la página 1 devuelve «sin resultados» sin indicarlo.</p>
+
+      <p class="prose"><strong>Riesgo.</strong> No es un problema de aislamiento — el filtro nunca opera
+      sobre datos fuera de alcance (el servidor ya restringió la página antes de que el filtro local se
+      aplique). El riesgo es de <b>completitud funcional</b>: el administrador puede concluir erróneamente
+      que un usuario no existe.</p>
+
+      <p class="prose"><strong>Acción exacta.</strong> No ejecutable sin decisión —
+      <a href="#decisiones">ver Decisión 1</a>.</p>
+    </section>
+
+    <!-- ===================== D-5 ===================== -->
+    <section id="d5">
+      <div class="section-head"><span class="letter">D5</span><h2>Bootstrap AdminPassword</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="clase c">C</span>
+        <span>D-5a requiere decisión · <span class="clase b" style="width:20px;height:20px;font-size:11px;">B</span> D-5b se corrige después</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia normativa</span>
+          <p><b>RF-078</b>: la contraseña inicial «NO DEBE estar incrustada… en archivos de configuración
+          <b>versionados</b>… ni en el repositorio».</p>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Evidencia de implementación</span>
+          <ul>
+            <li><code>docker-compose.prod.yml</code>: <code>${BOOTSTRAP_ADMIN_PASSWORD:?Defina...}</code> —
+            sin valor por defecto; producción no arranca sin proveerla. <span class="pill ok">Verificado</span></li>
+            <li>Grep exhaustivo confirma <code>Dev-Bootstrap1</code> en un único lugar:
+            <code>docker-compose.yml</code>. Ninguna ocurrencia en código fuente.
+            <span class="pill ok">Verificado</span></li>
+            <li><code>docker-compose.yml</code> — archivo <b>versionado y rastreado</b>, con valor de
+            contraseña por defecto.</li>
+            <li><code>quickstart.md</code> y <code>README.md</code> afirman ambos «nunca un valor
+            versionado en el repositorio».</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="prose"><strong>Diferencia (dos partes).</strong></p>
+      <ul class="tight">
+        <li><b>D-5a</b>: conflicto literal entre RF-078 y <code>docker-compose.yml</code>. Hay precedente en
+        el mismo archivo (<code>MSSQL_SA_PASSWORD</code>, <code>JWT_SIGNING_KEY</code>), pero ningún RF los
+        sujeta a esta prohibición explícita — RF-078 es más estricto para esta contraseña específica.</li>
+        <li><b>D-5b</b>: la documentación afirma algo hoy <b>falso</b>, independientemente de cómo se
+        resuelva D-5a.</li>
+      </ul>
+
+      <p class="prose"><strong>Riesgo.</strong> Bajo en explotación real (nunca llega a producción, nunca en
+      código fuente), pero no nulo: cualquiera con acceso al repositorio conoce la contraseña de un
+      <code>GLOBAL_ADMINISTRATOR</code> en cualquier entorno que reutilice <code>docker-compose.yml</code>
+      sin sobreescribir la variable.</p>
+
+      <p class="prose"><strong>Acción exacta.</strong> No ejecutable sin resolver D-5a primero —
+      <a href="#decisiones">ver Decisión 2</a>.</p>
+    </section>
+
+    <!-- ===================== DECISIONES ===================== -->
+    <section id="decisiones">
+      <div class="section-head"><span class="letter">?</span><h2>Decisiones que requieren intervención del usuario</h2></div>
+
+      <p class="prose">Solo las que realmente no pueden resolverse mediante los requisitos ya aprobados.</p>
+
+      <h3>Decisión 1 — D-4: ¿la búsqueda debe cubrir todo el alcance autorizado o solo la página visible?</h3>
+
+      <div class="alt-grid">
+        <div class="alt-card">
+          <span class="alt-tag">Opción A — Aceptar como está</span>
+          <p>Documentar que la búsqueda es por página.</p>
+          <p class="muted"><b>Consecuencia:</b> sin trabajo adicional; se matiza UX-22/§35.</p>
+          <p class="muted"><b>Cambia:</b> <code>ux-ui.md</code>; opcional aviso visual en
+          <code>UsuariosPage.tsx</code>.</p>
+        </div>
+        <div class="alt-card">
+          <span class="alt-tag">Opción B — Ampliar a server-side</span>
+          <p>Añadir parámetro <code>correo</code>/<code>texto</code> a <code>GET /api/usuarios</code>.</p>
+          <p class="muted"><b>Consecuencia:</b> requiere <code>/speckit-plan</code> +
+          <code>/speckit-implement</code>.</p>
+          <p class="muted"><b>Cambia:</b> <code>contracts/users.yaml</code>,
+          <code>UsuarioService.ListarAsync</code>, <code>UsuariosController.cs</code>, <code>api.ts</code>,
+          pruebas nuevas.</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 8px;">Decisión 2 — D-5a: ¿se permite un valor por defecto en <code>docker-compose.yml</code> para desarrollo?</h3>
+
+      <div class="alt-grid">
+        <div class="alt-card">
+          <span class="alt-tag">Opción A — Endurecer</span>
+          <p>Quitar el default, exigir <code>.env</code> también en desarrollo (<code>:?</code>).</p>
+          <p class="muted"><b>Consecuencia:</b> RF-078 se cumple al pie de la letra.</p>
+          <p class="muted"><b>Cambia:</b> <code>docker-compose.yml</code>, pasos de arranque local.</p>
+        </div>
+        <div class="alt-card">
+          <span class="alt-tag">Opción B — Enmendar RF-078</span>
+          <p>Excepción explícita y acotada, mismo patrón que <code>MAX_VALIDITY_DATE</code>.</p>
+          <p class="muted"><b>Consecuencia:</b> el valor por defecto permanece; el requisito queda alineado.</p>
+          <p class="muted"><b>Cambia:</b> <code>spec.md</code> (RF-078, vía <code>/speckit-clarify</code>).</p>
+        </div>
+      </div>
+
+      <p class="prose muted">Cualquiera de las dos opciones de la Decisión 2 resuelve D-5b automáticamente:
+      el texto correcto de <code>quickstart.md</code>/<code>README.md</code> se deriva mecánicamente de la
+      que se elija.</p>
+    </section>
+
+    <!-- ===================== CIERRE ===================== -->
+    <section id="cierre">
+      <div class="section-head"><span class="letter">✓</span><h2>Criterio de cierre</h2></div>
+
+      <div class="table-wrap">
+        <table class="cierre">
+          <thead>
+            <tr><th>ID</th><th>¿Cierra sin Speckit?</th><th>Comando necesario si no</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">D-2</td>
+              <td><span class="pill warn">No</span></td>
+              <td>Falta cobertura de pruebas: <code>/speckit-tasks</code> (ampliar T186/T187 o T214/T215) →
+              <code>/speckit-implement</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">D-3</td>
+              <td><span class="pill ok">Sí</span></td>
+              <td>Tal cual — sin comando adicional.</td>
+            </tr>
+            <tr>
+              <td class="id">D-4</td>
+              <td><span class="pill warn">No</span></td>
+              <td>Depende de la Decisión 1. A: <code>/speckit-clarify</code> basta. B:
+              <code>/speckit-clarify</code> (opcional) → <code>/speckit-plan</code> →
+              <code>/speckit-tasks</code> → <code>/speckit-implement</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">D-5</td>
+              <td><span class="pill warn">No</span></td>
+              <td>Depende de la Decisión 2. A: edición directa, sin Speckit formal. B:
+              <code>/speckit-clarify</code> basta.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Informe generado el 20/09/2026 como auditoría de decisión sobre las desviaciones D-2 a D-5, detectadas
+      al finalizar <code>/speckit-implement</code> sobre T169 a T228. Análisis de solo lectura: ningún
+      archivo del repositorio fue modificado, no se ejecutó ningún comando Speckit adicional y no hubo
+      commits ni push. D-1 no se mezcla con este análisis — ya fue decidida por separado. Documento local:
+      los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

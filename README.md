@@ -412,6 +412,24 @@ Las decisiones de negocio que bloqueaban el baseline se cerraron el 2026-09-20, 
   compañía, #7 prioridad de Historia 9) quedaron **todas cerradas**; ninguna requirió trabajo técnico salvo
   #6, absorbida por RF-079.
 
+Las tres desviaciones detectadas al terminar ese bloque se cerraron después, en la misma fecha (T229 a T242):
+
+- **Renovación de una asignación de rol administrativo**, expuesta como
+  `POST /api/usuarios/{id}/roles/{asignacionId}/renovar` → `204`, con cuerpo `{ "fechaHoraFin": … }`. Extiende
+  la vigencia sin crear un registro nuevo y sin tocar rol, compañía ni fecha de inicio; exige que la nueva
+  fecha sea estrictamente posterior y que la asignación siga vigente. Operable desde el detalle de usuario con
+  confirmación explícita, igual que finalizar (RF-075, RF-076, RF-077; UX-20).
+- **Búsqueda de usuarios en el servidor**: `GET /api/usuarios` acepta `texto`, que filtra por correo sobre
+  **todo el conjunto dentro del alcance autorizado y antes de paginar**. Un usuario que caería en la página 3
+  se encuentra desde la primera. Sin coincidencias responde `200` con una página vacía, nunca `404`: un correo
+  ajeno y uno inexistente son indistinguibles, para que la búsqueda no sirva como oráculo de enumeración
+  (RF-077, UX-22).
+- **Aislamiento verificado en los siete recursos de CS-037** —usuarios, compañías, unidades organizativas,
+  áreas de acceso, personas, contextos operativos y credenciales—, más el estado efectivo y la cascada de
+  revocación. En cada uno: un `COMPANY_ADMINISTRATOR` de otra compañía recibe `404` aunque conozca el
+  identificador real del recurso, y un `GLOBAL_ADMINISTRATOR` opera sobre dos Compañías Principales distintas
+  sin enumerarlas en su token.
+
 **3. Correcciones de la auditoría ya aplicadas**
 
 - **Crítico (F-01), corregido**: `UsuarioService` aplica Resource Ownership en todas sus operaciones. Un

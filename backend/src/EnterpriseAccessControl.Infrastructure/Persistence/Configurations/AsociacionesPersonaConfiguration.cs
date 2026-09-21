@@ -12,6 +12,7 @@ internal static class Triggers
     public const string AsignacionUnidadOrganizativa =
         "trg_AsignacionPersonaUnidadOrganizativa_NoSolapamiento";
     public const string AsignacionCredencial = "trg_AsignacionCredencial_NoSolapamiento";
+    public const string AsignacionRolAdministrativo = "trg_AsignacionRolAdministrativo_NoSolapamiento";
 }
 
 public sealed class ContextoOperativoPersonaPrincipalConfiguration

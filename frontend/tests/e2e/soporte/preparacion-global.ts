@@ -8,9 +8,11 @@ import { RUTA_ENTORNO, type EntornoE2E } from './entorno.ts'
  * Preparación del entorno E2E: SQL Server y la API contenedorizados, base de datos dedicada con las
  * migraciones reales, y usuarios de prueba.
  *
- * Los usuarios se insertan directamente en la base de datos porque el sistema no ofrece un mecanismo
- * de alta del primer administrador (quickstart.md §5, paso 1). Es preparación de pruebas, no una
- * semilla del producto: vive solo en esta base `_E2E`.
+ * Los usuarios se insertan directamente en la base de datos para fijar exactamente el alcance que
+ * cada escenario necesita: `admin` es GLOBAL_ADMINISTRATOR y `ajeno` es COMPANY_ADMINISTRATOR de
+ * otra compañía, que es lo que permite contrastar el aislamiento (RF-074, RF-077). El arranque de
+ * RF-078 crea su propio administrador aparte; estas filas son preparación de pruebas, no una semilla
+ * del producto, y viven solo en esta base `_E2E`.
  */
 
 const RAIZ = path.resolve(import.meta.dirname, '../../../..')
@@ -66,17 +68,17 @@ export default async function preparacionGlobal(): Promise<void> {
   const ajeno = { id: uuidV7(), correo: `e2e.ajeno.${Date.now()}@empresa.cl` }
 
   sql(`
-    INSERT INTO Compania (Id, Nombre, TipoDocumentoId, NumeroDocumento, TipoCompania, Estado, CreatedAt, UpdatedAt)
-    VALUES ('${anclaId}', 'E2E ancla ${Date.now()}', '${RUC_ID}', '${numero(11)}', 'PRINCIPAL_MANDANTE', 'ACTIVO', SYSUTCDATETIME(), SYSUTCDATETIME()),
-           ('${otraAnclaId}', 'E2E ancla ajena ${Date.now()}', '${RUC_ID}', '${numero(11)}', 'PRINCIPAL_MANDANTE', 'ACTIVO', SYSUTCDATETIME(), SYSUTCDATETIME());
+    INSERT INTO Compania (Id, Nombre, TipoDocumentoId, NumeroDocumento, TipoCompania, Estado, ZonaHorariaIana, CreatedAt, UpdatedAt)
+    VALUES ('${anclaId}', 'E2E ancla ${Date.now()}', '${RUC_ID}', '${numero(11)}', 'PRINCIPAL_MANDANTE', 'ACTIVO', 'America/Lima', SYSUTCDATETIME(), SYSUTCDATETIME()),
+           ('${otraAnclaId}', 'E2E ancla ajena ${Date.now()}', '${RUC_ID}', '${numero(11)}', 'PRINCIPAL_MANDANTE', 'ACTIVO', 'America/Lima', SYSUTCDATETIME(), SYSUTCDATETIME());
 
     INSERT INTO Usuario (Id, Correo, CorreoNormalizado, Estado, FechaUltimoCambioPassword, IntentosFallidosConsecutivos, PasswordHash, RequiereCambioPassword, CreatedAt, UpdatedAt)
     VALUES ('${admin.id}', '${admin.correo}', '${admin.correo.toUpperCase()}', 'ACTIVO', SYSUTCDATETIME(), 0, '${hashIdentity(PASSWORD_PRUEBAS)}', 0, SYSUTCDATETIME(), SYSUTCDATETIME()),
            ('${ajeno.id}', '${ajeno.correo}', '${ajeno.correo.toUpperCase()}', 'ACTIVO', SYSUTCDATETIME(), 0, '${hashIdentity(PASSWORD_PRUEBAS)}', 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 
-    INSERT INTO AlcanceUsuarioCompania (Id, UsuarioId, CompaniaId, CreatedAt, UpdatedAt)
-    VALUES ('${uuidV7()}', '${admin.id}', '${anclaId}', SYSUTCDATETIME(), SYSUTCDATETIME()),
-           ('${uuidV7()}', '${ajeno.id}', '${otraAnclaId}', SYSUTCDATETIME(), SYSUTCDATETIME());
+    INSERT INTO AsignacionRolAdministrativo (Id, UsuarioId, Rol, CompaniaId, FechaHoraInicio, FechaHoraFin, CreatedAt, UpdatedAt)
+    VALUES ('${uuidV7()}', '${admin.id}', 'GLOBAL_ADMINISTRATOR', NULL, DATEADD(day, -1, SYSUTCDATETIME()), DATEADD(year, 1, SYSUTCDATETIME()), SYSUTCDATETIME(), SYSUTCDATETIME()),
+           ('${uuidV7()}', '${ajeno.id}', 'COMPANY_ADMINISTRATOR', '${otraAnclaId}', DATEADD(day, -1, SYSUTCDATETIME()), DATEADD(year, 1, SYSUTCDATETIME()), SYSUTCDATETIME(), SYSUTCDATETIME());
   `)
 
   const entorno: EntornoE2E = { apiUrl, password: PASSWORD_PRUEBAS, admin, ajeno, anclaId }

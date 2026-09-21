@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gate de cierre de Etapa 1 — implementación T169 a T228</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--success);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--success);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+
+  /* ---------- Fases ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage { min-width: 0; }
+  }
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .fase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .fase-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+  .fase-card .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fase-card h3 { font-size: 14px; }
+  .fase-card .rango { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--primary); }
+  .metrica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+  .metrica { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; }
+  .metrica .valor { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metrica .etiqueta { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .metrica.ok .valor { color: var(--success); }
+  .check-list { display: grid; gap: 8px; }
+  .check-item { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 10px; align-items: start; font-size: 14px; }
+  .check-item .tick { color: var(--success); font-weight: 700; }
+  .trace td:nth-child(2) { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+</style>
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Gate de cierre · Etapa 1 · Implementación del baseline</p>
+    <h1>Gate de cierre de Etapa 1 contra el código corregido</h1>
+    <div class="meta">
+      <span>Feature <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Rama <b class="mono">feature/baseline-decisions</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Alcance <b class="mono">T169 – T228</b></span>
+      <span>Comando <b class="mono">/speckit-implement</b></span>
+      <span>Estado <b>Implementación completada y verificada en ejecución</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#veredicto"><span>✓</span><span>Veredicto</span></a></li>
+      <li><a href="#suites"><span>1</span><span>Regresión</span></a></li>
+      <li><a href="#fases"><span>2</span><span>Qué se construyó</span></a></li>
+      <li><a href="#criterios"><span>3</span><span>CS-036 a CS-041</span></a></li>
+      <li><a href="#hallazgos"><span>4</span><span>Hallazgos previos</span></a></li>
+      <li><a href="#desviaciones"><span>5</span><span>Desviaciones</span></a></li>
+      <li><a href="#fronteras"><span>6</span><span>Fronteras respetadas</span></a></li>
+      <li><a href="#pendiente"><span>7</span><span>Qué falta</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ===================== VEREDICTO ===================== -->
+    <section id="veredicto">
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">Baseline implementado</span>
+          <span class="pill ok">5 suites en verde</span>
+          <span class="pill ok">59 / 60 tareas</span>
+          <span class="pill warn">1 tarea detenida</span>
+        </div>
+
+        <p class="prose">Las 60 tareas del cierre de Etapa 1 (T169 a T228) se implementaron y se verificaron
+        <strong>en ejecución</strong>, no solo por lectura de código. Las cinco suites del proyecto pasan
+        íntegras, incluidas las de extremo a extremo contra la API contenedorizada y SQL Server real. Una
+        única tarea quedó detenida a propósito por una contradicción con la fuente de verdad, descrita en
+        <a href="#desviaciones">Desviaciones</a>.</p>
+
+        <p class="prose">Las dos auditorías del 2026-09-16 concluyeron <em>“No congelable” / “No cerrada”</em>
+        por el defecto crítico <b class="mono">F-01</b> —<code>UsuarioService</code> sin ningún control de
+        alcance— y por las nueve decisiones de negocio abiertas. Las decisiones se cerraron el 2026-09-20 y
+        este gate verifica que su implementación existe y funciona.</p>
+
+        <div class="runs">
+          <span>Unitarias <b>101/101</b></span>
+          <span>Contrato <b>244/244</b></span>
+          <span>Integración <b>511/511</b></span>
+          <span>Vitest <b>149/149</b></span>
+          <span>Playwright <b>8/8</b></span>
+          <span>Build <b>OK</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SUITES ===================== -->
+    <section id="suites">
+      <div class="section-head"><span class="letter">1</span><h2>Regresión completa (T225)</h2></div>
+
+      <p class="prose">Las cinco suites se ejecutaron sobre el código final. Las cifras entre paréntesis son
+      el estado previo a esta sesión, medido al inicio del trabajo.</p>
+
+      <div class="metrica-grid">
+        <div class="metrica ok"><span class="valor">101</span><span class="etiqueta">Unitarias (92)</span></div>
+        <div class="metrica ok"><span class="valor">244</span><span class="etiqueta">Contrato (222/242)</span></div>
+        <div class="metrica ok"><span class="valor">511</span><span class="etiqueta">Integración (485)</span></div>
+        <div class="metrica ok"><span class="valor">149</span><span class="etiqueta">Vitest (141)</span></div>
+        <div class="metrica ok"><span class="valor">8</span><span class="etiqueta">Playwright (3)</span></div>
+      </div>
+
+      <p class="prose"><strong>La condición preexistente H1 quedó resuelta.</strong> Al iniciar la sesión, 20
+      de 242 pruebas de contrato fallaban porque los contratos se habían actualizado antes que la
+      implementación C#. Las tareas T194 a T198 sincronizaron el código con
+      <code>contracts/</code> y la suite pasó a <b class="mono">244/244</b>, que es la evidencia que esas
+      tareas debían producir.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Suite</th><th>Resultado</th><th>Qué verifica en este cierre</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">UnitTests</td>
+              <td class="state"><span class="pill ok">101/101</span></td>
+              <td>Invariantes de dominio de <code>AsignacionRolAdministrativo</code>: regla fundamental de
+              <code>CompañíaId</code>, vigencia semiabierta, renovabilidad y la constante
+              <code>MAX_VALIDITY_DATE</code> acotada al arranque.</td>
+            </tr>
+            <tr>
+              <td class="id">ContractTests</td>
+              <td class="state"><span class="pill ok">244/244</span></td>
+              <td>Paridad contrato ↔ código: rutas de <code>/roles</code>, doce motivos de denegación,
+              <code>409</code> de cambio de tipo y snapshot del documento OpenAPI.</td>
+            </tr>
+            <tr>
+              <td class="id">IntegrationTests</td>
+              <td class="state"><span class="pill ok">511/511</span></td>
+              <td>CS-036 a CS-041 contra SQL Server real, incluidos el trigger de no-solapamiento y el
+              <code>CHECK</code> de la regla fundamental.</td>
+            </tr>
+            <tr>
+              <td class="id">Vitest</td>
+              <td class="state"><span class="pill ok">149/149</span></td>
+              <td>Wizard de alta, detalle con pestañas, restricciones por rol en la interfaz y árbol de
+              unidad organizativa.</td>
+            </tr>
+            <tr>
+              <td class="id">Playwright</td>
+              <td class="state"><span class="pill ok">8/8</span></td>
+              <td>UX-17 a UX-22 y los Casos A/B de Historia 5 desde la interfaz, contra la API real.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== FASES ===================== -->
+    <section id="fases">
+      <div class="section-head"><span class="letter">2</span><h2>Qué se construyó</h2></div>
+
+      <div class="fase-grid">
+        <div class="fase-card">
+          <span class="num">Fase 14</span><h3>Modelo y migraciones</h3>
+          <span class="rango">T169 – T174</span>
+          <p class="muted">Enum cerrado <code>RolAdministrativo</code>, entidad
+          <code>AsignacionRolAdministrativo</code> con <code>CHECK</code> e índice clúster, trigger de
+          no-solapamiento, baja de <code>AlcanceUsuarioCompania</code> y campo
+          <code>ZonaHorariaIana</code>.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 15</span><h3>Dominio</h3>
+          <span class="rango">T175 – T181</span>
+          <p class="muted">Servicio de asignaciones, validador de dependencias de
+          <code>TipoCompañía</code>, pasos 5, 6 y 13 del evaluador, y rediseño de
+          <code>IRelojEmpresarial</code> por Principal.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 16</span><h3>Autorización</h3>
+          <span class="rango">T182 – T189</span>
+          <p class="muted">Alcance efectivo por rol, <code>CompaniaScopeAuthorizationHandler</code>, claims
+          de rol en el JWT y Resource Ownership en <code>UsuarioService</code> — el contenido de F-01.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 17</span><h3>Arranque</h3>
+          <span class="rango">T190 – T193</span>
+          <p class="muted">Primer administrador global idempotente por configuración segura, con cambio de
+          contraseña obligatorio.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 18</span><h3>API y contratos</h3>
+          <span class="rango">T194 – T198</span>
+          <p class="muted">Controladores alineados con <code>contracts/</code>: <code>/roles</code>,
+          <code>zonaHorariaIana</code>, <code>COMPANIA_INACTIVA</code> y códigos de error nuevos.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 19</span><h3>Usuarios (G7)</h3>
+          <span class="rango">T199 – T206</span>
+          <p class="muted">Listado con aislamiento, wizard de cinco pasos, detalle con pestañas, asignación
+          y finalización, mensajes propios y entrada de navegación.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 20</span><h3>Historia 5</h3>
+          <span class="rango">T207 – T212</span>
+          <p class="muted">Wizard Caso A/B, árbol de unidad organizativa, perfiles, puntos de entrada y fin
+          del UUID crudo como respaldo.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 21</span><h3>Pruebas</h3>
+          <span class="rango">T213 – T224</span>
+          <p class="muted">Cobertura nueva de CS-036 a CS-041, de contrato, de componente y de extremo a
+          extremo.</p>
+        </div>
+        <div class="fase-card">
+          <span class="num">Fase 22</span><h3>Cierre</h3>
+          <span class="rango">T225 – T228</span>
+          <p class="muted">Regresión completa, escenarios de <code>quickstart.md</code> §7, actualización de
+          <code>README.md</code> y este informe.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CRITERIOS ===================== -->
+    <section id="criterios">
+      <div class="section-head"><span class="letter">3</span><h2>Criterios de éxito verificados</h2></div>
+
+      <p class="prose">Cada criterio nuevo tiene al menos una prueba que falla si la regla se revierte. Ese
+      era el punto: que el cierre no dependa de una lectura de código.</p>
+
+      <div class="table-wrap">
+        <table class="trace">
+          <thead>
+            <tr><th>Criterio</th><th>Prueba</th><th>Qué demuestra</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">CS-036</td>
+              <td>RolesAdministrativosTests</td>
+              <td>Un <code>COMPANY_ADMINISTRATOR</code> no lista ni modifica usuarios de otra compañía, no se
+              autoeleva y no crea asignaciones globales; sí crea pares de su mismo nivel.</td>
+            </tr>
+            <tr>
+              <td class="id">CS-037</td>
+              <td>RolesAdministrativosTests</td>
+              <td>Una lectura fuera de alcance responde <code>404</code>, y el total del listado no cuenta
+              usuarios ajenos.</td>
+            </tr>
+            <tr>
+              <td class="id">CS-038</td>
+              <td>RolesAdministrativosTests</td>
+              <td>El arranque deja exactamente un administrador global con cambio de contraseña pendiente;
+              reiniciar no crea un segundo y la fecha centinela no aparece en ninguna otra asignación.</td>
+            </tr>
+            <tr>
+              <td class="id">CS-039</td>
+              <td>CompaniaInactivaYZonaHorariaTests</td>
+              <td>Inactivar la Principal —o la compañía de pertenencia— deniega con
+              <code>COMPANIA_INACTIVA</code> sin alterar contextos, credenciales ni permisos; reactivar
+              restablece el acceso sin más intervención.</td>
+            </tr>
+            <tr>
+              <td class="id">CS-040</td>
+              <td>CompaniaInactivaYZonaHorariaTests</td>
+              <td>Dos Principales con zonas IANA distintas resuelven el mismo instante UTC en horas locales
+              distintas; cambiar la zona no altera ningún instante persistido.</td>
+            </tr>
+            <tr>
+              <td class="id">CS-041</td>
+              <td>CambioTipoCompaniaTests</td>
+              <td>El cambio de <code>TipoCompañía</code> se rechaza por cada una de las cinco categorías de
+              dependencia y en ambas direcciones; sin dependencias se acepta.</td>
+            </tr>
+            <tr>
+              <td class="id">UX-17…22</td>
+              <td>administracion-usuarios.spec.ts</td>
+              <td>Alta, detalle, asignación y finalización desde la interfaz, con el rol global oculto para
+              quien no puede asignarlo.</td>
+            </tr>
+            <tr>
+              <td class="id">D7 / CS-021</td>
+              <td>historia5-casos-a-b.spec.ts</td>
+              <td>Casos A y B completados desde la interfaz producen las mismas relaciones de dominio que la
+              API, contrastadas con <code>estado-efectivo</code>; la unidad se elige sobre el árbol.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== HALLAZGOS ===================== -->
+    <section id="hallazgos">
+      <div class="section-head"><span class="letter">4</span><h2>Hallazgos que bloqueaban el gate</h2></div>
+
+      <div class="findings">
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">F-01</span>
+            <span class="pill ok">Cerrado</span>
+          </div>
+          <div class="finding-body">
+            <h3>UsuarioService sin control de alcance</h3>
+            <p>Era el defecto crítico del gate anterior: cualquier usuario autenticado podía listar,
+            leer y modificar cualquier otro, y concederse compañías ajenas. Ahora el servicio aplica
+            Resource Ownership en sus siete operaciones y las de reemplazo de alcance desaparecieron:
+            el alcance es un conjunto de asignaciones con vigencia que se agregan y finalizan una a una.</p>
+            <dl class="facts">
+              <dt>Verificado por</dt><dd>CS-036 y CS-037, en integración contra SQL Server real.</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">F-02</span>
+            <span class="pill ok">Cerrado</span>
+          </div>
+          <div class="finding-body">
+            <h3>Alcance en los servicios de mantenimiento</h3>
+            <p>La revisión del código mostró que los servicios de unidades organizativas, áreas,
+            asignación de unidad, estado efectivo y revocación <em>sí</em> delegaban el control de alcance en
+            <code>CompaniaService</code> y <code>PersonaService</code>. Lo que faltaba era que esa delegación
+            entendiera el alcance GLOBAL, que no enumera compañías: sin ello, un administrador global habría
+            dejado de ver todo. Se corrigió en los tres puntos que filtraban por la lista enumerada.</p>
+            <dl class="facts">
+              <dt>Matiz</dt><dd>La premisa de T186/T187 —“hoy sin ningún control de alcance”— no se
+              correspondía con el código. Se documenta como desviación, no como trabajo omitido.</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">H1</span>
+            <span class="pill ok">Resuelto</span>
+          </div>
+          <div class="finding-body">
+            <h3>Contratos por delante del código</h3>
+            <p>Condición preexistente conocida: la sesión de planificación actualizó
+            <code>contracts/</code> antes que la implementación C#, dejando 20 pruebas de contrato en rojo.
+            Las tareas T194 a T198 las sincronizaron.</p>
+            <dl class="facts">
+              <dt>Antes</dt><dd>222 / 242</dd>
+              <dt>Después</dt><dd>244 / 244</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DESVIACIONES ===================== -->
+    <section id="desviaciones">
+      <div class="section-head"><span class="letter">5</span><h2>Desviaciones y contradicciones</h2></div>
+
+      <p class="prose">Ninguna se resolvió inventando una decisión de negocio. Donde la fuente de verdad se
+      contradecía a sí misma, la tarea afectada se detuvo y se reporta aquí.</p>
+
+      <div class="findings">
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">D-1</span>
+            <span class="pill warn">Detenida</span>
+          </div>
+          <div class="finding-body">
+            <h3>Renovar una asignación de rol no tiene endpoint</h3>
+            <p><code>ux-ui.md</code> §35 y UX-20 describen <em>finalizar o renovar</em> una asignación, y
+            T204 pide implementar ambas. Pero <code>contracts/users.yaml</code> v2.0.0 no declara ninguna
+            ruta de renovación: solo <code>GET/POST /roles</code> y <code>…/finalizar</code>.</p>
+            <p>Publicar una ruta no declarada rompería la conformidad que vigilan las pruebas de contrato, y
+            añadirla al contrato es una decisión sobre el contrato, no una tarea de implementación. Se
+            construyó la capacidad en el dominio —<code>AsignacionRolAdministrativoService.RenovarAsync</code>,
+            con las reglas de RF-073— pero <strong>no se expuso</strong>. La interfaz ofrece finalizar y
+            crear una asignación nueva, que consigue el mismo efecto con histórico explícito.</p>
+            <dl class="facts">
+              <dt>Requiere</dt><dd>Decidir si <code>contracts/users.yaml</code> incorpora la renovación.</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">D-2</span>
+            <span class="pill neutral">Premisa corregida</span>
+          </div>
+          <div class="finding-body">
+            <h3>T186 y T187 describían un defecto que ya no existía</h3>
+            <p>Ambas tareas afirmaban que cinco servicios estaban “hoy sin ningún control de alcance”. La
+            verificación contra el código mostró que todos delegaban ese control. El trabajo real —hacer que
+            la delegación entienda el alcance GLOBAL— se hizo; no se añadieron comprobaciones redundantes
+            solo para que la tarea pareciera ejecutada al pie de la letra.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">D-3</span>
+            <span class="pill neutral">Ajuste de orden</span>
+          </div>
+          <div class="finding-body">
+            <h3>La migración se generó después del código</h3>
+            <p>T171 y T172 aparecen antes que las fases de dominio y aplicación, pero
+            <code>dotnet ef migrations add</code> exige que la solución compile. Se implementó primero el
+            código y se generó la migración al final, con el mismo contenido que las tareas describen:
+            tabla, <code>CHECK</code>, índice clúster y trigger, más la baja de
+            <code>AlcanceUsuarioCompania</code> sin migración de datos.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">D-4</span>
+            <span class="pill neutral">Limitación documentada</span>
+          </div>
+          <div class="finding-body">
+            <h3>La búsqueda por correo del listado es local a la página</h3>
+            <p><code>ux-ui.md</code> §35 enumera “búsqueda por correo” entre los filtros del listado, pero
+            <code>GET /api/usuarios</code> solo declara <code>estado</code>, <code>pagina</code> y
+            <code>tamañoPagina</code>. El filtro se implementó sobre la página ya recibida; convertirlo en
+            búsqueda de servidor exigiría ampliar el contrato.</p>
+          </div>
+        </div>
+
+        <div class="finding">
+          <div class="finding-tag">
+            <span class="code">D-5</span>
+            <span class="pill neutral">Criterio aplicado</span>
+          </div>
+          <div class="finding-body">
+            <h3>Contraseña de arranque en el compose de desarrollo</h3>
+            <p>RF-078 prohíbe versionar la contraseña semilla. <code>docker-compose.prod.yml</code> la exige
+            sin valor por defecto y la API no arranca sin ella. En
+            <code>docker-compose.yml</code> —el de desarrollo, que ya versiona la clave de SA y la de firma
+            JWT— se dejó un valor por defecto local para no romper <code>docker compose up</code> ni las
+            pruebas de extremo a extremo. Se señala por si se prefiere exigirla también allí.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== FRONTERAS ===================== -->
+    <section id="fronteras">
+      <div class="section-head"><span class="letter">6</span><h2>Fronteras respetadas</h2></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <h3>Etapa 2 fuera de alcance</h3>
+          <div class="check-list">
+            <div class="check-item"><span class="tick">✓</span><span>Ninguna referencia a RF-067, RF-068,
+            RF-069 ni CS-032 en el código nuevo.</span></div>
+            <div class="check-item"><span class="tick">✓</span><span>Ningún endpoint de consultas
+            transversales ni de auditoría agregada.</span></div>
+            <div class="check-item"><span class="tick">✓</span><span>Historia 10, en su acepción de
+            consultas transversales, sigue sin tareas ni código.</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Baseline histórico intacto</h3>
+          <div class="check-list">
+            <div class="check-item"><span class="tick">✓</span><span>T001 a T168 no se regeneraron,
+            renumeraron ni reinterpretaron.</span></div>
+            <div class="check-item"><span class="tick">✓</span><span>Todo cambio en
+            <code>tasks.md</code> ocurre a partir de la línea 1151, dentro del bloque nuevo.</span></div>
+            <div class="check-item"><span class="tick">✓</span><span>Las pruebas históricas que se
+            actualizaron lo hicieron porque codificaban reglas <em>superadas</em> por D1, D3 o D5, no para
+            forzar un verde.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="prose"><strong>Sobre las pruebas históricas modificadas.</strong> Cuatro casos cambiaron de
+      expectativa, y conviene decir por qué: tres verificaban que el alcance sobre una <code>Persona</code>
+      dependía solo de su pertenencia, regla que D3 sustituyó por la unión con los contextos operativos
+      vigentes; el cuarto desbloqueaba un usuario sin asignaciones desde una cuenta de compañía, que RF-077
+      ya no permite. En ambos casos lo que cambió fue la regla aprobada, no el resultado deseado.</p>
+    </section>
+
+    <!-- ===================== PENDIENTE ===================== -->
+    <section id="pendiente">
+      <div class="section-head"><span class="letter">7</span><h2>Qué falta para congelar</h2></div>
+
+      <p class="prose">La implementación está completa y verificada. Para congelar formalmente el baseline
+      quedan decisiones y actos de gobierno, no trabajo de construcción:</p>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill warn">Decisión</span><span class="note">bloquea el
+        cierre formal</span></div>
+        <ol>
+          <li>Resolver si <code>contracts/users.yaml</code> incorpora la renovación de asignaciones (D-1) o
+          si UX-20 se reescribe para ofrecer solo finalizar y crear.</li>
+          <li>Decidir si la contraseña de arranque debe exigirse también en el compose de desarrollo
+          (D-5).</li>
+        </ol>
+      </div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill neutral">Gobierno</span><span class="note">sin trabajo
+        técnico asociado</span></div>
+        <ol>
+          <li>Revisar y aceptar este informe como sustituto del gate del 2026-09-16.</li>
+          <li>Confirmar la frontera de Etapa 2 y abrir su especificación por separado.</li>
+        </ol>
+      </div>
+
+      <p class="prose muted">Nada de lo anterior fue commiteado ni subido: el árbol de trabajo queda
+      modificado y a la espera de revisión.</p>
+    </section>
+
+    <footer class="foot">
+      Informe generado el 20/09/2026 tras ejecutar <code>/speckit-implement</code> sobre T169 a T228 en
+      <code>specs/001-control-acceso-empresarial/tasks.md</code>. Las cifras de las cinco suites provienen de
+      ejecuciones reales de esta sesión, no de una estimación. No se realizó ningún commit ni push. Documento
+      local: los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

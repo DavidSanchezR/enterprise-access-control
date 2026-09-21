@@ -86,14 +86,15 @@ public sealed class AutenticacionService(
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        var alcance = await ObtenerAlcanceAsync(usuario.Id, ct).ConfigureAwait(false);
-        var token = tokens.Emitir(usuario.Id, usuario.Correo, alcance);
+        var (rol, companiaIds) = await ResolverAlcanceAsync(usuario.Id, ct).ConfigureAwait(false);
+        var token = tokens.Emitir(usuario.Id, usuario.Correo, rol, companiaIds);
 
         return new LoginResponse(
             token.AccessToken,
             token.ExpiraEn,
             usuario.RequiereCambioPassword,
-            alcance);
+            rol,
+            companiaIds);
     }
 
     public async Task CambiarPasswordAsync(
@@ -143,9 +144,9 @@ public sealed class AutenticacionService(
                 CodigosError.RecursoNoEncontrado,
                 "Usuario no encontrado.");
 
-        var alcance = await ObtenerAlcanceAsync(usuarioId, ct).ConfigureAwait(false);
+        var (rol, companiaIds) = await ResolverAlcanceAsync(usuarioId, ct).ConfigureAwait(false);
 
-        return new SesionActual(usuario.Id, usuario.Correo, alcance);
+        return new SesionActual(usuario.Id, usuario.Correo, rol, companiaIds);
     }
 
     private async Task ValidarNoReutilizadaAsync(Usuario usuario, string passwordNueva, CancellationToken ct)
@@ -176,10 +177,45 @@ public sealed class AutenticacionService(
         }
     }
 
-    private async Task<IReadOnlyList<Guid>> ObtenerAlcanceAsync(Guid usuarioId, CancellationToken ct) =>
-        await db.AlcancesUsuarioCompania
-            .Where(a => a.UsuarioId == usuarioId)
-            .Select(a => a.CompaniaId)
+    /// <summary>
+    /// Alcance efectivo a partir de las asignaciones de rol vigentes (RF-074, RF-077).
+    /// </summary>
+    /// <remarks>
+    /// <c>GLOBAL_ADMINISTRATOR</c> prevalece sobre cualquier asignación por compañía y no enumera
+    /// compañías: su alcance es toda compañía, incluidas las que se creen después de emitido el
+    /// token. Un usuario sin ninguna asignación vigente recibe rol <c>null</c> y ninguna compañía;
+    /// el gate de autorización lo rechazará en el siguiente request (denegación por defecto).
+    /// </remarks>
+    private async Task<(RolAdministrativo? Rol, IReadOnlyList<Guid> CompaniaIds)> ResolverAlcanceAsync(
+        Guid usuarioId,
+        CancellationToken ct)
+    {
+        var ahora = reloj.UtcNow;
+
+        var vigentes = await db.AsignacionesRolAdministrativo
+            .AsNoTracking()
+            .Where(a => a.UsuarioId == usuarioId
+                        && a.FechaHoraInicio <= ahora
+                        && ahora < a.FechaHoraFin)
             .ToListAsync(ct)
             .ConfigureAwait(false);
+
+        if (vigentes.Count == 0)
+        {
+            return (null, []);
+        }
+
+        if (vigentes.Any(a => a.Rol == RolAdministrativo.GLOBAL_ADMINISTRATOR))
+        {
+            return (RolAdministrativo.GLOBAL_ADMINISTRATOR, []);
+        }
+
+        var companiaIds = vigentes
+            .Where(a => a.CompaniaId is not null)
+            .Select(a => a.CompaniaId!.Value)
+            .Distinct()
+            .ToList();
+
+        return (RolAdministrativo.COMPANY_ADMINISTRATOR, companiaIds);
+    }
 }

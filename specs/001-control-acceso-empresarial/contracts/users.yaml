@@ -1,13 +1,19 @@
 openapi: 3.0.3
 info:
   title: Control de Acceso Empresarial — Mantenimiento de Usuarios
-  version: "2.0.0"
+  version: "2.1.0"
   description: >
     Administración de usuarios y su alcance administrativo mediante RBAC (RF-004, RF-005; Sesión
     2026-09-20, cierre de Etapa 1, D1 — research.md §27). Reemplaza el modelo anterior de
     `alcanceCompanias` (lista plana de compañías) por asignaciones de rol auditable con vigencia
     temporal: `GLOBAL_ADMINISTRATOR` (alcance GLOBAL, sin compañía) o `COMPANY_ADMINISTRATOR` (alcance
     limitado a una compañía). Distinto del flujo de login (ver auth.yaml).
+
+    v2.1.0 (cierre de las desviaciones D-1 y D-4, research.md §34): agrega
+    `roles/{asignacionId}/renovar` —contraparte inversa de `/finalizar`, ya soportada por el dominio
+    (RF-075) y hasta ahora no expuesta— y el parámetro de búsqueda `texto` en el listado, que se
+    resuelve en el servidor sobre todo el conjunto dentro del alcance y antes de paginar (RF-077,
+    UX-22). Ningún cambio de modelo de datos ni de reglas de negocio.
 tags:
   - name: Usuarios
 paths:
@@ -18,12 +24,25 @@ paths:
       description: >
         Un GLOBAL_ADMINISTRATOR ve todos los usuarios; un COMPANY_ADMINISTRATOR ve únicamente usuarios
         con alguna asignación de rol vigente en su propia compañía (Resource Ownership, research.md §29).
+        Los filtros se aplican en este orden, no en otro: alcance del solicitante (RF-077) → `estado` y
+        `texto` → total → paginación. `total` cuenta las coincidencias dentro del alcance, nunca el
+        universo del sistema, y la búsqueda alcanza a todo ese conjunto, no solo a la página pedida
+        (UX-22, research.md §34.3).
       parameters:
         - $ref: "#/components/parameters/Pagina"
         - $ref: "#/components/parameters/TamañoPagina"
         - name: estado
           in: query
           schema: { $ref: "#/components/schemas/EstadoUsuario" }
+        - name: texto
+          in: query
+          description: >
+            Búsqueda por correo, por coincidencia parcial. Se resuelve en el servidor sobre todos los
+            usuarios dentro del alcance autorizado y antes de paginar: un usuario que caería en la
+            página 3 se encuentra igual. Se combina con `estado` mediante AND. No amplía el alcance
+            bajo ninguna circunstancia; sin coincidencias responde 200 con `items: []` y `total: 0`,
+            nunca 404 —conocer un correo no revela ni concede acceso a un usuario fuera de alcance.
+          schema: { type: string }
       responses:
         "200":
           description: Página de usuarios
@@ -184,6 +203,72 @@ paths:
           description: No encontrada o fuera de alcance
         "409":
           description: La asignación ya no está vigente
+  /api/usuarios/{id}/roles/{asignacionId}/renovar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: asignacionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Usuarios]
+      summary: Renovar una asignación de rol vigente extendiendo su fechaHoraFin (RF-075)
+      description: >
+        Contraparte inversa de /finalizar: esa operación acorta y cierra; esta extiende sin cerrar.
+        Mueve únicamente fechaHoraFin hacia una fecha estrictamente posterior a la ya declarada; nunca
+        modifica rol, companiaId ni fechaHoraInicio —cambiar el rol o la compañía exige finalizar esta
+        asignación y crear otra (RF-074)— y no crea un registro nuevo. Solo aplica mientras la
+        asignación siga vigente dinámicamente en el momento de renovar (fechaHoraInicio <= ahora <
+        fechaHoraFin): una asignación ya expirada no es renovable, porque extenderla puentearía
+        retroactivamente un intervalo en el que el usuario no tuvo autorización; ese caso exige una
+        asignación nueva. Reutiliza las mismas reglas de vigencia ya establecidas para
+        AsignacionCompania en people.yaml (RF-073, referenciadas desde RF-075 sin reabrirlas). Exige la
+        misma autorización que crear o finalizar esa misma asignación (RF-076) y el mismo régimen de
+        alcance y ocultamiento de existencia que el resto de operaciones sobre Usuario (RF-077).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fechaHoraFin]
+              properties:
+                fechaHoraFin:
+                  type: string
+                  format: date-time
+                  description: Nueva fecha de fin de vigencia; DEBE ser estrictamente posterior a la fechaHoraFin ya vigente
+      responses:
+        "204":
+          description: Asignación renovada
+        "400":
+          description: Cuerpo ausente o mal formado (fechaHoraFin faltante o no interpretable como date-time)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "403":
+          description: >
+            El usuario autenticado no tiene autorización para renovar esa asignación
+            (codigo = ROL_NO_AUTORIZADO): quien no podría crearla tampoco puede extenderla — un
+            COMPANY_ADMINISTRATOR no puede renovar una asignación GLOBAL_ADMINISTRATOR ni una de otra
+            compañía
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "404":
+          description: No encontrada o fuera de alcance (nunca 403, para no confirmar su existencia)
+        "409":
+          description: >
+            La asignación ya no está vigente y por tanto no es renovable
+            (codigo = ASIGNACION_ROL_NO_VIGENTE); o la fechaHoraFin indicada no es estrictamente
+            posterior a la ya vigente (codigo = RENOVACION_NO_POSTERIOR); o la vigencia extendida se
+            solaparía con otra asignación COMPANY_ADMINISTRATOR del mismo par (usuario, compañía)
+            (codigo = SOLAPAMIENTO_VIGENCIA)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
 components:
   securitySchemes:
     bearerAuth:

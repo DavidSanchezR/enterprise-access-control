@@ -1510,3 +1510,169 @@ AsignaciónPersonaCompañía")
 - **Alternatives considered**: Construir un selector de unidad organizativa plano (statu quo actual,
   descartado: contradice CS-021, que exige explícitamente un árbol); construir un componente de árbol nuevo
   específico para este flujo (descartado: duplicaría `Tree.tsx` sin necesidad).
+
+## 34. Cierre de las desviaciones D-1, D-2 y D-4 del Baseline (Sesión 2026-09-20, `/speckit-plan`)
+
+> **Nomenclatura — leer antes de esta sección**: las etiquetas `D-1`, `D-2`, `D-4` (con guion) identifican
+> las **desviaciones de implementación** detectadas al terminar T169–T228 y auditadas con
+> `/speckit-analyze`. NO son las decisiones de negocio `D1`–`D9` (sin guion) de §27 a §33, que provienen de
+> la matriz de 16 preguntas del cierre de Etapa 1. La coincidencia de letra es accidental y los contenidos
+> no se corresponden (p. ej. `D4` = inactivación de compañía, §30; `D-4` = búsqueda de usuarios, §34.3).
+>
+> Las otras dos desviaciones no generan trabajo de implementación y no se planifican aquí: **D-3** se cerró
+> como implementación válida sin cambios (la migración EF generada al final es consistente con el modelo
+> final), y **D-5** se cerró por configuración y documentación (`docker-compose.yml`, `README.md`,
+> `quickstart.md`), sin modificar RF-078, cuyo texto ya era inequívoco.
+
+### 34.1 Renovación de `AsignaciónRolAdministrativo` expuesta como operación HTTP (D-1)
+
+- **Decision**: Se expone `POST /api/usuarios/{id}/roles/{asignacionId}/renovar`, con cuerpo
+  `{ "fechaHoraFin": "<date-time>" }` y respuesta `204`, como contraparte inversa de
+  `.../roles/{asignacionId}/finalizar` ya existente — exactamente el mismo par de operaciones y la misma
+  forma de contrato que `contracts/people.yaml` ya estableció para `AsignaciónPersonaCompañía`
+  (`.../historial-companias/{asignacionId}/renovar`, §26). **La lógica de negocio no se rescribe**: ya está
+  implementada y es correcta en `AsignacionRolAdministrativoService.RenovarAsync` (invariantes: renovable
+  solo si sigue vigente dinámicamente, nueva fecha estrictamente posterior, revalidación de no-solapamiento)
+  y en `UsuarioService.RenovarRolAsync`, que le antepone el alcance de RF-077
+  (`ObtenerEnAlcanceAsync` ⇒ `404` fuera de alcance) y la autorización de RF-076 (`ValidarPuedeAsignar` ⇒
+  `403 ROL_NO_AUTORIZADO`, misma regla que ya protege finalizar: quien no podría crear esa asignación tampoco
+  puede extenderla). Lo único ausente es la **exposición**: el controlador, el contrato, el cliente del
+  frontend y las pruebas.
+
+  El mapeo de códigos queda determinado por los tipos de excepción ya existentes, sin inventar ninguno:
+  `RecursoNoEncontradoException` ⇒ `404`; `RolNoAutorizadoException` ⇒ `403 ROL_NO_AUTORIZADO`;
+  `ConflictoEstadoException(ASIGNACION_ROL_NO_VIGENTE)` ⇒ `409`;
+  `ConflictoEstadoException(SOLAPAMIENTO_VIGENCIA)` ⇒ `409`; validación de cuerpo ⇒ `400`.
+
+  **Dos correcciones puntuales detectadas en el código actual**, ambas necesarias para que la operación
+  expuesta sea consistente con el precedente ya vigente — no son funcionalidad nueva:
+
+  1. `RenovarAsignacionRolRequest(DateTime NuevaFechaHoraFin)` serializa como `nuevaFechaHoraFin`, pero el
+     contrato de renovación ya establecido en `people.yaml` —y el cuerpo aprobado para esta operación— usa
+     `fechaHoraFin`. La propiedad debe pasar a llamarse `FechaHoraFin`. Es un DTO todavía no alcanzable por
+     HTTP, así que el cambio no rompe ningún consumidor existente.
+  2. `AsignacionRolAdministrativoService.RenovarAsync` lanza `ReglaNegocioInvalidaException` (⇒ `400`) para
+     `RENOVACION_NO_POSTERIOR`, mientras que `HistorialPersonaService.RenovarAsync` lanza
+     `ConflictoEstadoException` (⇒ `409`) para **la misma regla y el mismo código de negocio**, y
+     `people.yaml` documenta `409`. Debe unificarse en `ConflictoEstadoException`: el mismo código de error
+     no puede significar dos estados HTTP distintos según la entidad.
+
+- **Rationale**: Reutilizar la operación de dominio ya implementada y probada evita duplicar reglas de
+  vigencia; exponerla con la forma exacta del precedente (`/finalizar` ↔ `/renovar`, `204`, cuerpo de un solo
+  campo) mantiene la simetría que ya existe para `AsignaciónPersonaCompañía` y hace que el frontend y las
+  pruebas de contrato se escriban por analogía en vez de por invención. Las dos correcciones se incluyen aquí
+  —y no como hallazgos separados— porque exponer la operación sin resolverlas publicaría un contrato
+  inconsistente consigo mismo: un cliente que trate `RENOVACION_NO_POSTERIOR` como conflicto en personas y
+  como error de validación en usuarios tendría que ramificar por entidad.
+- **Alternatives considered**: `PATCH` sobre la asignación con `fechaHoraFin` (descartado: convertiría la
+  renovación en una edición genérica y abriría la puerta a modificar `rol`/`compañíaId`, que RF-075 prohíbe
+  explícitamente — la operación dedicada es lo que hace inexpresable el cambio no permitido); devolver `200`
+  con la asignación renovada (descartado: `RenovarAsync` sí devuelve el DTO, pero `/finalizar` y el
+  `/renovar` de personas ya responden `204`, y romper esa simetría por conveniencia del cliente no se
+  justifica — el frontend invalida la caché y refetch, como ya hace tras finalizar); generalizar RF-073 a
+  todas las entidades renovables (descartado explícitamente: RF-073 permanece específico de
+  `AsignaciónPersonaCompañía`; RF-075 ya referencia sus reglas sin absorberlas).
+
+> **Estado (Sesión 2026-09-20, posterior a esta planificación)**: las tres desviaciones quedaron
+> **implementadas y verificadas** (T229 a T242). Dos precisiones que el plan no anticipó y que la
+> implementación resolvió sin cambiar ninguna decisión de negocio:
+>
+> 1. **La cobertura de CS-037 se amplió de cinco servicios a los siete recursos que el criterio declara**
+>    (hallazgo C2 de la auditoría posterior): T237/T238 cubren los cinco servicios que D-2 identificó, y
+>    **T242** añade usuarios, compañías, personas, contextos operativos y credenciales. Se cerró ampliando la
+>    cobertura, no recortando el criterio ni reescribiendo T215.
+> 2. **`EstadoEfectivoService` y `RevocacionService` no tienen recurso propio que pedir**: el primero es una
+>    proyección de la persona y el segundo un colaborador interno. Su aislamiento se verifica por la
+>    superficie de la persona (`estado-efectivo`) y por su invocador (`historial-companias/{id}/finalizar`),
+>    comprobando además que la pertenencia ajena no se modifica — un `404` que escribiera de todas formas
+>    sería peor que un `403`.
+
+### 34.2 Cobertura de alcance GLOBAL vs COMPANY en los cinco servicios auditados (D-2)
+
+- **Decision**: **Ningún cambio de código de producción.** La verificación confirma que el control de alcance
+  exigido por RF-077 ya está aplicado, con dos formas distintas y ambas correctas:
+  `UnidadOrganizativaService` y `AreaAccesoService` resuelven el alcance directamente (vía
+  `CompañíaPrincipalId` y el recorrido de raíces de §29); `AsignacionUnidadOrganizativaService` y
+  `EstadoEfectivoService` lo delegan a un único punto de control, `PersonaService.ExigirAlcanceHistoricoAsync`,
+  invocado al inicio de cada operación pública; y `RevocacionService` **no tiene ni debe tener control
+  propio**: no es un punto de entrada, es un colaborador interno cuyo único invocador es
+  `HistorialPersonaService`, que ya validó el alcance de la persona antes de disparar la cascada.
+
+  Lo que falta es exclusivamente **cobertura de pruebas de integración** que demuestre ese comportamiento
+  bajo el modelo RBAC actual. Verificado: las tres suites de aislamiento existentes
+  (`OrgUnits/AislamientoMultiPrincipalTests`, `AreaAccess/AislamientoAreasMultiPrincipalTests`,
+  `People/AislamientoPertenenciasTests`) son anteriores a D1/D3 y no mencionan `GLOBAL_ADMINISTRATOR` ni
+  `COMPANY_ADMINISTRATOR`: prueban el aislamiento **de datos** entre Principales, no el aislamiento **por rol
+  del actor autenticado**. Y `RolesAdministrativosTests` declara CS-037 en su comentario de clase pero no
+  contiene ningún método `CS037_*`: sus pruebas cubren CS-036 (el recurso `Usuario`) y CS-038 (bootstrap),
+  nunca los cinco servicios de esta desviación.
+
+  La cobertura a agregar tiene dos casos por servicio: (a) un `GLOBAL_ADMINISTRATOR` opera sobre recursos de
+  **dos Principales distintas** en la misma prueba —lo que falsaría cualquier regresión que volviera a exigir
+  `CompaniaIds.Count > 0`—, y (b) un `COMPANY_ADMINISTRATOR` de la Principal A recibe `404` sobre un recurso
+  de la Principal B, nunca `403`. Para `RevocacionService` el caso se ejercita a través de su invocador
+  (`POST /api/personas/{id}/historial-companias/{asignacionId}/finalizar`), porque no tiene endpoint propio.
+
+- **Rationale**: Modificar código que ya satisface el requisito solo para que se parezca más al texto
+  original de T186/T187 introduciría riesgo sin beneficio. La ausencia de pruebas, en cambio, sí es un
+  defecto real frente al Principio VII de la Constitución, que exige cobertura automatizada explícita de las
+  fugas de datos entre compañías: hoy una regresión en el alcance de esos cinco servicios no rompería
+  ninguna prueba. Distinguir los dos casos (GLOBAL sobre dos Principales / COMPANY con `404`) es lo que
+  convierte la prueba en una red de seguridad real y no en una confirmación del camino feliz.
+- **Alternatives considered**: Dar D-2 por cerrada solo con la evidencia de lectura de código (descartado:
+  deja el invariante sin red de regresión, contra el Principio VII); agregar a `RevocacionService` un control
+  de alcance propio para poder probarlo aisladamente (descartado: duplicaría la verificación que su único
+  invocador ya hace, y un doble control divergente es peor que uno solo bien ubicado).
+
+### 34.3 Búsqueda server-side de usuarios dentro del alcance autorizado (D-4)
+
+- **Decision**: Se agrega el parámetro de consulta **`texto`** (`string`, opcional) a `GET /api/usuarios`,
+  reutilizando literalmente la convención ya establecida por `contracts/people.yaml`
+  (`texto` — "Búsqueda por nombres, apellidos o número de documento") y `contracts/companies.yaml`
+  (`texto` — "Búsqueda por nombre o número de documento"). Para `Usuario` el único atributo textual del
+  contrato es `correo`, de modo que la semántica es **coincidencia parcial sobre el correo**, resuelta en el
+  servidor con `EF.Functions.Like(u.Correo, $"%{texto}%")` — exactamente el mecanismo que
+  `CompaniaService.ListarAsync` ya usa, ejecutado por SQL Server con la colación de la base (insensible a
+  mayúsculas por defecto). En la capa de aplicación se introduce el registro `FiltroUsuarios(EstadoUsuario?
+  Estado, string? Texto)`, simétrico a `FiltroCompanias` ya existente, en vez de seguir sumando parámetros
+  sueltos a `ListarAsync`.
+
+  El **orden de composición** queda fijado y es el contenido sustantivo de la decisión: `AplicarAlcance(...)`
+  (RF-077) → filtro `estado` → filtro `texto` → `CountAsync` (total) → `OrderBy(u => u.Correo)` →
+  `Skip`/`Take`. La búsqueda se aplica sobre el `IQueryable` **ya restringido al alcance** y **antes** de
+  contar y paginar, por lo que: nunca amplía el alcance (es un `Where` adicional sobre un conjunto ya
+  acotado, jamás un punto de entrada alternativo); `total` refleja las coincidencias dentro del alcance, no
+  el universo del sistema; y un usuario de la página 2 se encuentra igual que uno de la página 1. `estado` y
+  `texto` se combinan con **AND**, como ya ocurre entre `estado`, `tipoCompania` y `texto` en compañías. Sin
+  coincidencias ⇒ `200` con `items: []` y `total: 0` — nunca `404`, que en este contrato significa "recurso
+  fuera de alcance" (RF-077) y no "búsqueda vacía".
+
+  **No se agregan requisitos de ordenamiento ni de rendimiento**: `OrderBy(u => u.Correo)` ya existe y no
+  cambia; CS-002 fija un objetivo de rendimiento para la búsqueda de **personas** (≥100.000 registros), no
+  para la de usuarios administrativos, y ningún artefacto vigente establece un umbral para esta operación —
+  inventarlo excedería la decisión tomada.
+
+  En el frontend, `UsuariosPage.tsx` deja de filtrar `consulta.data?.items` por correo y pasa `texto` al
+  hook `useUsuarios`, que ya deriva su clave de caché del filtro completo (cambiar el texto produce una
+  consulta nueva, no una reutilización). Los filtros de **rol**, **compañía** y **solo vigentes** permanecen
+  en el cliente: `ux-ui.md` los enumera junto a la búsqueda por correo, pero la decisión D-4 y la enmienda de
+  RF-077/UX-22 hablan explícitamente de la **búsqueda**, y el contrato no declara parámetros para ellos.
+  Migrarlos al servidor sería alcance nuevo, no el cierre de esta desviación.
+
+- **Rationale**: Adoptar `texto` en vez de acuñar un nombre nuevo (`correo`, `q`, `busqueda`) mantiene una
+  sola convención de búsqueda en toda la API: los tres listados paginados del sistema se consultan igual, y
+  el cliente HTTP tipado no necesita un caso especial. Aplicar el filtro sobre el `IQueryable` ya acotado
+  —en vez de sobre la página materializada— es lo que traduce la semántica aprobada
+  (`Scope → Search → Pagination`) a una única línea de LINQ, sin capa nueva ni consulta adicional: el alcance
+  no se "vuelve a aplicar" después de buscar porque nunca se soltó. Devolver una página vacía en vez de
+  `404` preserva la propiedad de ocultamiento de existencia: un correo fuera del alcance y un correo
+  inexistente producen exactamente la misma respuesta, de modo que la búsqueda no puede usarse como oráculo
+  de enumeración.
+- **Alternatives considered**: Mantener el filtrado en cliente (descartado por la decisión de negocio D-4,
+  Opción B: no encuentra a quien esté en otra página); buscar también sobre los identificadores de rol o
+  compañía dentro del mismo parámetro `texto` (descartado: `people.yaml`/`companies.yaml` restringen `texto`
+  a atributos textuales del propio recurso, y mezclar criterios heterogéneos en un parámetro libre haría el
+  resultado impredecible); agregar parámetros server-side para rol/compañía/vigentes en la misma pasada
+  (descartado: alcance mayor que la desviación, no respaldado por la decisión tomada); usar búsqueda de
+  texto completo de SQL Server (descartado: exige infraestructura de catálogo adicional que la Constitución
+  obliga a justificar con un requisito explícito, inexistente aquí).

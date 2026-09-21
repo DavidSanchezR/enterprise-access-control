@@ -434,7 +434,153 @@ plan.
 > 2026-09-20, el renombrado de `AlcanceUsuarioCompañía` a `AsignaciónRolAdministrativo`, las anotaciones
 > `[DIFERIDA A ETAPA 2]` de RF-067 a RF-069 y CS-032, la sincronización de Historia 8 a 15 pasos y el cierre de
 > las diez Decisiones Pendientes. Lo único que sigue pendiente de este párrafo es `/speckit-tasks` (tareas de
-> corrección con numeración ≥T169, sin renumerar T001–T168), aún no autorizado.
+> corrección con numeración ≥T169, sin renumerar T001–T168), aún no autorizado. **[CUMPLIDO]**: `/speckit-tasks`
+> generó T169–T228 y `/speckit-implement` las completó; el gate de cierre quedó registrado en
+> `docs/auditorias/gate-cierre-etapa1-2026-09-20.html`.
+
+**Re-chequeo post-desviaciones (Sesión 2026-09-20, cierre de D-1, D-2 y D-4 — `/speckit-plan`)**: confirmado,
+sin violaciones nuevas. Alcance **exclusivo**: las tres desviaciones que quedaron abiertas tras implementar
+T169–T228. No replantea T001–T168 ni T169–T228, que permanecen completas y válidas.
+
+> **Nomenclatura**: `D-1`/`D-2`/`D-4` (con guion) son **desviaciones de implementación** auditadas con
+> `/speckit-analyze`, no las decisiones de negocio `D1`–`D9` (sin guion) del re-chequeo anterior. La letra
+> coincide por accidente y el contenido no se corresponde. `D-3` se cerró como implementación válida sin
+> cambios; **`D-5` se cerró por configuración y documentación y no forma parte de este plan** (RF-078 no se
+> modifica; `docker-compose.yml` ya exige `BOOTSTRAP_ADMIN_PASSWORD` sin valor por defecto).
+
+- **D-1** (renovación de `AsignaciónRolAdministrativo` expuesta como operación HTTP) **refuerza el Principio
+  I**: la operación no estaba accesible, pero su ausencia no era una protección — la regla que la gobierna ya
+  vive en el dominio y lo que faltaba era exponerla bajo los mismos controles de RF-076/RF-077 que el resto.
+  El Principio IV se mantiene íntegro: la renovación es aditiva hacia adelante, nunca reescribe
+  `FechaHoraInicio`, no crea un registro nuevo y no puede puentear un intervalo ya transcurrido. Cero
+  entidades, columnas y migraciones nuevas. Dos correcciones puntuales de consistencia acompañan la
+  exposición (nombre del campo del cuerpo y estado HTTP de `RENOVACION_NO_POSTERIOR`), detalladas en
+  research.md §34.1.
+- **D-2** (cobertura de alcance GLOBAL vs COMPANY) **no modifica código de producción**: el control exigido
+  por RF-077 ya está aplicado en los cinco servicios auditados. Lo que faltaba es la red de regresión que el
+  **Principio VII** exige de forma explícita para las fugas de datos entre compañías — hoy una regresión en
+  el alcance de esos servicios no rompería ninguna prueba. Es, por tanto, el único de los tres puntos que
+  cierra una violación real de la Constitución, y lo hace sin tocar la lógica que verifica.
+- **D-4** (búsqueda server-side de usuarios) **refuerza el Principio I** y la regla de ingeniería de
+  consistencia API/interfaz: el filtrado por correo vivía solo en el cliente, que la Constitución prohíbe
+  tratar como frontera de seguridad. Moverlo al servidor lo somete al mismo alcance que el listado
+  (`Scope → Search → Pagination`) y elimina el riesgo de que la interfaz y la API discrepen sobre qué
+  conjunto se está filtrando. Cero cambios de modelo de datos: es una cláusula `Where` adicional sobre una
+  consulta ya acotada.
+
+Ningún principio requirió enmienda. En esta sesión de planificación se modificaron `research.md` (§34 nueva),
+`contracts/users.yaml` (v2.0.0 → v2.1.0), `data-model.md` (`AsignaciónRolAdministrativo`, párrafo de
+renovación) y `quickstart.md` (§8 nueva, escenarios 1-3). `spec.md` y `ux-ui.md` **no** se modificaron: ya
+incorporan D-1 (RF-075) y D-4 (RF-077, UX-22) desde la sesión de `/speckit-clarify` previa. `tasks.md`
+**no** se modificó: las tareas las genera `/speckit-tasks`, aún no ejecutado.
+
+### Plan de cierre de D-1, D-2 y D-4
+
+#### Archivos afectados, por capa
+
+| Capa | D-1 — renovación | D-2 — cobertura de alcance | D-4 — búsqueda server-side |
+|---|---|---|---|
+| Especificación | RF-075 ya enmendado (sin cambios) | RF-077 ya vigente (sin cambios) | RF-077 y UX-22 ya enmendados (sin cambios) |
+| Contrato | `contracts/users.yaml` — ruta `/renovar` **(hecho en este plan)** | — | `contracts/users.yaml` — parámetro `texto` **(hecho en este plan)** |
+| Backend | `UsuariosController.cs` (acción nueva); `AuthDtos.cs` (`RenovarAsignacionRolRequest.FechaHoraFin`); `AsignacionRolAdministrativoService.cs` (excepción de `RENOVACION_NO_POSTERIOR`) | **ninguno** | `UsuarioService.cs` (`ListarAsync` + registro `FiltroUsuarios`); `UsuariosController.cs` (parámetro `texto`) |
+| Frontend | `features/users/api.ts`, `hooks.ts`, `UsuarioDetalle.tsx`, `mensajesRol.ts` | — | `features/users/api.ts` (`FiltroUsuarios.texto`), `UsuariosPage.tsx` (deja de filtrar por correo en cliente) |
+| Pruebas | contrato, integración, Vitest, Playwright | **integración únicamente** | contrato, integración, Vitest, Playwright |
+| Documentación | `quickstart.md` §8.1 **(hecho)** | `quickstart.md` §8.2 **(hecho)** | `quickstart.md` §8.3 **(hecho)** |
+
+`UsuariosController.cs` aparece en D-1 y D-4: son cambios independientes en el mismo archivo, así que sus
+tareas no deben marcarse `[P]` entre sí.
+
+#### Tareas: ampliación vs. tareas nuevas
+
+**Recomendación: tareas nuevas con numeración ≥T229, sin reabrir ninguna tarea T169–T228.** Razón: las
+T169–T228 están cerradas y su cierre fue verificado por el gate de T228; reabrirlas haría que `[X]`
+significara dos cosas distintas y volvería falso un registro de auditoría ya emitido. Es además el criterio
+que este proyecto ya aplicó ante el caso idéntico de D7/T116 ("el trabajo debe reflejarse en tareas nuevas,
+nunca reescribir ni renumerar T115/T116 retroactivamente"). La trazabilidad se preserva citando la tarea
+antecesora en el texto de cada tarea nueva, no modificándola.
+
+Matiz honesto sobre dos de ellas: **T199** ("…listar, crear, asignar, finalizar, **renovar**") y **T204**
+("Implementar finalizar **y renovar** una asignación") sí nombraban la renovación y se cerraron sin ella,
+porque `contracts/users.yaml` v2.0.0 no declaraba la ruta y publicarla habría roto las pruebas de contrato —
+limitación registrada en su momento como nota explícita en `UsuariosController.cs`. Se completaron hasta
+donde el contrato permitía; el resto queda desbloqueado solo ahora, con v2.1.0.
+
+| # (indicativo) | Trabajo | Antecesora | Capa |
+|---|---|---|---|
+| T229 | Unificar `RENOVACION_NO_POSTERIOR` en `ConflictoEstadoException` (409) y renombrar `RenovarAsignacionRolRequest.NuevaFechaHoraFin` → `FechaHoraFin` | — (corrección, research.md §34.1) | backend |
+| T230 | Exponer `POST .../roles/{asignacionId}/renovar` (204) reutilizando `UsuarioService.RenovarRolAsync`, y retirar la nota que documenta su ausencia | completa T194 | backend |
+| T231 | `renovarRol` en `api.ts` y `useRenovarRol` en `hooks.ts` | completa T199 | frontend |
+| T232 | Acción **Renovar** en `UsuarioDetalle.tsx` con confirmación (UX-20) y sus mensajes en `mensajesRol.ts` | completa T204/T205 | frontend |
+| T233 | Filtro `texto` server-side en `UsuarioService.ListarAsync` (registro `FiltroUsuarios`) y parámetro en `UsuariosController` | amplía T185/T194 | backend |
+| T234 | `UsuariosPage.tsx` deja de filtrar por correo en cliente y pasa `texto` al hook | amplía T200 | frontend |
+| T235 | Pruebas de contrato de v2.1.0: ruta `/renovar` y parámetro `texto` (incl. snapshot OpenAPI) | amplía T220 | pruebas |
+| T236 | Integración de renovación: caso feliz, `409` ×3, `404` fuera de alcance, `403` sin autorización | amplía T213/T214 | pruebas |
+| T237 | Integración de alcance GLOBAL/COMPANY en `UnidadOrganizativaService` y `AreaAccesoService` | cubre T186, cierra CS-037 | pruebas |
+| T238 | Integración de alcance GLOBAL/COMPANY en `AsignacionUnidadOrganizativaService`, `EstadoEfectivoService` y `RevocacionService` (vía `/historial-companias/{id}/finalizar`) | cubre T187, cierra CS-037 | pruebas |
+| T239 | Integración de búsqueda: hallazgo entre páginas, AND con `estado`, resultado vacío, aislamiento con correo exacto conocido | amplía T215 | pruebas |
+| T240 | Vitest del módulo de usuarios: renovar y búsqueda server-side | amplía T221 | pruebas |
+| T241 | E2E: renovar desde UX-20 y encontrar por búsqueda un usuario que no está en la página 1 | amplía T223 | pruebas |
+
+La numeración final la fija `/speckit-tasks`; aquí solo se fija el alcance y el orden.
+
+#### Dependencias reales
+
+- **D-1**: T229 → T230 → T231 → T232. T229 precede a T230 porque el contrato publicado ya declara
+  `fechaHoraFin` y `409`; exponer la ruta antes de corregir el DTO y la excepción publicaría un endpoint que
+  contradice su propio contrato. T235/T236 dependen de T230; T240/T241 de T232.
+- **D-2**: T237 y T238 **no dependen de nada** dentro de este plan — el código que verifican ya existe. Pueden
+  ejecutarse en paralelo entre sí y con todo lo demás, y son el trabajo que puede empezar primero.
+- **D-4**: T233 → T234. T235 y T239 dependen de T233; T240/T241 de T234.
+- **Entre decisiones**: D-1, D-2 y D-4 son independientes. Las únicas coincidencias son de archivo
+  (`UsuariosController.cs` en T230 y T233; `api.ts` en T231 y T234; y las suites compartidas de T235, T240 y
+  T241), que obligan a secuencia dentro del archivo, no dependencia lógica entre decisiones.
+
+#### Trazabilidad
+
+| Decisión | Requisito / UX | Artefacto de diseño | Tareas | Evidencia de prueba |
+|---|---|---|---|---|
+| D-1 | RF-075 (vigencia y renovación), RF-076 (autorización), RF-077 (alcance y `404`) | research.md §34.1; `contracts/users.yaml` `/renovar`; data-model.md (`AsignaciónRolAdministrativo`, renovación); quickstart.md §8.1 | T229–T232 | T235 (contrato), T236 (integración), T240 (Vitest), T241 (E2E UX-20) |
+| D-2 | RF-077 | research.md §34.2; quickstart.md §8.2 | T237, T238 | T237, T238 (son la evidencia; cierran CS-037) |
+| D-4 | RF-077 (alcance antes de buscar y paginar), UX-22 (`ux-ui.md` §35) | research.md §34.3; `contracts/users.yaml` parámetro `texto`; quickstart.md §8.3 | T233, T234 | T235 (contrato), T239 (integración), T240 (Vitest), T241 (E2E) |
+
+#### Estrategia de pruebas
+
+Cada prueba debe fallar si se revierte la capacidad que verifica; no basta con ejercitar el camino feliz.
+
+- **Contrato** (T235): el documento OpenAPI publicado vuelve a coincidir con `users.yaml` v2.1.0 — ruta
+  `/renovar` presente con sus cinco respuestas, parámetro `texto` declarado en el listado. **Desde este plan
+  y hasta que T230 esté implementada, `OpenApiSnapshotTests` está en rojo** con
+  `POST /api/usuarios/{id}/roles/{asignacionId}/renovar: no existe en la API`: recorre cada operación
+  declarada en `contracts/*.yaml` y exige que exista. Es el estado esperado —el contrato se actualiza como
+  artefacto de diseño y el código lo alcanza después, igual que ocurrió con T194–T198— pero conviene saberlo
+  antes de ejecutar la suite. El parámetro `texto` **no** rompe nada mientras tanto: ese snapshot compara
+  rutas, códigos de estado y forma del cuerpo, no parámetros de consulta, de modo que su verificación exige
+  una aserción dedicada en `UsersContractTests` (parte de T235).
+- **Integración** (T236–T239, Testcontainers contra SQL Server real): los tres `409` de la renovación se
+  distinguen por `codigo`, no por el estado HTTP. El aislamiento se prueba siempre con identificadores
+  **conocidos y válidos** de otra Principal —no inventados— porque lo que se verifica es que conocer el
+  identificador no concede acceso (RF-077). En D-2, el caso GLOBAL debe tocar **dos Principales distintas en
+  la misma prueba**: es lo único que falsaría una regresión que volviera a exigir `CompaniaIds.Count > 0`. En
+  D-4, el caso decisivo es el `COMPANY_ADMINISTRATOR` que busca el correo **exacto** de un usuario fuera de su
+  alcance y obtiene la misma respuesta que ante un correo inexistente.
+- **Vitest** (T240) y **Playwright** (T241): la renovación exige confirmación explícita como finalizar
+  (UX-20); la búsqueda encuentra desde la interfaz a un usuario que no está en la página cargada, que es
+  precisamente lo que la implementación anterior no podía hacer.
+- **Regresión**: las cinco suites completas deben quedar en verde, incluida la prueba E2E existente de UX-17 a
+  UX-22, cuyo ayudante `filaDelUsuario` recorre páginas por carecer de búsqueda server-side y podrá
+  simplificarse una vez D-4 esté implementada.
+
+#### Criterios de cierre del Baseline para estas tres desviaciones
+
+1. Las cinco suites en verde, sin regresión en T001–T168 ni en T169–T228.
+2. `ContractTests` confirma que el OpenAPI publicado coincide con `users.yaml` v2.1.0.
+3. Los tres escenarios de `quickstart.md` §8 se reproducen con los resultados esperados.
+4. CS-037 pasa a tener pruebas reales que lo cubran para los cinco servicios auditados, y no solo una
+   mención en un comentario de clase.
+5. `UsuariosController.cs` ya no contiene la nota que documenta la ausencia de la renovación, y
+   `UsuariosPage.tsx` ya no filtra por correo sobre `consulta.data?.items`.
+6. Ninguna casilla de T001–T228 se modifica, y el gate de cierre se repite registrando el resultado en
+   `docs/auditorias/`.
 
 ## Project Structure
 

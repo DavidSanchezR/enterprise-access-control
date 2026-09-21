@@ -217,7 +217,12 @@ asignaciones `GLOBAL_ADMINISTRATOR`, de uno o varios usuarios, sin restricción 
 
 **Renovación**: sigue las mismas reglas ya establecidas para `AsignaciónPersonaCompañía` (RF-073): solo
 extiende `FechaHoraFin` hacia una fecha posterior, solo mientras la asignación siga vigente dinámicamente
-(`fecha actual <= FechaHoraFin` ya declarada) — nunca puentea un vacío temporal ya transcurrido.
+(`fecha actual <= FechaHoraFin` ya declarada) — nunca puentea un vacío temporal ya transcurrido. Es una
+**operación administrativa expuesta**, no solo una regla de dominio: `contracts/users.yaml`
+(`POST .../roles/{asignacionId}/renovar`, contraparte inversa de `/finalizar`), sujeta a las mismas
+restricciones de autorización que crear o finalizar la asignación (RF-076) y al mismo régimen de alcance y
+ocultamiento de existencia (RF-077). Nunca modifica `Rol` ni `CompañíaId` — para cambiar cualquiera de los
+dos se finaliza la asignación y se crea otra (RF-074, RF-075; research.md §34.1).
 
 **Validaciones clave**: toda consulta/operación administrativa DEBE resolver el alcance efectivo del usuario
 autenticado a partir de sus asignaciones vigentes de esta entidad (research.md §27, §29) — `GLOBAL_ADMINISTRATOR`

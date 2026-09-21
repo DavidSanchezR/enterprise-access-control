@@ -14,6 +14,7 @@ function compania(overrides: Partial<Compania> = {}): Compania {
     numeroDocumento: '76543210-9',
     tipoCompania: 'PRINCIPAL_MANDANTE',
     estado: 'ACTIVO',
+    zonaHorariaIana: 'America/Lima',
     ...overrides,
   }
 }
@@ -128,6 +129,8 @@ describe('CompaniasPage', () => {
       numeroDocumento: '77777777-7',
       tipoCompania: 'CONTRATISTA',
       estado: 'ACTIVO',
+      // RF-080: una CONTRATISTA no declara zona propia; el formulario la envía como null.
+      zonaHorariaIana: null,
     })
   })
 

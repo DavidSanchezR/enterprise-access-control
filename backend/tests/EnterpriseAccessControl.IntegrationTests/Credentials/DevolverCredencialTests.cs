@@ -166,8 +166,11 @@ public sealed class DevolverCredencialTests(SqlServerFixture fixture)
         var escenario = await CredencialesSoporte.MontarConContextosAsync(fixture);
         var credencial = await escenario.AsignarCredencialAsync(escenario.PrincipalA.Id);
 
-        // Administra la Principal A, pero la persona pertenece a la Contratista, fuera de su alcance.
-        using var ajeno = await fixture.Api.ClienteDeAreasAsync(escenario.PrincipalA.Id);
+        // Desde D3 el alcance sobre una Persona es la UNIÓN de su pertenencia vigente y de sus
+        // contextos operativos vigentes (RF-077), así que la Principal A sí la alcanza. Quien no la
+        // alcanza es una compañía ajena a esa unión.
+        var ajena = await fixture.Api.SembrarCompaniaAsync("Principal Sin Relación");
+        using var ajeno = await fixture.Api.ClienteDeAreasAsync(ajena.Id);
 
         using var respuesta = await escenario.DevolverAsync(credencial.Id, ajeno);
 

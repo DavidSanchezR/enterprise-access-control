@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
   actualizarUsuario,
+  asignarRol,
   crearUsuario,
   desbloquearUsuario,
+  finalizarRol,
+  listarRoles,
   listarUsuarios,
-  obtenerAlcance,
-  reemplazarAlcance,
+  renovarRol,
+  type AsignacionRol,
+  type DatosAsignacion,
   type EstadoUsuario,
   type FiltroUsuarios,
   type PaginaUsuarios,
@@ -20,7 +24,7 @@ export const clavesUsuarios = {
   todo: ['usuarios'] as const,
   listas: () => [...clavesUsuarios.todo, 'lista'] as const,
   lista: (filtro: FiltroUsuarios) => [...clavesUsuarios.listas(), filtro] as const,
-  alcance: (id: string) => [...clavesUsuarios.todo, 'alcance', id] as const,
+  roles: (id: string) => [...clavesUsuarios.todo, 'roles', id] as const,
 }
 
 export function useUsuarios(filtro: FiltroUsuarios): UseQueryResult<PaginaUsuarios> {
@@ -33,10 +37,11 @@ export function useUsuarios(filtro: FiltroUsuarios): UseQueryResult<PaginaUsuari
   })
 }
 
-export function useAlcanceUsuario(id: string | null): UseQueryResult<string[]> {
+/** Asignaciones vigentes e históricas de un usuario (UX-18). */
+export function useRolesUsuario(id: string | null): UseQueryResult<AsignacionRol[]> {
   return useQuery({
-    queryKey: clavesUsuarios.alcance(id ?? ''),
-    queryFn: () => obtenerAlcance(id!),
+    queryKey: clavesUsuarios.roles(id ?? ''),
+    queryFn: () => listarRoles(id!),
     enabled: id !== null,
   })
 }
@@ -75,14 +80,40 @@ export function useDesbloquearUsuario() {
   })
 }
 
-export function useReemplazarAlcance() {
+export function useAsignarRol() {
   const invalidar = useInvalidarUsuarios()
 
   return useMutation({
-    mutationFn: (entrada: { id: string; companiaIds: string[] }) =>
-      reemplazarAlcance(entrada.id, entrada.companiaIds),
+    mutationFn: (entrada: { id: string } & DatosAsignacion) =>
+      asignarRol(entrada.id, {
+        rol: entrada.rol,
+        companiaId: entrada.companiaId,
+        fechaHoraInicio: entrada.fechaHoraInicio,
+        fechaHoraFin: entrada.fechaHoraFin,
+      }),
     onSuccess: invalidar,
   })
 }
 
-export type { EstadoUsuario, FiltroUsuarios, PaginaUsuarios, Usuario }
+export function useFinalizarRol() {
+  const invalidar = useInvalidarUsuarios()
+
+  return useMutation({
+    mutationFn: (entrada: { id: string; asignacionId: string }) =>
+      finalizarRol(entrada.id, entrada.asignacionId),
+    onSuccess: invalidar,
+  })
+}
+
+/** Extiende la vigencia de una asignación (UX-20). Contraparte de `useFinalizarRol`. */
+export function useRenovarRol() {
+  const invalidar = useInvalidarUsuarios()
+
+  return useMutation({
+    mutationFn: (entrada: { id: string; asignacionId: string; fechaHoraFin: string }) =>
+      renovarRol(entrada.id, entrada.asignacionId, entrada.fechaHoraFin),
+    onSuccess: invalidar,
+  })
+}
+
+export type { AsignacionRol, DatosAsignacion, EstadoUsuario, FiltroUsuarios, PaginaUsuarios, Usuario }

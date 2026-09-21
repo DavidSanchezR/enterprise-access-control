@@ -290,9 +290,75 @@ Decisiones sin escenario de validación funcional (no requieren uno): D8 (fuera 
 funcionalidad que probar) y D9 (ratifican comportamiento ya cubierto por las suites existentes de política de
 contraseñas y de `CredencialService`).
 
-## 8. Próximos pasos
+## 8. Escenarios de validación del cierre de desviaciones (D-1, D-2, D-4 — Sesión 2026-09-20)
+
+> Las etiquetas con guion (`D-1`, `D-2`, `D-4`) son las **desviaciones** detectadas al terminar T169–T228,
+> distintas de las decisiones `D1`–`D9` de la sección 7 pese a la coincidencia de letra (research.md §34).
+> `D-3` y `D-5` no tienen escenario: la primera se cerró como implementación válida sin cambios y la segunda
+> por configuración/documentación, ya verificable en la sección 2 (la API no arranca sin
+> `Bootstrap__AdminPassword`).
+
+Estos escenarios validan lo planificado en `research.md` §34. **Implementados en la sesión del 2026-09-20**
+(tareas T229 a T242) y cubiertos por pruebas automatizadas, de modo que ejecutarlos a mano es una
+verificación de confirmación y no la única evidencia:
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Renovación de asignación de rol (D-1) | `RolesAdministrativosTests.Renovar_*` (7 pruebas), `UsuarioDetalle.test.tsx`, `administracion-usuarios.spec.ts` |
+| 2 — Alcance GLOBAL vs COMPANY (D-2) | `AislamientoRecursosTests` (9 pruebas, los siete recursos de CS-037) |
+| 3 — Búsqueda server-side (D-4) | `BusquedaUsuariosTests` (7 pruebas), `UsuariosPage.test.tsx`, `administracion-usuarios.spec.ts` |
+
+1. **Renovación de una asignación de rol (D-1 — RF-075, RF-076, RF-077)**: con un `GLOBAL_ADMINISTRATOR`,
+   crear un usuario con una asignación vigente y renovarla con
+   `POST /api/usuarios/{id}/roles/{asignacionId}/renovar` y cuerpo `{ "fechaHoraFin": "<posterior>" }` —
+   resultado esperado: `204`, y `GET .../roles` devuelve la **misma** asignación (mismo `id`, mismo `rol`,
+   misma `companiaId`, misma `fechaHoraInicio`) con la nueva `fechaHoraFin`; nunca un registro adicional.
+   Repetir con una fecha anterior o igual a la vigente — resultado esperado: `409`,
+   `codigo = RENOVACION_NO_POSTERIOR`. Repetir sobre una asignación ya finalizada o ya expirada — resultado
+   esperado: `409`, `codigo = ASIGNACION_ROL_NO_VIGENTE`. Desde un `COMPANY_ADMINISTRATOR` de Minera ABC,
+   renovar una asignación de un usuario de Minera XYZ — resultado esperado: `404` (no `403`, para no
+   confirmar su existencia); y renovar una asignación `GLOBAL_ADMINISTRATOR` de un usuario que sí está en su
+   alcance — resultado esperado: `403`, `codigo = ROL_NO_AUTORIZADO`. Desde la interfaz, la acción
+   **Renovar** del detalle de usuario debe pedir confirmación igual que **Finalizar** (UX-20).
+2. **Alcance GLOBAL vs COMPANY en los siete recursos de CS-037 (D-2 y C2 — RF-077)**: con dos Principales
+   distintas (Minera ABC y Minera XYZ, secciones 5 y 6), operar con un `GLOBAL_ADMINISTRATOR` sobre recursos
+   de **ambas** en la misma sesión y repetir cada operación con un `COMPANY_ADMINISTRATOR` cuya única
+   asignación vigente es sobre Minera ABC, apuntando a recursos de Minera XYZ **cuyos identificadores se
+   conocen y son válidos** — resultado esperado: el global procede en las dos Principales sin enumerar
+   compañías en el token; el de compañía recibe `404` en todos los casos, nunca `403` ni una respuesta
+   parcial. Los siete recursos y su superficie real de autorización:
+
+   | Recurso | Superficie que se ejercita |
+   |---|---|
+   | Usuarios | `GET /api/usuarios/{id}` |
+   | Compañías | `GET /api/companias/{id}` y el listado paginado |
+   | Unidades organizativas | `GET` y `PUT /api/unidades-organizativas/{id}` |
+   | Áreas de acceso | `GET` y `PUT /api/areas-acceso/{id}` |
+   | Personas | `GET /api/personas/{id}` y su `historial-companias` |
+   | Contextos operativos | `GET .../contextos-operativos` y `POST .../{contextoId}/unidad-organizativa` |
+   | Credenciales | `GET`, `POST .../devolver` y `DELETE` bajo `/api/personas/{id}/credenciales` |
+
+   Además, dos servicios sin recurso propio: el **estado efectivo** (`GET .../estado-efectivo`, proyección de
+   la persona) y la **cascada de revocación**, que se ejercita vía
+   `POST /api/personas/{id}/historial-companias/{asignacionId}/finalizar` porque `RevocacionService` no tiene
+   endpoint propio ni control de alcance propio por diseño (research.md §34.2). En ese último caso se
+   comprueba además que la pertenencia ajena **no se modificó**: el `404` no puede ser cosmético.
+3. **Búsqueda server-side de usuarios (D-4 — RF-077, UX-22)**: con un `GLOBAL_ADMINISTRATOR` y más usuarios
+   que `tamañoPagina`, identificar un correo que **no** esté en la primera página y consultar
+   `GET /api/usuarios?texto=<fragmento-de-ese-correo>&pagina=1` — resultado esperado: el usuario aparece en
+   la página 1 del resultado filtrado, con `total` igual al número de coincidencias y no al de usuarios del
+   sistema. Combinar `texto` con `estado` — resultado esperado: se aplican ambos (AND). Buscar un fragmento
+   sin coincidencias — resultado esperado: `200` con `items: []` y `total: 0`, nunca `404`. Desde un
+   `COMPANY_ADMINISTRATOR` de Minera ABC, buscar el correo **exacto y conocido** de un usuario cuya única
+   asignación es de Minera XYZ — resultado esperado: `items: []` y `total: 0`, idéntico a buscar un correo
+   inexistente: conocer el correo no revela su existencia ni concede acceso. Desde la interfaz, escribir en
+   el filtro **Correo** debe encontrar al usuario de la página 3 sin navegar hasta ella.
+
+## 9. Próximos pasos
 
 Este quickstart valida el comportamiento end-to-end una vez implementado. La secuencia de construcción
 (entidades → migraciones → casos de uso → endpoints → UI) se define en `tasks.md`, generado por el comando
-`/speckit-tasks` a partir de este plan. Las tareas de corrección del cierre de Etapa 1 (D1-D9) se agregarán
-como tareas nuevas (numeración ≥T169) en una futura ejecución de `/speckit-tasks`, sin renumerar T001–T168.
+`/speckit-tasks` a partir de este plan. Las tareas de corrección del cierre de Etapa 1 (D1-D9) ya se
+generaron y completaron como T169–T228, sin renumerar T001–T168. Los escenarios de la sección 8 (cierre de
+las desviaciones D-1, D-2 y D-4) son los únicos pendientes: sus tareas se generarán en la próxima ejecución
+de `/speckit-tasks`, continuando la numeración a partir de T228.

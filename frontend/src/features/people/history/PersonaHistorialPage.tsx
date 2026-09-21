@@ -10,6 +10,8 @@ import {
   type AsignacionCompania,
   type ContextoOperativo,
 } from './api'
+import { PerfilesPersona } from '../perfiles/PerfilesPersona'
+import { PertenenciaContextoWizard } from './PertenenciaContextoWizard'
 import { RenovarPertenenciaDialogo } from './RenovarPertenenciaDialogo'
 import { useContextos, useFinalizarPertenencia, useHistorialCompanias } from './hooks'
 import './history.css'
@@ -38,6 +40,7 @@ export function PersonaHistorialPage(): ReactElement {
 
   const [renovando, setRenovando] = useState<AsignacionCompania | null>(null)
   const [contextoSeleccionado, setContextoSeleccionado] = useState<ContextoOperativo | null>(null)
+  const [registrando, setRegistrando] = useState(false)
 
   const historial = useHistorialCompanias(personaId)
   const contextos = useContextos(personaId)
@@ -72,6 +75,14 @@ export function PersonaHistorialPage(): ReactElement {
           {error.message}
         </p>
       )}
+
+      {/* Punto de entrada que faltaba: los hooks de alta de pertenencia y apertura de contexto ya
+          existían, pero ninguna pantalla los invocaba y Historia 5 solo era operable por API (D7). */}
+      <div className="historial-acciones">
+        <button type="button" className="primario" onClick={() => setRegistrando(true)}>
+          Registrar pertenencia y contexto
+        </button>
+      </div>
 
       <h2>Pertenencia a compañía</h2>
 
@@ -201,7 +212,16 @@ export function PersonaHistorialPage(): ReactElement {
         })}
       </ol>
 
+      <PerfilesPersona personaId={personaId} />
+
       <CredencialesPersona personaId={personaId} />
+
+      {registrando && (
+        <PertenenciaContextoWizard
+          personaId={personaId}
+          alCerrar={() => setRegistrando(false)}
+        />
+      )}
 
       {renovando && (
         <RenovarPertenenciaDialogo

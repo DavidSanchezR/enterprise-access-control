@@ -50,7 +50,11 @@ public sealed class CompaniasController(
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType<CompaniaDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // 409 CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS: el tipo destino es incompatible con dependencias
+    // existentes (RF-081).
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CompaniaDto>> Actualizar(
         Guid id,
         [FromBody] CompaniaRequest request,

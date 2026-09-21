@@ -40,6 +40,10 @@ public sealed class ApiContratoFixture : IAsyncLifetime
                     // check de SQL Server y el DbContext no se conecta durante el arranque.
                     ["ConnectionStrings:SqlServer"] = string.Empty,
                     ["Jwt:SigningKey"] = "clave-de-pruebas-de-contrato-con-longitud-suficiente-256-bits",
+                    // BootstrapOptions también se valida al arrancar (RF-078). Sin cadena de conexión
+                    // la siembra se omite, pero las opciones deben estar completas o el host aborta.
+                    ["Bootstrap:AdminEmail"] = "contrato-admin@pruebas.local",
+                    ["Bootstrap:AdminPassword"] = "Contrato-Pruebas1",
                 }));
         });
 
@@ -136,6 +140,71 @@ public sealed class ContratoOpenApi(string nombre, Dictionary<object, object> cr
     /// </remarks>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> ValoresPorEnumerado { get; } =
         LeerEnumerados(crudo);
+
+    private readonly Dictionary<object, object> crudoDelContrato = crudo;
+
+    /// <summary>
+    /// Nombres de los parámetros <c>in: query</c> declarados por una operación.
+    /// </summary>
+    /// <remarks>
+    /// El snapshot transversal compara rutas, estados y cuerpos, no parámetros de consulta: sin esta
+    /// lectura, un filtro declarado en el contrato y no implementado pasaría inadvertido. Resuelve los
+    /// <c>$ref</c> a <c>components.parameters</c>, que es como el contrato declara la paginación.
+    /// </remarks>
+    public IReadOnlyList<string> ParametrosDeConsulta(string ruta, string metodo)
+    {
+        if (Paths(crudoDelContrato).GetValueOrDefault(ruta) is not Dictionary<object, object> item
+            || item.GetValueOrDefault(metodo) is not Dictionary<object, object> operacion
+            || operacion.GetValueOrDefault("parameters") is not List<object> parametros)
+        {
+            return [];
+        }
+
+        var nombres = new List<string>();
+
+        foreach (var entrada in parametros.OfType<Dictionary<object, object>>())
+        {
+            var declaracion = entrada.GetValueOrDefault("$ref") is string referencia
+                ? Referenciado(crudoDelContrato, referencia)
+                : entrada;
+
+            if (declaracion?.GetValueOrDefault("in") as string != "query")
+            {
+                continue;
+            }
+
+            if (Convert.ToString(declaracion.GetValueOrDefault("name"), CultureInfo.InvariantCulture)
+                is { Length: > 0 } nombre)
+            {
+                nombres.Add(nombre);
+            }
+        }
+
+        return nombres;
+    }
+
+    /// <summary>Resuelve un <c>$ref</c> local del tipo <c>#/components/parameters/Pagina</c>.</summary>
+    private static Dictionary<object, object>? Referenciado(
+        Dictionary<object, object> crudo,
+        string referencia)
+    {
+        var partes = referencia.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        // Se salta el "#" inicial y se desciende por el resto del camino.
+        object? actual = crudo;
+
+        foreach (var parte in partes.Where(p => p != "#"))
+        {
+            if (actual is not Dictionary<object, object> mapa)
+            {
+                return null;
+            }
+
+            actual = mapa.GetValueOrDefault(parte);
+        }
+
+        return actual as Dictionary<object, object>;
+    }
 
     private static readonly string[] MetodosHttp =
         ["get", "post", "put", "patch", "delete", "head", "options"];

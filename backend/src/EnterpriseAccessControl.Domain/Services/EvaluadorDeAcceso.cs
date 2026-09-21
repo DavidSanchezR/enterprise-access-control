@@ -5,8 +5,8 @@ using EnterpriseAccessControl.Domain.Enums;
 namespace EnterpriseAccessControl.Domain.Services;
 
 /// <summary>
-/// Motor de evaluación de acceso: los 14 pasos ordenados de research.md §7
-/// (Historia 8, RF-023 a RF-025, RF-059, RF-065, RF-066).
+/// Motor de evaluación de acceso: los 15 pasos ordenados de research.md §7
+/// (Historia 8, RF-023 a RF-025, RF-059, RF-065, RF-066, RF-079, RF-080).
 /// </summary>
 /// <remarks>
 /// **Servicio de dominio puro, deliberadamente no un <c>AuthorizationPolicy</c> de ASP.NET Core**
@@ -53,12 +53,28 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(MotivoDenegacion.FUERA_DE_ALCANCE_USUARIO, principalId);
         }
 
-        // Paso 5: contexto operativo vigente con esa Principal, y legitimidad re-derivada.
+        // Paso 5: la Compañía Principal propietaria del área debe estar ACTIVA (RF-079).
+        // La comprobación es dinámica y no escribe nada: inactivar la compañía deniega de inmediato
+        // sin tocar contextos, credenciales ni permisos, y reactivarla restablece el acceso.
+        if (datos.CompaniaPrincipal is null || datos.CompaniaPrincipal.Estado != Estado.ACTIVO)
+        {
+            return Denegar(MotivoDenegacion.COMPANIA_INACTIVA, principalId);
+        }
+
+        // Paso 6: contexto operativo vigente con esa Principal, y legitimidad re-derivada.
         var contexto = datos.ContextoOperativo;
 
         if (contexto is null || !contexto.EstaVigenteEn(datos.FechaHoraUtc))
         {
             return Denegar(MotivoDenegacion.SIN_CONTEXTO_OPERATIVO_VIGENTE, principalId);
+        }
+
+        // Paso 6 (continuación): la compañía de pertenencia vigente también debe estar ACTIVA
+        // (RF-079), con el mismo motivo y la misma reversibilidad que el paso 5.
+        if (datos.CompaniaPertenencia is not null
+            && datos.CompaniaPertenencia.Estado != Estado.ACTIVO)
+        {
+            return Denegar(MotivoDenegacion.COMPANIA_INACTIVA, principalId, contexto.Id);
         }
 
         var motivoIlegitimidad = EvaluarLegitimidad(datos, principalId);
@@ -67,7 +83,7 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(motivoIlegitimidad.Value, principalId, contexto.Id);
         }
 
-        // Paso 6: credencial vigente para esa misma Principal (RF-066, RF-070, RF-071).
+        // Paso 7: credencial vigente para esa misma Principal (RF-066, RF-070, RF-071).
         // Los cuatro casos —nunca asignada, DEVUELTO/ELIMINADO/REVOCADA, o ASIGNADO ya expirada—
         // se reportan con el mismo motivo, y ninguno modifica el estado de la credencial.
         if (datos.Credencial is null || !datos.Credencial.EstaVigenteEn(datos.FechaHoraUtc))
@@ -75,19 +91,19 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(MotivoDenegacion.SIN_CREDENCIAL_VIGENTE, principalId, contexto.Id);
         }
 
-        // Paso 7: el área debe estar activa.
+        // Paso 8: el área debe estar activa.
         if (datos.Area.Estado != Estado.ACTIVO)
         {
             return Denegar(MotivoDenegacion.AREA_INACTIVA, principalId, contexto.Id);
         }
 
-        // Paso 8: algún perfil vigente de la persona debe estar autorizado en el área (RF-024).
+        // Paso 9: algún perfil vigente de la persona debe estar autorizado en el área (RF-024).
         if (!datos.TiposPersonaVigentes.Any(datos.TiposPersonaAutorizadosEnArea.Contains))
         {
             return Denegar(MotivoDenegacion.PERFIL_NO_AUTORIZADO_EN_AREA, principalId, contexto.Id);
         }
 
-        // Pasos 9 y 10: recolectar los permisos aplicables en los tres niveles.
+        // Pasos 10 y 11: recolectar los permisos aplicables en los tres niveles.
         var aplicables = datos.PermisosDelArea
             .Where(p => EsAplicableAlSujeto(p.Permiso, datos))
             .ToList();
@@ -97,7 +113,7 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(MotivoDenegacion.SIN_PERMISO_APLICABLE, principalId, contexto.Id);
         }
 
-        // Paso 11: filtrar por vigencia del permiso en la fecha evaluada.
+        // Paso 12: filtrar por vigencia del permiso en la fecha evaluada.
         // Se exige además Estado ACTIVO: el estado es una baja lógica, y un permiso dado de baja que
         // siguiera concediendo acceso contradiría el propósito de darlo de baja. La vigencia en sí
         // se sigue evaluando por fechas y nunca por el estado (Principio IV).
@@ -111,9 +127,12 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(MotivoDenegacion.PERMISO_FUERA_DE_VIGENCIA, principalId, contexto.Id);
         }
 
-        // Paso 12: filtrar por día de semana y bloque horario en la zona empresarial.
-        var dia = ADiaSemana(reloj.DiaSemanaLocal(datos.FechaHoraUtc));
-        var hora = reloj.HoraLocal(datos.FechaHoraUtc);
+        // Paso 13: filtrar por día de semana y bloque horario en la zona horaria de la Compañía
+        // Principal propietaria del área, determinada en el paso 4 (RF-080). Antes de la Sesión
+        // 2026-09-20 este paso usaba una única zona de proceso para todas las compañías.
+        var zona = datos.CompaniaPrincipal.ZonaHorariaIana;
+        var dia = ADiaSemana(reloj.DiaSemanaLocal(datos.FechaHoraUtc, zona));
+        var hora = reloj.HoraLocal(datos.FechaHoraUtc, zona);
 
         var enHorario = vigentes
             .Where(p => p.Bloques.Any(b => b.Cubre(dia, hora)))
@@ -124,14 +143,14 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
             return Denegar(MotivoDenegacion.FUERA_DE_BLOQUE_HORARIO, principalId, contexto.Id);
         }
 
-        // Paso 13: precedencia PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA (RF-025).
+        // Paso 14: precedencia PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA (RF-025).
         var ganador = enHorario
             .OrderBy(p => (int)p.Permiso.Alcance)
             .ThenBy(p => p.Permiso.Id)
             .First()
             .Permiso;
 
-        // Paso 14: conceder.
+        // Paso 15: conceder.
         return new ResultadoDeEvaluacion(
             ResultadoEvaluacion.CONCEDIDO,
             MotivoDenegacion: null,
@@ -142,7 +161,7 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
     }
 
     /// <summary>
-    /// Paso 5: re-deriva si el contexto operativo sigue siendo legítimo (RF-061, RF-065).
+    /// Paso 6: re-deriva si el contexto operativo sigue siendo legítimo (RF-061, RF-065).
     /// </summary>
     /// <remarks>
     /// Devuelve <c>null</c> cuando es legítimo. La re-derivación es dinámica y no escribe nada: no
@@ -176,14 +195,14 @@ public sealed class EvaluadorDeAcceso(IRelojEmpresarial reloj)
         return MotivoDenegacion.SIN_CONTEXTO_OPERATIVO_VIGENTE;
     }
 
-    /// <summary>Paso 10: el permiso apunta al sujeto evaluado en su nivel.</summary>
+    /// <summary>Paso 11: el permiso apunta al sujeto evaluado en su nivel.</summary>
     private static bool EsAplicableAlSujeto(PermisoAcceso permiso, DatosDeEvaluacion datos) =>
         permiso.Alcance switch
         {
             AlcancePermiso.PERSONA =>
                 permiso.PersonaId == datos.PersonaId,
 
-            // Solo si la persona tiene unidad vigente en este contexto (paso 9).
+            // Solo si la persona tiene unidad vigente en este contexto (paso 10).
             AlcancePermiso.UNIDAD_ORGANIZATIVA =>
                 datos.UnidadOrganizativaVigenteId is not null
                 && permiso.UnidadOrganizativaId == datos.UnidadOrganizativaVigenteId,

@@ -64,7 +64,8 @@ describe('LoginPage', () => {
       accessToken: 'token-de-prueba',
       expiraEn: '2026-12-31T00:00:00Z',
       requiereCambioPassword: false,
-      alcanceCompanias: ['0199b0d0-0000-7000-8000-000000000001'],
+      rol: 'COMPANY_ADMINISTRATOR',
+      companiaIds: ['0199b0d0-0000-7000-8000-000000000001'],
     })
 
     renderizar()
@@ -77,7 +78,8 @@ describe('LoginPage', () => {
 
     const sesion = leerSesion()
     expect(sesion?.accessToken).toBe('token-de-prueba')
-    expect(sesion?.alcanceCompanias).toEqual(['0199b0d0-0000-7000-8000-000000000001'])
+    expect(sesion?.rol).toBe('COMPANY_ADMINISTRATOR')
+    expect(sesion?.companiaIds).toEqual(['0199b0d0-0000-7000-8000-000000000001'])
   })
 
   it('lleva al cambio de contraseña cuando el servidor lo exige', async () => {
@@ -85,7 +87,8 @@ describe('LoginPage', () => {
       accessToken: 'token-de-prueba',
       expiraEn: '2026-12-31T00:00:00Z',
       requiereCambioPassword: true,
-      alcanceCompanias: [],
+      rol: 'GLOBAL_ADMINISTRATOR',
+      companiaIds: [],
     })
 
     renderizar()

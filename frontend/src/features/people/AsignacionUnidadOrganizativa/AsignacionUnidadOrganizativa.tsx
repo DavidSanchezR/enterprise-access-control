@@ -1,11 +1,22 @@
-import { useState, type ReactElement } from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
+import { Tree, type NodoArbol } from '../../../components/Tree'
 import { ApiError } from '../../../lib/apiClient'
-import { useUnidades } from '../../org-units/hooks'
+import { formatearFechaHora } from '../../../lib/fechas'
+import { useCompanias } from '../../companies/hooks'
+import type { NodoArbolUnidad } from '../../org-units/api'
+import { useArbolUnidades, useUnidades } from '../../org-units/hooks'
 import { ETIQUETA_MOTIVO_REVOCACION, type ContextoOperativo } from '../history/api'
 import { useAsignarUnidad, useUnidadesDelContexto } from '../history/hooks'
 
-function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString()
+/** Adapta el árbol de la API al contrato de Tree, conservando la ruta de ancestros. */
+function aNodosArbol(nodos: NodoArbolUnidad[], ruta: string[] = []): NodoArbol[] {
+  return nodos.map((nodo) => ({
+    id: nodo.id,
+    // El estado viaja en el nombre visible para que no dependa solo del color (ux-ui.md §26).
+    nombre: nodo.estado === 'INACTIVO' ? `${nodo.nombre} (inactiva)` : nodo.nombre,
+    rutaAncestros: ruta,
+    hijos: aNodosArbol(nodo.hijos, [...ruta, nodo.nombre]),
+  }))
 }
 
 /**
@@ -26,8 +37,17 @@ export function AsignacionUnidadOrganizativa({
 
   // Solo las unidades del árbol de la Principal de este contexto.
   const unidades = useUnidades(contexto.companiaPrincipalId)
+  const arbol = useArbolUnidades(contexto.companiaPrincipalId)
+
+  // La zona de la Principal del contexto rige la presentación de fechas (RF-080).
+  const companias = useCompanias({ tamañoPagina: 200 })
+  const zonaPrincipal =
+    companias.data?.items.find((c) => c.id === contexto.companiaPrincipalId)?.zonaHorariaIana ??
+    null
 
   const asignar = useAsignarUnidad(personaId)
+
+  const nodos = useMemo(() => aNodosArbol(arbol.data ?? []), [arbol.data])
 
   const [unidadId, setUnidadId] = useState('')
   const [desde, setDesde] = useState(contexto.fechaHoraInicio.slice(0, 10))
@@ -64,16 +84,23 @@ export function AsignacionUnidadOrganizativa({
         <ul className="asignacion-uo-lista">
           {asignaciones.data!.map((asignacion) => (
             <li key={asignacion.id}>
+              {/* Nunca se muestra el UUID como respaldo (RF-013): mientras el nombre no ha llegado
+                  se indica la carga, y si no resuelve se usa un marcador legible. */}
               <span>
-                {unidades.data?.find((u) => u.id === asignacion.unidadOrganizativaId)?.nombre ??
-                  asignacion.unidadOrganizativaId}
+                {unidades.isPending ? (
+                  <span className="cargando">Cargando nombre…</span>
+                ) : (
+                  (unidades.data?.find((u) => u.id === asignacion.unidadOrganizativaId)?.nombre ?? (
+                    <span className="sin-resolver">Unidad no disponible</span>
+                  ))
+                )}
               </span>
 
               <span className={`etiqueta ${asignacion.estado}`}>{asignacion.estado}</span>
 
               <span className="asignacion-uo-fechas">
-                {formatearFecha(asignacion.fechaHoraInicio)} –{' '}
-                {formatearFecha(asignacion.fechaHoraFin)}
+                {formatearFechaHora(asignacion.fechaHoraInicio, zonaPrincipal)} –{' '}
+                {formatearFechaHora(asignacion.fechaHoraFin, zonaPrincipal)}
               </span>
 
               {asignacion.motivoFin && (
@@ -88,20 +115,32 @@ export function AsignacionUnidadOrganizativa({
 
       {contexto.estado === 'ACTIVO' && (
         <div className="asignacion-uo-alta">
+          {/* CS-021 exige elegir sobre el árbol, no sobre una lista plana: un selector lineal pierde
+              la jerarquía que da sentido a los nombres repetidos entre ramas (ux-ui.md §14). */}
           <div className="campo">
-            <label htmlFor={`unidad-${contexto.id}`}>Unidad organizativa</label>
-            <select
-              id={`unidad-${contexto.id}`}
-              value={unidadId}
-              onChange={(evento) => setUnidadId(evento.target.value)}
-            >
-              <option value="">Seleccione…</option>
-              {unidades.data?.map((unidad) => (
-                <option key={unidad.id} value={unidad.id}>
-                  {unidad.nombre}
-                </option>
-              ))}
-            </select>
+            <span className="campo-etiqueta" id={`unidad-${contexto.id}-etiqueta`}>
+              Unidad organizativa
+            </span>
+
+            {arbol.isPending && <p>Cargando el árbol de la compañía principal…</p>}
+
+            {!arbol.isPending && nodos.length === 0 && (
+              <p className="campo-ayuda">
+                La compañía principal de este contexto todavía no tiene unidades organizativas.
+              </p>
+            )}
+
+            {/* La etiqueta describe el alcance del árbol sin nombrar un selector de Principal: la
+                Principal no se elige aquí, la fija el contexto (RF-055). */}
+            {nodos.length > 0 && (
+              <Tree
+                nodos={nodos}
+                etiqueta="Unidades organizativas disponibles en este contexto operativo"
+                seleccionadoId={unidadId === '' ? undefined : unidadId}
+                onSeleccionar={(nodo) => setUnidadId(nodo.id)}
+              />
+            )}
+
             <span className="campo-ayuda">
               Solo unidades de la compañía principal de este contexto.
             </span>

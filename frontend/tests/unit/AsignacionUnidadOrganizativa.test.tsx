@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as orgUnitsApi from '../../src/features/org-units/api'
-import type { UnidadOrganizativa } from '../../src/features/org-units/api'
+import type { NodoArbolUnidad, UnidadOrganizativa } from '../../src/features/org-units/api'
+import * as companiasApi from '../../src/features/companies/api'
 import { AsignacionUnidadOrganizativa } from '../../src/features/people/AsignacionUnidadOrganizativa/AsignacionUnidadOrganizativa'
 import * as api from '../../src/features/people/history/api'
 import type { ContextoOperativo } from '../../src/features/people/history/api'
@@ -30,6 +31,10 @@ function contexto(overrides: Partial<ContextoOperativo> = {}): ContextoOperativo
   }
 }
 
+function nodoArbol(id: string, nombre: string): NodoArbolUnidad {
+  return { id, nombre, unidadSuperiorId: null, estado: 'ACTIVO', hijos: [] }
+}
+
 function unidad(id: string, nombre: string): UnidadOrganizativa {
   return {
     id,
@@ -41,15 +46,14 @@ function unidad(id: string, nombre: string): UnidadOrganizativa {
 }
 
 /**
- * Elige la unidad esperando primero a que el selector tenga sus opciones.
+ * Elige la unidad sobre el arbol, esperando a que sus nodos lleguen.
  *
- * Las unidades llegan de una consulta asíncrona; sin la espera, `selectOptions` actuaría sobre un
- * `<select>` que todavía solo contiene el marcador de posición.
+ * CS-021 exige elegir sobre el arbol y no sobre una lista plana: el selector es un `treeitem`, no
+ * una opcion de `<select>`.
  */
 async function elegirUnidadAsync(): Promise<void> {
-  const selector = await screen.findByLabelText('Unidad organizativa')
-  await screen.findByRole('option', { name: 'Planta Norte' })
-  await userEvent.selectOptions(selector, UNIDAD_A)
+  const nodo = await screen.findByRole('treeitem', { name: /Planta Norte/ })
+  await userEvent.click(nodo)
 }
 
 function renderizar(ctx = contexto()): void {
@@ -69,6 +73,13 @@ describe('AsignacionUnidadOrganizativa', () => {
     localStorage.clear()
     vi.spyOn(api, 'listarUnidadesDelContexto').mockResolvedValue([])
     vi.spyOn(orgUnitsApi, 'listarUnidades').mockResolvedValue([unidad(UNIDAD_A, 'Planta Norte')])
+    vi.spyOn(orgUnitsApi, 'obtenerArbol').mockResolvedValue([nodoArbol(UNIDAD_A, 'Planta Norte')])
+    vi.spyOn(companiasApi, 'listarCompanias').mockResolvedValue({
+      items: [],
+      total: 0,
+      pagina: 1,
+      tamañoPagina: 200,
+    })
   })
 
   afterEach(() => {
@@ -78,7 +89,7 @@ describe('AsignacionUnidadOrganizativa', () => {
   it('no ofrece elegir compañía principal: la fija el contexto', async () => {
     renderizar()
 
-    await screen.findByLabelText('Unidad organizativa')
+    await screen.findByRole('treeitem', { name: /Planta Norte/ })
 
     // Caso A/B ya quedó resuelto al abrir el contexto. Un selector aquí permitiría proponer una
     // unidad de otra Principal, que el servidor rechazaría (RF-055).
@@ -86,21 +97,21 @@ describe('AsignacionUnidadOrganizativa', () => {
   })
 
   it('solo lista unidades de la compañía principal del contexto', async () => {
-    const listar = vi.spyOn(orgUnitsApi, 'listarUnidades')
+    const listar = vi.spyOn(orgUnitsApi, 'obtenerArbol')
 
     renderizar()
 
-    await screen.findByLabelText('Unidad organizativa')
+    await screen.findByRole('treeitem', { name: /Planta Norte/ })
 
     expect(listar.mock.calls[0][0]).toBe(PRINCIPAL_A)
   })
 
   it('consulta el árbol de la principal correcta en otro contexto', async () => {
-    const listar = vi.spyOn(orgUnitsApi, 'listarUnidades')
+    const listar = vi.spyOn(orgUnitsApi, 'obtenerArbol')
 
     renderizar(contexto({ id: 'c2', companiaPrincipalId: PRINCIPAL_B }))
 
-    await screen.findByLabelText('Unidad organizativa')
+    await screen.findByRole('treeitem', { name: /Planta Norte/ })
 
     expect(listar.mock.calls[0][0]).toBe(PRINCIPAL_B)
   })

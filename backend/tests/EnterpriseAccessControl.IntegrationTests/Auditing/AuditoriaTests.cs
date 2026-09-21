@@ -93,7 +93,13 @@ public sealed class AuditoriaTests(SqlServerFixture fixture)
 
         var inicio = DateTime.UtcNow;
         var peticion = new CompaniaRequest(
-            $"Auditada {Sufijo()}", ApiFactory.Maestros.Dni, Sufijo(), TipoCompania.CONTRATISTA, Estado.ACTIVO);
+            $"Auditada {Sufijo()}",
+            ApiFactory.Maestros.Dni,
+            Sufijo(),
+            TipoCompania.CONTRATISTA,
+            Estado.ACTIVO,
+            // Una CONTRATISTA no requiere zona horaria propia (RF-080).
+            ZonaHorariaIana: null);
 
         using var alta = await autores.A.PostAsJsonAsync(
             new Uri("/api/companias", UriKind.Relative), ConAuditoriaFalsa(peticion), ApiFactory.Json);
@@ -316,10 +322,15 @@ public sealed class AuditoriaTests(SqlServerFixture fixture)
     private Task AmpliarAlcanceAsync(Guid usuarioId, Guid companiaId) =>
         fixture.Api.ConDbContextAsync(async db =>
         {
-            db.Set<AlcanceUsuarioCompania>().Add(new AlcanceUsuarioCompania
+            var ahora = DateTime.UtcNow;
+
+            db.Set<AsignacionRolAdministrativo>().Add(new AsignacionRolAdministrativo
             {
                 UsuarioId = usuarioId,
+                Rol = RolAdministrativo.COMPANY_ADMINISTRATOR,
                 CompaniaId = companiaId,
+                FechaHoraInicio = ahora.AddDays(-1),
+                FechaHoraFin = ahora.AddYears(1),
             });
 
             await db.SaveChangesAsync();

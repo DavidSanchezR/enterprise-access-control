@@ -106,7 +106,12 @@ public sealed class ListarCredencialesTests(SqlServerFixture fixture)
         var escenario = await CredencialesSoporte.MontarConContextosAsync(fixture);
         await escenario.AsignarCredencialAsync(escenario.PrincipalA.Id);
 
-        using var ajeno = await fixture.Api.ClienteDeAreasAsync(escenario.PrincipalA.Id);
+        // Desde D3 el alcance sobre una Persona es la UNIÓN de su pertenencia vigente y de sus
+        // contextos operativos vigentes (RF-077): la Principal A ya está DENTRO del alcance porque la
+        // persona tiene contexto con ella. Para probar la ausencia de alcance hace falta una compañía
+        // ajena a esa unión.
+        var ajena = await fixture.Api.SembrarCompaniaAsync("Principal Sin Relación");
+        using var ajeno = await fixture.Api.ClienteDeAreasAsync(ajena.Id);
 
         using var respuesta = await ajeno.GetAsync(escenario.Ruta("credenciales"));
 

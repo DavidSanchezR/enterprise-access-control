@@ -24,7 +24,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<HistorialContrasena> HistorialContrasenas => Set<HistorialContrasena>();
 
-    public DbSet<AlcanceUsuarioCompania> AlcancesUsuarioCompania => Set<AlcanceUsuarioCompania>();
+    public DbSet<AsignacionRolAdministrativo> AsignacionesRolAdministrativo =>
+        Set<AsignacionRolAdministrativo>();
 
     public DbSet<Compania> Companias => Set<Compania>();
 

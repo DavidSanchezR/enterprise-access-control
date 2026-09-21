@@ -11,6 +11,7 @@ using EnterpriseAccessControl.Application.Permissions;
 using EnterpriseAccessControl.Domain.Common;
 using EnterpriseAccessControl.Domain.Services;
 using EnterpriseAccessControl.Infrastructure.Auditing;
+using EnterpriseAccessControl.Infrastructure.Hosting;
 using EnterpriseAccessControl.Infrastructure.Persistence;
 using EnterpriseAccessControl.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -55,6 +56,14 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Sin valor por defecto versionado: un despliegue sin correo ni contraseña de arranque falla
+        // al iniciar en lugar de levantar con un administrador adivinable (RF-078).
+        services
+            .AddOptions<BootstrapOptions>()
+            .Bind(configuration.GetSection(BootstrapOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         // --- Contexto de request: identidad y alcance (research.md §3) ---
         services.AddScoped<IUsuarioActualAccessor, UsuarioActualAccessor>();
         services.AddScoped<IAlcanceCompaniaAccessor, AlcanceCompaniaAccessor>();
@@ -88,7 +97,12 @@ public static class DependencyInjection
         // --- Casos de uso de Aplicación (US1) ---
         services.AddScoped<PasswordPolicyValidator>();
         services.AddScoped<AutenticacionService>();
+        services.AddScoped<AsignacionRolAdministrativoService>();
         services.AddScoped<UsuarioService>();
+
+        // --- Arranque: primer administrador global (RF-078) ---
+        services.AddScoped<BootstrapAdministradorService>();
+        services.AddHostedService<BootstrapHostedService>();
 
         // --- Casos de uso de Aplicación (US3: catálogos maestros) ---
         // El servicio es genérico abierto: registrarlo así lo resuelve para cualquier catálogo sin
@@ -97,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(MasterDataService<>));
 
         // --- Casos de uso de Aplicación (US2) ---
+        services.AddScoped<DependenciasTipoCompaniaValidator>();
         services.AddScoped<CompaniaService>();
         services.AddScoped<RelacionContratistaPrincipalService>();
         services.AddScoped<UnidadOrganizativaService>();

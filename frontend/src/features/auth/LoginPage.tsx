@@ -36,7 +36,8 @@ export function LoginPage(): ReactElement {
       iniciar({
         accessToken: respuesta.accessToken,
         expiraEn: respuesta.expiraEn,
-        alcanceCompanias: respuesta.alcanceCompanias,
+        rol: respuesta.rol,
+        companiaIds: respuesta.companiaIds,
         requiereCambioPassword: respuesta.requiereCambioPassword,
       })
 

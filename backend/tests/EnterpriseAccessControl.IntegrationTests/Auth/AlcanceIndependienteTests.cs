@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using EnterpriseAccessControl.Application.Auth;
 using EnterpriseAccessControl.Domain.Entities;
+using EnterpriseAccessControl.Domain.Enums;
 using EnterpriseAccessControl.IntegrationTests.Fixtures;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -10,15 +11,18 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EnterpriseAccessControl.IntegrationTests.Auth;
 
 /// <summary>
-/// RF-050: el alcance administrativo (<c>AlcanceUsuarioCompañía</c>) es independiente de la relación
-/// operacional Persona → Compañía → UnidadOrganizativa.
+/// RF-050: el alcance administrativo (<c>AsignaciónRolAdministrativo</c>) es independiente de la
+/// relación operacional Persona → Compañía → UnidadOrganizativa.
 /// </summary>
 /// <remarks>
 /// <c>Usuario</c> y <c>Persona</c> son entidades distintas: el usuario opera el sistema, la persona es
-/// el sujeto cuyo acceso físico se evalúa. Que hoy no exista todavía la entidad <c>Persona</c> (llega
-/// en una fase posterior) no debilita estas pruebas: la comprobación estructural sobre el modelo de EF
-/// Core fallará en el momento en que alguien conecte ambas jerarquías, que es exactamente cuando debe
+/// el sujeto cuyo acceso físico se evalúa. La comprobación estructural sobre el modelo de EF Core
+/// fallará en el momento en que alguien conecte ambas jerarquías, que es exactamente cuando debe
 /// avisar.
+///
+/// Desde la Sesión 2026-09-20 (D1) el alcance dejó de ser un join plano Usuario×Compañía y pasó a ser
+/// una asignación de rol con vigencia (RF-074): estas pruebas se actualizaron a la entidad nueva
+/// conservando intacto lo que verifican.
 /// </remarks>
 [Collection(SqlServerFixtureDefinition.Name)]
 public sealed class AlcanceIndependienteTests(SqlServerFixture fixture)
@@ -35,7 +39,7 @@ public sealed class AlcanceIndependienteTests(SqlServerFixture fixture)
         var db = ambito.ServiceProvider
             .GetRequiredService<Infrastructure.Persistence.AppDbContext>();
 
-        var tipo = db.Model.FindEntityType(typeof(AlcanceUsuarioCompania));
+        var tipo = db.Model.FindEntityType(typeof(AsignacionRolAdministrativo));
         tipo.Should().NotBeNull();
 
         var relacionados = tipo!.GetForeignKeys()
@@ -64,7 +68,7 @@ public sealed class AlcanceIndependienteTests(SqlServerFixture fixture)
         usuario.Should().NotBeNull();
 
         usuario!.GetForeignKeys().Should().BeEmpty(
-            "Usuario es una entidad autónoma; su vínculo con compañías vive en AlcanceUsuarioCompañía");
+            "Usuario es una entidad autónoma; su vínculo con compañías vive en AsignaciónRolAdministrativo");
 
         usuario.GetNavigations().Should().BeEmpty();
     }
@@ -100,59 +104,89 @@ public sealed class AlcanceIndependienteTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task El_alcance_se_reemplaza_por_completo_y_solo_afecta_a_ese_usuario()
+    public async Task Un_administrador_global_opera_sin_enumerar_ninguna_compania()
     {
-        var companiaA = await fixture.Api.SembrarCompaniaAsync("Compañía A");
-        var companiaB = await fixture.Api.SembrarCompaniaAsync("Compañía B");
-        var companiaC = await fixture.Api.SembrarCompaniaAsync("Compañía C");
-
-        var admin = await fixture.Api.SembrarUsuarioAsync(
-            CorreoUnico("admin"),
+        // RF-074: el alcance GLOBAL no se expresa como lista de compañías. Bajo el modelo anterior
+        // este usuario habría sido denegado por tener el alcance "vacío".
+        var usuario = await fixture.Api.SembrarUsuarioAsync(
+            CorreoUnico("global"),
             Password,
-            alcanceCompanias: [companiaA.Id]);
+            global: true);
 
-        var otro = await fixture.Api.SembrarUsuarioAsync(
-            CorreoUnico("otro"),
-            Password,
-            alcanceCompanias: [companiaA.Id, companiaB.Id]);
+        var (rol, companiaIds) = await fixture.Api.AlcanceDeAsync(usuario.Id);
 
-        using var cliente = await fixture.Api.CrearClienteAutenticadoAsync(admin.Id, admin.Correo);
+        rol.Should().Be(RolAdministrativo.GLOBAL_ADMINISTRATOR);
+        companiaIds.Should().BeEmpty();
 
-        using var reemplazo = await cliente.PutAsJsonAsync(
-            new Uri($"/api/usuarios/{otro.Id}/alcance-companias", UriKind.Relative),
-            new ReemplazarAlcanceRequest([companiaC.Id]));
+        using var cliente = await fixture.Api.CrearClienteAutenticadoAsync(usuario.Id, usuario.Correo);
+        using var respuesta = await cliente.GetAsync(new Uri("/api/usuarios", UriKind.Relative));
 
-        reemplazo.StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        (await fixture.Api.AlcanceDeAsync(otro.Id)).Should().BeEquivalentTo([companiaC.Id]);
-
-        // El alcance del administrador que ejecutó el cambio no se ve afectado.
-        (await fixture.Api.AlcanceDeAsync(admin.Id)).Should().BeEquivalentTo([companiaA.Id]);
+        respuesta.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task No_se_puede_incorporar_al_alcance_una_compania_inactiva()
+    public async Task Asignar_un_rol_agrega_una_asignacion_y_no_reemplaza_las_existentes()
     {
-        var activa = await fixture.Api.SembrarCompaniaAsync("Activa");
-        var inactiva = await fixture.Api.SembrarCompaniaAsync(
-            "Inactiva",
-            estado: Domain.Enums.Estado.INACTIVO);
+        var companiaA = await fixture.Api.SembrarCompaniaAsync("Compañía A");
+        var companiaB = await fixture.Api.SembrarCompaniaAsync("Compañía B");
 
+        // Solo un GLOBAL_ADMINISTRATOR puede asignar en una compañía que no es la suya (RF-076).
         var admin = await fixture.Api.SembrarUsuarioAsync(
-            CorreoUnico("admin"),
-            Password,
-            alcanceCompanias: [activa.Id]);
+            CorreoUnico("admin"), Password, global: true);
+
+        var otro = await fixture.Api.SembrarUsuarioAsync(
+            CorreoUnico("otro"), Password, alcanceCompanias: [companiaA.Id]);
 
         using var cliente = await fixture.Api.CrearClienteAutenticadoAsync(admin.Id, admin.Correo);
 
-        using var respuesta = await cliente.PutAsJsonAsync(
-            new Uri($"/api/usuarios/{admin.Id}/alcance-companias", UriKind.Relative),
-            new ReemplazarAlcanceRequest([inactiva.Id]));
+        var ahora = DateTime.UtcNow;
+
+        using var asignacion = await cliente.PostAsJsonAsync(
+            new Uri($"/api/usuarios/{otro.Id}/roles", UriKind.Relative),
+            new AsignarRolRequest(
+                RolAdministrativo.COMPANY_ADMINISTRATOR,
+                companiaB.Id,
+                ahora.AddDays(-1),
+                ahora.AddYears(1)),
+            ApiFactory.Json);
+
+        asignacion.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // La asignación previa sigue vigente: se agregó, no se reemplazó (RF-074, UX-19).
+        var (_, companiaIds) = await fixture.Api.AlcanceDeAsync(otro.Id);
+        companiaIds.Should().BeEquivalentTo([companiaA.Id, companiaB.Id]);
+
+        // El alcance del administrador que ejecutó el cambio no se ve afectado.
+        var (rolAdmin, _) = await fixture.Api.AlcanceDeAsync(admin.Id);
+        rolAdmin.Should().Be(RolAdministrativo.GLOBAL_ADMINISTRATOR);
+    }
+
+    [Fact]
+    public async Task No_se_puede_asignar_un_rol_sobre_una_compania_inactiva()
+    {
+        var inactiva = await fixture.Api.SembrarCompaniaAsync("Inactiva", estado: Estado.INACTIVO);
+
+        var admin = await fixture.Api.SembrarUsuarioAsync(
+            CorreoUnico("admin"), Password, global: true);
+
+        using var cliente = await fixture.Api.CrearClienteAutenticadoAsync(admin.Id, admin.Correo);
+
+        var ahora = DateTime.UtcNow;
+
+        using var respuesta = await cliente.PostAsJsonAsync(
+            new Uri($"/api/usuarios/{admin.Id}/roles", UriKind.Relative),
+            new AsignarRolRequest(
+                RolAdministrativo.COMPANY_ADMINISTRATOR,
+                inactiva.Id,
+                ahora.AddDays(-1),
+                ahora.AddYears(1)),
+            ApiFactory.Json);
 
         respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         // El alcance previo se conserva intacto: el rechazo no deja al usuario a medias.
-        (await fixture.Api.AlcanceDeAsync(admin.Id)).Should().BeEquivalentTo([activa.Id]);
+        var (rol, _) = await fixture.Api.AlcanceDeAsync(admin.Id);
+        rol.Should().Be(RolAdministrativo.GLOBAL_ADMINISTRATOR);
     }
 
     [Fact]
@@ -167,27 +201,33 @@ public sealed class AlcanceIndependienteTests(SqlServerFixture fixture)
         var dos = await fixture.Api.SembrarUsuarioAsync(
             CorreoUnico("dos"), Password, alcanceCompanias: [compania.Id]);
 
-        (await fixture.Api.AlcanceDeAsync(uno.Id)).Should().BeEquivalentTo([compania.Id]);
-        (await fixture.Api.AlcanceDeAsync(dos.Id)).Should().BeEquivalentTo([compania.Id]);
+        (await fixture.Api.AlcanceDeAsync(uno.Id)).CompaniaIds.Should().BeEquivalentTo([compania.Id]);
+        (await fixture.Api.AlcanceDeAsync(dos.Id)).CompaniaIds.Should().BeEquivalentTo([compania.Id]);
     }
 
     [Fact]
-    public async Task Una_compania_no_puede_repetirse_dentro_del_alcance_de_un_mismo_usuario()
+    public async Task Dos_asignaciones_solapadas_del_mismo_par_usuario_compania_las_rechaza_la_base_de_datos()
     {
-        var compania = await fixture.Api.SembrarCompaniaAsync("Sin Duplicados");
+        var compania = await fixture.Api.SembrarCompaniaAsync("Sin Solapamiento");
 
         var usuario = await fixture.Api.SembrarUsuarioAsync(
             CorreoUnico("dup"), Password, alcanceCompanias: [compania.Id]);
 
         await fixture.Api.ConDbContextAsync(async db =>
         {
-            db.Set<AlcanceUsuarioCompania>().Add(new AlcanceUsuarioCompania
+            var ahora = DateTime.UtcNow;
+
+            db.Set<AsignacionRolAdministrativo>().Add(new AsignacionRolAdministrativo
             {
                 UsuarioId = usuario.Id,
+                Rol = RolAdministrativo.COMPANY_ADMINISTRATOR,
                 CompaniaId = compania.Id,
+                // Se solapa con la que sembró SembrarUsuarioAsync.
+                FechaHoraInicio = ahora,
+                FechaHoraFin = ahora.AddMonths(6),
             });
 
-            // Lo impide el índice único compuesto, no sólo el código de aplicación.
+            // Lo impide el trigger de no-solapamiento (RF-075), no sólo el código de aplicación.
             var guardar = async () => await db.SaveChangesAsync();
             await guardar.Should().ThrowAsync<DbUpdateException>();
         });

@@ -24,7 +24,17 @@ const esquema = z.object({
   // RF-042: la clasificación es obligatoria y no admite un valor "sin clasificar".
   tipoCompania: z.enum(TIPOS_COMPANIA),
   estado: z.enum(ESTADOS),
-})
+  // RF-080: identificador IANA propio de cada Compañía Principal.
+  zonaHorariaIana: z.string(),
+}).refine(
+  (valores) =>
+    valores.tipoCompania !== 'PRINCIPAL_MANDANTE' || valores.zonaHorariaIana.trim() !== '',
+  {
+    // Una Contratista no la necesita: no posee áreas ni bloques horarios propios (RF-080).
+    message: 'Una compañía principal mandante debe declarar su zona horaria.',
+    path: ['zonaHorariaIana'],
+  },
+)
 
 type Formulario = z.infer<typeof esquema>
 
@@ -50,6 +60,7 @@ export function CompaniaFormulario(
       numeroDocumento: edicion?.numeroDocumento ?? '',
       tipoCompania: edicion?.tipoCompania ?? 'PRINCIPAL_MANDANTE',
       estado: edicion?.estado ?? 'ACTIVO',
+      zonaHorariaIana: edicion?.zonaHorariaIana ?? 'America/Lima',
     },
   })
 
@@ -64,10 +75,21 @@ export function CompaniaFormulario(
       <form
         onSubmit={(evento) => {
           void handleSubmit((valores) => {
+            const peticion = {
+              ...valores,
+              // Solo una Principal tiene zona propia; en una Contratista carece de uso funcional y
+              // guardarla dejaría un dato que nada interpreta (RF-080).
+              zonaHorariaIana:
+                valores.tipoCompania !== 'PRINCIPAL_MANDANTE' ||
+                valores.zonaHorariaIana.trim() === ''
+                  ? null
+                  : valores.zonaHorariaIana.trim(),
+            }
+
             if (edicion) {
-              actualizar.mutate({ id: edicion.id, ...valores }, { onSuccess: props.alCerrar })
+              actualizar.mutate({ id: edicion.id, ...peticion }, { onSuccess: props.alCerrar })
             } else {
-              crear.mutate(valores, { onSuccess: props.alCerrar })
+              crear.mutate(peticion, { onSuccess: props.alCerrar })
             }
           })(evento)
         }}
@@ -77,7 +99,9 @@ export function CompaniaFormulario(
           <p className="aviso error" role="alert">
             {error.codigo === 'DOCUMENTO_YA_REGISTRADO'
               ? 'Ya existe una compañía con ese tipo y número de documento.'
-              : error.message}
+              : error.codigo === 'CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS'
+                ? `No se puede cambiar la clasificación mientras existan dependencias incompatibles. ${error.message}`
+                : error.message}
           </p>
         )}
 
@@ -141,8 +165,36 @@ export function CompaniaFormulario(
             ))}
           </select>
           <span className="campo-ayuda">
-            Solo una compañía principal mandante puede poseer unidades organizativas.
+            Solo una compañía principal mandante puede poseer unidades organizativas. Cambiarla se
+            rechaza si existen dependencias incompatibles con el tipo destino.
           </span>
+        </div>
+
+        <div className="campo">
+          <label htmlFor="compania-zona">Zona horaria</label>
+          <input
+            id="compania-zona"
+            type="text"
+            list="zonas-iana"
+            aria-invalid={errors.zonaHorariaIana ? 'true' : undefined}
+            aria-describedby="compania-zona-ayuda"
+            {...register('zonaHorariaIana')}
+          />
+          <datalist id="zonas-iana">
+            <option value="America/Lima" />
+            <option value="America/Santiago" />
+            <option value="America/Bogota" />
+            <option value="America/Mexico_City" />
+          </datalist>
+          <span className="campo-ayuda" id="compania-zona-ayuda">
+            Identificador IANA. Interpreta los bloques horarios de sus áreas; los instantes se siguen
+            almacenando en UTC, así que cambiarla no altera ningún registro anterior.
+          </span>
+          {errors.zonaHorariaIana && (
+            <span className="error-campo" role="alert">
+              {errors.zonaHorariaIana.message}
+            </span>
+          )}
         </div>
 
         <div className="campo">

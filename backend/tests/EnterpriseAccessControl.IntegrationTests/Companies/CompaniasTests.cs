@@ -25,13 +25,16 @@ public sealed class CompaniasTests(SqlServerFixture fixture)
         TipoCompania tipo = TipoCompania.PRINCIPAL_MANDANTE,
         Estado estado = Estado.ACTIVO,
         Guid? tipoDocumentoId = null,
-        string? numeroDocumento = null) =>
+        string? numeroDocumento = null,
+        string? zonaHorariaIana = null) =>
         new(
             nombre,
             tipoDocumentoId ?? Guid.CreateVersion7(),
             numeroDocumento ?? Guid.CreateVersion7().ToString("N")[..12],
             tipo,
-            estado);
+            estado,
+            // RF-080: una Principal exige zona IANA propia; una Contratista no la necesita.
+            zonaHorariaIana ?? (tipo == TipoCompania.PRINCIPAL_MANDANTE ? "America/Lima" : null));
 
     /// <summary>Crea un administrador cuyo alcance cubre exactamente las compañías indicadas.</summary>
     private async Task<HttpClient> ClienteConAlcanceAsync(params Guid[] companiaIds)

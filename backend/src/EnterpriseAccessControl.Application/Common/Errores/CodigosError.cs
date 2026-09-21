@@ -53,6 +53,37 @@ public static class CodigosError
     /// <summary>La persona no tiene compañía de pertenencia vigente (RF-052, research.md §13).</summary>
     public const string SinPertenenciaVigente = "SIN_PERTENENCIA_VIGENTE";
 
+    // --- Roles administrativos (RF-074 a RF-078) ---
+
+    /// <summary>
+    /// <c>CompañíaId</c> incompatible con el rol: debe ser NULL para GLOBAL_ADMINISTRATOR y
+    /// obligatoria para COMPANY_ADMINISTRATOR (RF-074, regla fundamental).
+    /// </summary>
+    public const string RolCompaniaInconsistente = "ROL_COMPANIA_INCONSISTENTE";
+
+    /// <summary>
+    /// El solicitante no puede asignar ese rol o esa compañía (RF-076): un COMPANY_ADMINISTRATOR no
+    /// asigna GLOBAL_ADMINISTRATOR, no se autoeleva y no administra otra compañía.
+    /// </summary>
+    public const string RolNoAutorizado = "ROL_NO_AUTORIZADO";
+
+    /// <summary>La asignación de rol ya no está vigente y no admite finalización ni renovación (RF-075).</summary>
+    public const string AsignacionRolNoVigente = "ASIGNACION_ROL_NO_VIGENTE";
+
+    // --- Compañías (RF-080, RF-081) ---
+
+    /// <summary>
+    /// El cambio de <c>TipoCompañía</c> se rechaza porque existen dependencias incompatibles con el
+    /// tipo destino; nunca se eliminan ni modifican en cascada (RF-081).
+    /// </summary>
+    public const string CambioTipoCompaniaConDependencias = "CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS";
+
+    /// <summary>El identificador de zona horaria no es un IANA reconocido (RF-080).</summary>
+    public const string ZonaHorariaInvalida = "ZONA_HORARIA_INVALIDA";
+
+    /// <summary>Una Compañía Principal exige zona horaria IANA propia (RF-080).</summary>
+    public const string ZonaHorariaRequerida = "ZONA_HORARIA_REQUERIDA";
+
     // --- Jerarquías (Principio V) ---
 
     /// <summary>La operación crearía un ciclo en la jerarquía (RF-038).</summary>
