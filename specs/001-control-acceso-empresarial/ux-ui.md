@@ -794,13 +794,21 @@ Columnas:
 - vigencia de la asignación más próxima a vencer;
 - acciones.
 
-Filtros:
+Filtros, con la frontera entre servidor y cliente explícita —no es un detalle de implementación: determina
+si el filtro alcanza a todo el conjunto autorizado o solo a la página recibida:
 
-- búsqueda por correo;
-- estado del usuario;
-- rol;
-- compañía;
-- solo con asignaciones vigentes.
+| Filtro | Dónde se resuelve | Alcance del filtro |
+|---|---|---|
+| búsqueda por correo | **servidor**, antes de paginar (RF-077) | todo el conjunto dentro del alcance autorizado |
+| estado del usuario | **servidor**, antes de paginar (RF-077) | todo el conjunto dentro del alcance autorizado |
+| rol | cliente, sobre la página recibida | solo los usuarios de la página visible |
+| compañía | cliente, sobre la página recibida | solo los usuarios de la página visible |
+| solo con asignaciones vigentes | cliente, sobre la página recibida | solo los usuarios de la página visible |
+
+Los tres últimos son **refinamientos de presentación** sobre un conjunto que el servidor ya acotó al alcance
+del solicitante: afinan lo que se muestra, nunca amplían lo que se puede ver, y por tanto no constituyen una
+frontera de seguridad (Constitución, Principio I). El contrato no declara parámetros para ellos; moverlos al
+servidor sería alcance nuevo, no una corrección.
 
 Reglas de visibilidad (RF-077):
 
@@ -824,8 +832,11 @@ Tabs:
 - Asignaciones — todas, vigentes e históricas, con rol, compañía, inicio, fin y si está vigente hoy;
 - Histórico — trazabilidad de altas, finalizaciones y renovaciones de asignaciones.
 
-En Asignaciones, distinguir visualmente **estado de la asignación** de **vigencia efectiva por fechas**, sin
-combinarlos (§16): una asignación puede figurar como registrada y no estar vigente hoy.
+En Asignaciones, distinguir visualmente **la existencia del registro** de su **vigencia efectiva por fechas**,
+sin combinarlas (§16): una asignación puede figurar como registrada y no estar vigente hoy. La asignación de
+rol **no tiene un estado administrativo propio** —a diferencia de la pertenencia de una persona a su
+compañía—, de modo que "vigente hoy" se deriva siempre de comparar la fecha actual con su intervalo, nunca de
+un campo de estado.
 
 ### Crear usuario
 
