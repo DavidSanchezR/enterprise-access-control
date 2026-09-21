@@ -90,7 +90,8 @@ aprobados salvo donde se indica explícitamente.
   (corrección Contexto Operativo): la independencia entre el histórico de compañía (RF-014) y las
   asignaciones operativas se mantiene, pero ahora existe una restricción explícita para personas de
   compañías CONTRATISTA — RF-054.]**
-- Q: ¿El alcance administrativo de un Usuario (`AlcanceUsuarioCompañía`) cambia con esta corrección? → A:
+- Q: ¿El alcance administrativo de un Usuario (`AlcanceUsuarioCompañía` — **[RENOMBRADA — Sesión 2026-09-20:
+  esta entidad queda reemplazada por `AsignaciónRolAdministrativo`, RF-074]**) cambia con esta corrección? → A:
   No; permanece independiente de la relación operacional Persona→Compañía→UnidadOrganizativa, tal como en
   el diseño original (RF-050 lo hace explícito).
 
@@ -506,6 +507,110 @@ impedir el solapamiento, y ninguno de los estados terminales existentes represen
   cláusula de `contracts/credentials.yaml` y se acota research.md §5, que la atribuía genéricamente a todas
   las entidades particionadas.
 
+### Sesión 2026-09-20 (cierre de Etapa 1: formalización de las decisiones D1 a D9)
+
+Sesión de `/speckit-clarify` que **no abre ninguna decisión nueva**: transcribe a requisitos las nueve
+decisiones de negocio ya aprobadas (D1 a D9) que cerraron las 16 preguntas de la matriz de auditoría de
+cierre de Etapa 1, y corrige las inconsistencias documentales que el análisis de consistencia del 20/09/2026
+detectó entre `spec.md` y el diseño técnico ya escrito en `plan.md`, `research.md` y `contracts/`. Las
+respuestas ya existían al iniciar la sesión; no se formuló ninguna pregunta al usuario.
+
+- Q: ¿Cómo se controla la administración de usuarios y su alcance? → A: Mediante RBAC con un catálogo cerrado
+  de dos roles, `GLOBAL_ADMINISTRATOR` (alcance GLOBAL, sin compañía) y `COMPANY_ADMINISTRATOR` (alcance
+  limitado a una compañía), asignados mediante la entidad `AsignaciónRolAdministrativo` con vigencia temporal
+  y auditoría. Regla fundamental: `CompañíaId` nulo si y solo si el rol es `GLOBAL_ADMINISTRATOR`. Agregar un
+  rol nuevo exige modificar el modelo de autorización, no insertar datos (RF-074, RF-075).
+- Q: ¿Qué puede y qué no puede hacer un `COMPANY_ADMINISTRATOR`? → A: Administra usuarios solo de su propia
+  compañía y puede crear asignaciones de su mismo nivel para ella; no puede administrar fuera de su alcance,
+  reasignar fuera de él, elevar su propio alcance, asignar `GLOBAL_ADMINISTRATOR` ni asignar
+  `COMPANY_ADMINISTRATOR` para otra compañía. Cualquier asignación fuera de esos límites exige un
+  `GLOBAL_ADMINISTRATOR` o el mecanismo de arranque (RF-076, RF-078).
+- Q: ¿Cómo se resuelve el alcance y qué significa exactamente «dentro del alcance» para una `Persona`? → A:
+  El alcance se deriva de las asignaciones de rol vigentes (GLOBAL = todas las compañías; en caso contrario,
+  las compañías de sus asignaciones por compañía). Una `Persona` está dentro del alcance si su compañía de
+  pertenencia vigente lo está **o** si tiene un contexto operativo vigente con una Principal del alcance.
+  Poseer el identificador de un recurso no otorga autorización: las lecturas fuera de alcance responden 404
+  (RF-077).
+- Q: ¿Cómo se crea el primer administrador en un despliegue nuevo? → A: Con una rutina de arranque
+  idempotente posterior a las migraciones, que crea un `GLOBAL_ADMINISTRATOR` solo si no existe ninguno, con
+  correo y contraseña provistos por configuración segura del entorno, cumpliendo la política de contraseñas
+  vigente y forzando su cambio en el primer inicio de sesión. Su vigencia inicial usa `MAX_VALIDITY_DATE`
+  (`2999-12-31T23:59:59Z`) como excepción explícita y acotada exclusivamente a esa asignación (RF-078).
+- Q: ¿Qué efecto tiene inactivar una compañía sobre el acceso? → A: Denegación por evaluación dinámica, no
+  cascada de escritura: la evaluación exige `Estado = ACTIVO` tanto en la Principal propietaria del área como
+  en la compañía de pertenencia vigente de la persona, y deniega con `COMPANIA_INACTIVA` sin modificar ningún
+  registro dependiente; reactivar restablece el acceso automáticamente (RF-079; cierra la Decisión Pendiente
+  #6 para este caso). Hasta esta sesión, este documento y `research.md` §14.5 afirmaban incorrectamente que
+  ese comportamiento ya existía.
+- Q: ¿En qué calendario se interpretan las fechas y los bloques horarios? → A: Cada Compañía Principal tiene
+  su propia zona horaria IANA (`ZonaHorariaIana`), obligatoria para `PRINCIPAL_MANDANTE`; los timestamps
+  siguen persistiéndose siempre en UTC y la zona solo convierte entre ese instante y la hora local. Las
+  asociaciones no resolubles a una única Principal usan la zona global de respaldo del sistema. Cambiar la
+  zona no reinterpreta instantes ya persistidos, solo su representación futura, y no se versiona
+  históricamente (RF-080; resuelve la ambigüedad de RF-016).
+- Q: ¿Puede cambiarse el `TipoCompañía` de una compañía que ya tiene dependientes? → A: No mientras existan
+  dependencias incompatibles con el tipo destino (áreas de acceso, raíces de unidad organizativa, relaciones
+  Contratista↔Principal vigentes —simétricamente en ambas direcciones—, contextos operativos y credenciales).
+  La operación se rechaza indicando qué resolver primero; nunca se eliminan, cierran ni revocan dependencias
+  en cascada (RF-081).
+- Q: ¿Entran las consultas transversales (RF-067 a RF-069, CS-032) en el baseline de Etapa 1? → A: No. Quedan
+  explícitamente fuera del alcance obligatorio de Etapa 1 y diferidas a una etapa futura, sin retirarse de
+  este documento y sin generar tareas de baseline (anotaciones `[DIFERIDA A ETAPA 2]` en cada una).
+- Q: ¿Qué ocurre con las decisiones heredadas #1, #3 y #7? → A: Las tres se cierran sin trabajo técnico
+  derivado: #1 la política de contraseñas ya configurada queda como autoridad única; #3 el baseline no
+  implementa retención ni purga y conserva el comportamiento actual; #7 Historia 9 mantiene P2. Ver la sección
+  Decisiones Pendientes.
+
+### Sesión 2026-09-20 (cierre de la desviación D-1 — renovación de `AsignaciónRolAdministrativo`)
+
+Desviación detectada al finalizar `/speckit-implement` sobre T169–T228: el dominio implementa la renovación
+de una `AsignaciónRolAdministrativo` (`RenovarAsync`/`RenovarRolAsync`, con las reglas de vigencia de RF-073
+referenciadas desde RF-075), pero no se expuso ningún endpoint HTTP porque `contracts/users.yaml` no lo
+declaraba — publicar una ruta no declarada habría roto la conformidad contractual que vigilan las pruebas de
+contrato. Sesión de `/speckit-clarify` que no abre ninguna decisión de negocio nueva: cierra esa desviación
+transcribiendo a `spec.md` una decisión de alcance ya aprobada.
+
+- Q: ¿La renovación de una `AsignaciónRolAdministrativo` es una capacidad del Baseline de Etapa 1? → A:
+  **Sí.** Se incorpora al contrato funcional y HTTP del Baseline, reutilizando íntegramente las reglas de
+  vigencia ya aprobadas en RF-073 (referenciadas, sin reabrirlas ni modificar su texto, que sigue siendo
+  específico de `AsignaciónPersonaCompañía`) y aplicando las mismas restricciones de autorización (RF-076) y
+  de alcance/ocultamiento de existencia (RF-077) que el resto de operaciones sobre asignaciones de rol. La
+  operación HTTP (ruta, verbo, cuerpo y códigos de respuesta) se define en la fase de planificación siguiendo
+  el precedente ya vigente de `contracts/people.yaml` (`.../historial-companias/{id}/renovar`) y el patrón ya
+  usado por `.../roles/{asignacionId}/finalizar` en el propio `contracts/users.yaml`; no se declara en esta
+  sesión de clarificación para no adelantar contenido de `research.md`/`contracts/`, que corresponde a
+  `/speckit-plan` (RF-075).
+
+### Sesión 2026-09-20 (cierre de las desviaciones D-4 y D-5 — auditoría de decisión del Baseline)
+
+Auditoría de decisión sobre D-2 a D-5 realizada tras T169–T228 (`/speckit-analyze`, sesión previa). D-2 y D-3
+se cerraron como implementación válida sin cambios de especificación (clasificación A). Esta sesión de
+`/speckit-clarify` formaliza las dos decisiones que sí requerían intervención del usuario, ya tomadas
+explícitamente por el usuario, sin reabrirlas como preguntas.
+
+- Q: ¿La búsqueda de usuarios dentro del alcance autorizado (UX-22) debe operar sobre todo el conjunto
+  autorizado o solo sobre la página ya cargada? → A: **Sobre todo el conjunto autorizado.** La búsqueda es
+  server-side: se aplica sobre el universo de usuarios ya restringido al alcance del actor (RF-077) y el
+  resultado se pagina después, nunca al revés — el filtrado nunca se limita a los registros de la página
+  actualmente visible en el cliente. La búsqueda NO amplía el alcance autorizado bajo ninguna circunstancia:
+  un `COMPANY_ADMINISTRATOR` solo obtiene resultados de su propia compañía y un `GLOBAL_ADMINISTRATOR` busca
+  dentro de su alcance GLOBAL, con las mismas reglas de aislamiento, autorización y ocultamiento de existencia
+  que el listado normal (RF-077); conocer un correo o identificador no concede acceso al recurso. El contrato
+  HTTP actual (`contracts/users.yaml`, `GET /api/usuarios` con `pagina`/`tamañoPagina`/`estado`) no declara
+  todavía un parámetro de búsqueda — su nombre, el soporte de múltiples criterios, los códigos de error
+  asociados y cualquier requisito de ordenamiento o rendimiento se definen en `/speckit-plan`, no en esta
+  sesión. *(Nuevo — Sesión 2026-09-20, cierre de la desviación D-4; precisa RF-077 y UX-22 sin
+  reemplazarlos.)*
+- Q: ¿La contraseña inicial del `GLOBAL_ADMINISTRATOR` de arranque (RF-078) puede tener un valor por defecto
+  en entornos de desarrollo? → A: **No, en ningún entorno.** RF-078 ya exigía que la contraseña NO esté
+  incrustada en archivos de configuración versionados ni en el repositorio, sin distinguir entre desarrollo y
+  producción; esa regla no se relaja por conveniencia de desarrollo. La configuración de desarrollo DEBE
+  requerir la variable de entorno correspondiente igual que producción, y el arranque DEBE fallar
+  explícitamente si no se provee, en lugar de levantar con una contraseña adivinable. Esta sesión no modifica
+  el texto de RF-078 —ya era inequívoco— y cierra la desviación detectada en `docker-compose.yml`, cuya
+  corrección de configuración y documentación se realiza fuera de `spec.md`. *(Cierre de la desviación D-5 —
+  Sesión 2026-09-20; RF-078 sin cambios de texto.)*
+
 ## Historias de Usuario y Pruebas
 
 ### Historia 1 - Inicio de sesión y alcance de gestión (Prioridad P1)
@@ -547,7 +652,9 @@ Criterios de aceptación:
 5. No es posible asociar una unidad organizativa raíz a una compañía clasificada como CONTRATISTA.
 6. Una compañía o unidad INACTIVA no puede recibir nuevas asignaciones activas.
 7. Las unidades organizativas de una Compañía Principal solo son visibles y administrables por usuarios
-   cuyo alcance de compañías (`AlcanceUsuarioCompañía`) incluya esa Compañía Principal.
+   cuyo alcance de compañías incluya esa Compañía Principal — alcance resuelto a partir de sus
+   `AsignaciónRolAdministrativo` vigentes (RF-074, RF-077; antes de la Sesión 2026-09-20 esta entidad se
+   llamaba `AlcanceUsuarioCompañía`).
 8. Una Compañía Principal puede tener varios nodos raíz de unidad organizativa (varios árboles) al mismo
    tiempo (CS-010); dos Compañías Principales distintas nunca comparten unidades organizativas (CS-011).
 9. Una Compañía Contratista puede declararse con relación vigente simultánea hacia dos o más Compañías
@@ -702,7 +809,8 @@ Como usuario autorizado, quiero indicar qué tipos de persona pueden acceder a c
 
 Un área puede tener uno o varios tipos de persona asociados, por ejemplo Trabajador, Visitante y
 Proveedor. La autorización evalúa esta restricción dentro del contexto de la Compañía Principal propietaria
-del área (Historia 8, paso 7 del algoritmo de evaluación).
+del área (Historia 8, paso 9 del algoritmo de evaluación — corregido en la Sesión 2026-09-20: la referencia
+anterior apuntaba al paso 7, que verifica el área activa, no el perfil autorizado).
 
 ### Historia 8 - Permisos de acceso con vigencia y horarios (Prioridad P1)
 
@@ -734,13 +842,19 @@ defecto: cualquier paso sin resultado inequívoco produce DENEGADO):
 2. Identificar a la persona evaluada.
 3. Identificar el Área de Acceso evaluada.
 4. Determinar la Compañía Principal propietaria del área (vía `ÁreaAcceso.CompañíaPrincipalId`).
-5. Verificar que la persona tenga un `ContextoOperativoPersonaPrincipal` vigente con esa Principal en la
+5. Verificar que esa Compañía Principal tenga `Estado = ACTIVO` (RF-079, Sesión 2026-09-20). Si está
+   `INACTIVO`, el acceso se deniega por defecto (`COMPANIA_INACTIVA`) sin evaluar los pasos restantes. La
+   verificación es dinámica: no escribe ni modifica ningún registro, y reactivar la compañía restablece el
+   acceso sin intervención adicional.
+6. Verificar que la persona tenga un `ContextoOperativoPersonaPrincipal` vigente con esa Principal en la
    fecha evaluada, **y que esa relación siga siendo legítima según la compañía de pertenencia vigente de la
    persona en esa misma fecha** (RF-061): automática si esa compañía es la propia Principal (RF-053), o
    mediante una `RelaciónContratistaPrincipal` vigente si es una Contratista (RF-054, RF-059). Un cambio de
    compañía de pertenencia NO cierra el contexto operativo, pero sí puede hacer que deje de ser legítimo
-   para efectos de esta evaluación (Decisión Pendiente #4 resuelta, Clarifications).
-6. Verificar que exista una `AsignaciónCredencial` **vigente** para la persona y la Compañía Principal
+   para efectos de esta evaluación (Decisión Pendiente #4 resuelta, Clarifications). Además, esa compañía de
+   pertenencia vigente DEBE tener `Estado = ACTIVO`; si está `INACTIVO`, el acceso se deniega por defecto
+   con el mismo motivo `COMPANIA_INACTIVA` del paso 5, también de forma dinámica y reversible (RF-079).
+7. Verificar que exista una `AsignaciónCredencial` **vigente** para la persona y la Compañía Principal
    determinada en el paso 4, en la fecha evaluada — donde "vigente" significa la conjunción de **ambas**
    condiciones (RF-066, RF-070, RF-071): (a) `Estado = ASIGNADO`, y (b) `FechaHoraInicio <= fecha evaluada
    <= FechaHoraFin` (ambos campos son obligatorios desde RF-071; ya no existe la rama "`FechaHoraFin` es
@@ -750,17 +864,20 @@ defecto: cualquier paso sin resultado inequívoco produce DENEGADO):
    (`SIN_CREDENCIAL_VIGENTE`). Una credencial `ASIGNADO` cuya `FechaHoraFin` ya pasó NO se transiciona
    automáticamente a otro `Estado` por el mero paso del tiempo (RF-070) — la denegación surge exclusivamente
    de esta verificación dinámica, no de una escritura de estado.
-7. Verificar que el área esté ACTIVA.
-8. Verificar que algún perfil (tipo de persona) vigente de la persona esté autorizado en el área (Historia
+8. Verificar que el área esté ACTIVA.
+9. Verificar que algún perfil (tipo de persona) vigente de la persona esté autorizado en el área (Historia
    7, RF-024).
-9. Determinar la unidad organizativa vigente de la persona dentro de ese contexto operativo (si existe).
-10. Evaluar los permisos aplicables en los tres niveles: PERSONA, UNIDAD_ORGANIZATIVA (la determinada en el
-    paso 9) y COMPAÑÍA (la compañía de pertenencia vigente de la persona).
-11. Evaluar la vigencia de fechas de cada permiso aplicable.
-12. Evaluar día de semana y bloque horario en `America/Lima`.
-13. Resolver conflictos entre permisos aplicables en varios niveles con precedencia definitiva PERSONA >
+10. Determinar la unidad organizativa vigente de la persona dentro de ese contexto operativo (si existe).
+11. Evaluar los permisos aplicables en los tres niveles: PERSONA, UNIDAD_ORGANIZATIVA (la determinada en el
+    paso 10) y COMPAÑÍA (la compañía de pertenencia vigente de la persona).
+12. Evaluar la vigencia de fechas de cada permiso aplicable.
+13. Evaluar día de semana y bloque horario en la **zona horaria de la Compañía Principal propietaria del
+    área** determinada en el paso 4 (`Compañía.ZonaHorariaIana`, RF-080, Sesión 2026-09-20); si esa zona no
+    fuera resoluble, en la zona horaria global de respaldo del sistema. *(Antes de esa sesión este paso
+    usaba `America/Lima` de forma fija para todas las compañías.)*
+14. Resolver conflictos entre permisos aplicables en varios niveles con precedencia definitiva PERSONA >
     UNIDAD_ORGANIZATIVA > COMPAÑÍA (el nivel más específico siempre prevalece).
-14. Conceder o denegar el acceso.
+15. Conceder o denegar el acceso.
 
 > Nota de consolidación: esta lista reemplazó originalmente la de 9 pasos de una corrección anterior,
 > fusionándola con una lista de 13 pasos entregada por negocio. Se preservaron dos verificaciones de la
@@ -769,6 +886,14 @@ defecto: cualquier paso sin resultado inequívoco produce DENEGADO):
 > elegibilidad de perfil/área (paso 8, RF-024, Historia 7). El paso 6 (credencial vigente) se agregó en la
 > Sesión 2026-09-14 de integración de `ux-ui.md` (RF-066), llevando el total de 13 a 14 pasos. Ver
 > research.md §7.
+>
+> **Renumeración (Sesión 2026-09-20, cierre de Etapa 1)**: el total pasa de 14 a **15 pasos** al insertarse el
+> paso 5 (Compañía Principal `ACTIVO`, RF-079). Los pasos 1 a 4 conservan su número; **todos los posteriores
+> se desplazan en uno**: el antiguo paso 5 (contexto operativo) es ahora el 6, el 6 (credencial) el 7, el 7
+> (área activa) el 8, el 8 (perfil) el 9, el 9 (unidad organizativa) el 10, el 10 (permisos) el 11, el 11
+> (vigencia) el 12, el 12 (bloque horario) el 13, el 13 (precedencia) el 14 y el 14 (conceder/denegar) el 15.
+> Cualquier referencia a un número de paso escrita **antes** de esta sesión —en las sesiones de Clarifications
+> anteriores, en `research.md` o en los contratos— debe leerse contra esa correspondencia.
 
 ### Historia 9 - Asignación de credencial/fotocheck por Compañía Principal (Prioridad P2)
 
@@ -855,8 +980,14 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 - RF-001: El sistema DEBE autenticar mediante correo electrónico y contraseña.
 - RF-002: El usuario DEBE soportar estados ACTIVO, INACTIVO y BLOQUEADO.
 - RF-003: DEBE existir historial de contraseñas; las contraseñas no pueden almacenarse en texto plano.
-- RF-004: El alcance de compañías administrables DEBE ser una entidad independiente.
+- RF-004: El alcance de compañías administrables DEBE ser una entidad independiente. **[AMPLIADA — Sesión
+  2026-09-20, D1: esa entidad es `AsignaciónRolAdministrativo` y expresa el alcance mediante un rol
+  administrativo con tipo de alcance GLOBAL o COMPAÑÍA, no como una lista plana de compañías. Ver RF-074 a
+  RF-077.]**
 - RF-005: Las consultas y operaciones DEBEN respetar el alcance de compañías del usuario autenticado.
+  **[AMPLIADA — Sesión 2026-09-20, D1/D3: el alcance se resuelve a partir del rol administrativo vigente
+  (RF-077), y la comprobación incluye la pertenencia del recurso concreto a ese alcance, no solo que el
+  alcance no esté vacío.]**
 - RF-006: Compañía DEBE contener ID, compañía, tipo de documento, número de documento, tipo de compañía
   (PRINCIPAL_MANDANTE o CONTRATISTA) y estado.
 - RF-007: Unidad Organizativa DEBE contener ID, nombre, unidad superior y estado.
@@ -883,6 +1014,9 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   persona. *(Corrige la versión anterior de este requisito, que imponía como máximo una asignación activa
   por persona a nivel global; ver Clarifications, Sesión 2026-09-14 "corrección Contexto Operativo".)*
 - RF-016: Las asignaciones de compañía y unidad DEBEN iniciar a 00:00 y finalizar a 23:59 del último día.
+  **[MATIZADA — Sesión 2026-09-20, D5: el «día» se interpreta en la zona horaria de la Compañía Principal
+  correspondiente (`Compañía.ZonaHorariaIana`) y, cuando la asignación no es resoluble a una única Compañía
+  Principal, en la zona horaria global de respaldo del sistema. Ver RF-080.]**
 - RF-017: Tipo de Credencial DEBE tener estado ACTIVO/INACTIVO.
 - RF-018: DEBE existir histórico de asignación de credenciales.
 - RF-019: Un área DEBE poder asociarse a uno o varios tipos de persona.
@@ -946,7 +1080,8 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   DEBEN limitarse a las Compañías Principales dentro del alcance de compañías del usuario autenticado
   (resuelto vía la entidad de enlace de raíz para unidades organizativas, o directamente para áreas de
   acceso).
-- RF-050: El alcance administrativo de un Usuario (`AlcanceUsuarioCompañía`, RF-004) DEBE mantenerse
+- RF-050: El alcance administrativo de un Usuario (`AsignaciónRolAdministrativo`, RF-004 y RF-074; entidad
+  llamada `AlcanceUsuarioCompañía` antes de la Sesión 2026-09-20) DEBE mantenerse
   independiente de la relación operacional Persona→Compañía→UnidadOrganizativa; un usuario administrativo
   puede gestionar una o varias compañías según su alcance, sin que ello implique ni derive de ninguna
   asignación operacional de personas.
@@ -1045,15 +1180,18 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 - RF-067: El sistema DEBE exponer una consulta agregada y transversal de auditoría (no limitada a una
   entidad individual), filtrable por rango temporal, usuario, persona, compañía, Compañía Principal, entidad
   y acción, respetando el alcance de compañías del usuario autenticado (RF-005). *(Nuevo — Sesión
-  2026-09-14, integración `ux-ui.md`, Historia 10.)*
+  2026-09-14, integración `ux-ui.md`, Historia 10.)* **[DIFERIDA A ETAPA 2 — Sesión 2026-09-20, D8: queda
+  fuera del alcance obligatorio del baseline de Etapa 1. El requisito se conserva íntegro como capacidad
+  futura; no genera tareas de baseline ni contrato en esta etapa.]**
 - RF-068: El sistema DEBE exponer una consulta transversal de los históricos de compañía de pertenencia,
   contexto operativo y unidad organizativa (Historia 5), filtrable por persona, compañía, Compañía
   Principal, entidad y tipo de evento, respetando el alcance de compañías del usuario autenticado (RF-005).
-  *(Nuevo — Sesión 2026-09-14, integración `ux-ui.md`, Historia 5.)*
+  *(Nuevo — Sesión 2026-09-14, integración `ux-ui.md`, Historia 5.)* **[DIFERIDA A ETAPA 2 — Sesión
+  2026-09-20, D8: ver la anotación de RF-067.]**
 - RF-069: El sistema DEBE exponer indicadores operativos agregados (conteos de personas/Contratistas/
   Principales activas, credenciales próximas a vencer, relaciones o pertenencias próximas a finalizar),
   respetando el alcance de compañías del usuario autenticado (RF-005). *(Nuevo — Sesión 2026-09-14,
-  integración `ux-ui.md`.)*
+  integración `ux-ui.md`.)* **[DIFERIDA A ETAPA 2 — Sesión 2026-09-20, D8: ver la anotación de RF-067.]**
 - RF-070: `AsignaciónCredencial.FechaHoraFin` representa el fin de vigencia de la credencial. **[MATIZADA —
   ver Sesión 2026-09-14 "vigencia temporal jerárquica" en Clarifications: `FechaHoraFin` deja de ser
   nullable — RF-071 exige un valor real conocido desde la creación, `null` ya no representa vigencia
@@ -1114,12 +1252,126 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   sin necesitar un campo o entidad nueva. *(Nuevo — Sesión 2026-09-14, "renovación de
   AsignaciónPersonaCompañía", cierra Decisión Pendiente #9; punto (a) ampliado en la Sesión "cierre Decisión
   Pendiente #10" con la exigencia de vigencia dinámica.)*
+- RF-074: La administración de usuarios DEBE controlarse mediante un catálogo **cerrado** de roles
+  administrativos con exactamente dos valores: `GLOBAL_ADMINISTRATOR` (alcance GLOBAL sobre todo el sistema)
+  y `COMPANY_ADMINISTRATOR` (alcance limitado a una compañía específica). Incorporar un rol administrativo
+  nuevo NO DEBE ser una operación de datos en tiempo de ejecución: exige una modificación explícita del
+  modelo de autorización. La asignación de un rol a un `Usuario` DEBE modelarse como una entidad propia,
+  `AsignaciónRolAdministrativo` (reemplaza a `AlcanceUsuarioCompañía`, RF-004), con `UsuarioId`, `Rol`,
+  `CompañíaId` y vigencia temporal. **Regla fundamental**: `Rol = GLOBAL_ADMINISTRATOR` ⇒ `CompañíaId` DEBE
+  ser nulo; `Rol = COMPANY_ADMINISTRATOR` ⇒ `CompañíaId` DEBE existir y referenciar una compañía válida. El
+  alcance GLOBAL comprende todas las compañías del sistema sin enumerarlas, incluidas las creadas después de
+  la asignación. *(Nuevo — Sesión 2026-09-20, D1.)*
+- RF-075: Toda `AsignaciónRolAdministrativo` DEBE tener `FechaHoraInicio` y `FechaHoraFin` obligatorias desde
+  su creación, nunca nulas ni expresadas con una fecha centinela — mismo principio que RF-071, aplicado por
+  primera vez a una entidad vinculada a un `Usuario` y no a una `Persona`. **Única excepción**: la asignación
+  `GLOBAL_ADMINISTRATOR` creada por el mecanismo de arranque inicial usa el valor `MAX_VALIDITY_DATE`
+  (`2999-12-31T23:59:59Z`) como `FechaHoraFin`, conforme a la excepción explícita y acotada declarada en
+  RF-078; esa excepción aplica exclusivamente a esa asignación sembrada y NO DEBE extenderse a ninguna otra
+  asignación de rol. NO DEBEN existir asignaciones
+  `COMPANY_ADMINISTRATOR` temporalmente solapadas para el mismo par (`UsuarioId`, `CompañíaId`); asignaciones
+  consecutivas sin solapamiento sí son válidas. Un mismo usuario PUEDE tener varias asignaciones
+  `COMPANY_ADMINISTRATOR` vigentes simultáneamente cuando correspondan a compañías distintas.
+  `GLOBAL_ADMINISTRATOR` queda fuera de esa restricción de solapamiento (no tiene compañía asociada) y PUEDEN
+  coexistir varios usuarios con ese rol simultáneamente. La extensión de la vigencia de una asignación DEBE
+  seguir las reglas de renovación ya establecidas en RF-073: solo hacia una fecha posterior y solo mientras la
+  asignación siga vigente dinámicamente; una asignación `FINALIZADA`, o una vigente cuya `FechaHoraFin` ya
+  expiró dinámicamente, NO es renovable en ningún caso y exige una asignación nueva. La renovación NUNCA
+  modifica `Rol` ni `CompañíaId` de la asignación existente — para cambiar cualquiera de los dos se finaliza la
+  asignación y se crea una distinta (RF-074) — y DEBE quedar expuesta como una operación administrativa propia,
+  análoga a la ya existente para `AsignaciónPersonaCompañía` (RF-073), sujeta a las mismas restricciones de
+  autorización que crear o finalizar esa misma asignación (RF-076) y al mismo régimen de alcance y
+  ocultamiento de existencia que el resto de operaciones sobre `Usuario` (RF-077). *(Nuevo — Sesión 2026-09-20,
+  D1; alcance de la operación de renovación aclarado explícitamente — Sesión 2026-09-20, cierre de la
+  desviación D-1.)*
+- RF-076: Un `COMPANY_ADMINISTRATOR` DEBE poder crear y administrar usuarios únicamente dentro de la compañía
+  sobre la que tiene autorización administrativa vigente, y NO DEBE poder: administrar usuarios de otras
+  compañías, reasignar usuarios fuera de su alcance, elevar su propio alcance, asignar el rol
+  `GLOBAL_ADMINISTRATOR`, ni asignar `COMPANY_ADMINISTRATOR` para una compañía distinta de la suya. SÍ DEBE
+  poder crear asignaciones `COMPANY_ADMINISTRATOR` para su propia compañía. Crear o modificar cualquier
+  asignación de rol fuera de esos límites DEBE requerir un `GLOBAL_ADMINISTRATOR` vigente o el mecanismo de
+  arranque inicial (RF-078). *(Nuevo — Sesión 2026-09-20, D1.)*
+- RF-077: El alcance efectivo de un usuario autenticado DEBE resolverse a partir de sus
+  `AsignaciónRolAdministrativo` vigentes: con una asignación `GLOBAL_ADMINISTRATOR` vigente, el alcance
+  comprende todas las compañías; en caso contrario, comprende exactamente las compañías de sus asignaciones
+  `COMPANY_ADMINISTRATOR` vigentes. Toda operación DEBE verificar además que el **recurso concreto**
+  pertenezca a ese alcance, no solo que el alcance no esté vacío; conocer o poseer el identificador de un
+  recurso NO otorga autorización sobre él. Para una `Persona` —que no tiene una única compañía propietaria—
+  el recurso se considera dentro del alcance si su compañía de pertenencia vigente está en el alcance del
+  usuario **o** si tiene al menos un `ContextoOperativoPersonaPrincipal` vigente con una Compañía Principal
+  del alcance del usuario. Las operaciones de **lectura** sobre recursos fuera del alcance DEBEN responder
+  `404`, sin revelar la existencia del recurso; las de **escritura** DEBEN respetar el contrato específico de
+  cada endpoint, sin asumir `404` automáticamente. Cualquier operación de **búsqueda o filtrado** sobre un
+  listado —incluida la búsqueda de usuarios de UX-22— DEBE aplicarse sobre el conjunto ya restringido al
+  alcance del actor, nunca sobre un universo mayor, y DEBE evaluarse **antes** de la paginación: el resultado
+  paginado refleja los elementos que coinciden con el criterio de búsqueda dentro de ese alcance, no solo los
+  de la página actualmente cargada en el cliente. *(Nuevo — Sesión 2026-09-20, D1 y D3; precisa RF-005,
+  RF-049 y RF-060 sin reemplazarlos. Semántica de búsqueda/paginación aclarada explícitamente — Sesión
+  2026-09-20, cierre de la desviación D-4.)*
+- RF-078: El sistema DEBE crear automáticamente un primer usuario con rol `GLOBAL_ADMINISTRATOR` durante el
+  arranque de la aplicación, mediante una rutina **idempotente** ejecutada después de aplicar las migraciones
+  —no mediante datos sembrados en una migración—, y solo si no existe ya ninguna asignación
+  `GLOBAL_ADMINISTRATOR`. Su identidad DEBE ser un correo electrónico válido (RF-001 sin cambios: no se
+  introduce autenticación por nombre de usuario) provisto por configuración obligatoria del entorno. Su
+  contraseña inicial DEBE provenirse de configuración segura o gestor de secretos del entorno de ejecución,
+  NO DEBE estar incrustada en el código fuente, en archivos de configuración versionados, en las
+  especificaciones ni en el repositorio, DEBE cumplir la política de contraseñas vigente sin excepción
+  (Decisión #1) y DEBE exigir cambio obligatorio en el primer inicio de sesión. La vigencia inicial de esa
+  asignación de rol usa el valor `MAX_VALIDITY_DATE` del sistema (`2999-12-31T23:59:59Z`), que constituye una
+  **excepción explícita y acotada exclusivamente a esa asignación** frente a RF-071/RF-075: NO DEBE
+  generalizarse a ninguna otra asignación de rol ni a ninguna entidad vinculada a una `Persona`. Esa
+  asignación puede modificarse, renovarse o revocarse después por los mecanismos administrativos normales.
+  Todo usuario creado por otro usuario de mayor nivel DEBE exigir igualmente el cambio de contraseña en su
+  primer inicio de sesión. *(Nuevo — Sesión 2026-09-20, D2.)*
+- RF-079: La evaluación de acceso DEBE verificar dinámicamente que las compañías involucradas tengan
+  `Estado = ACTIVO`: tanto (a) la Compañía Principal propietaria del área evaluada, como (b) la compañía de
+  pertenencia vigente de la persona. Si cualquiera de las dos está `INACTIVO`, el acceso DEBE denegarse por
+  defecto con el motivo `COMPANIA_INACTIVA`, sin evaluar los pasos restantes (Historia 8, pasos 5 y 6). La
+  inactivación de una compañía NO DEBE modificar, cerrar, finalizar ni revocar ninguna asignación, relación,
+  credencial, permiso ni registro histórico asociado: no existe cascada de escritura, y el efecto sobre el
+  acceso surge exclusivamente de esta verificación dinámica. Por lo mismo, el efecto es **inmediato y
+  reversible**: al reactivar la compañía, el acceso se restablece automáticamente si las demás condiciones de
+  autorización siguen siendo válidas. El cambio de `Estado` de la compañía DEBE quedar registrado por el
+  mecanismo general de auditoría (RF-026, RF-027); la denegación en sí no escribe nada. *(Nuevo — Sesión
+  2026-09-20, D4; cierra la Decisión Pendiente #6 para el caso de inactivación de compañía.)*
+- RF-080: Cada Compañía Principal DEBE tener asociada una zona horaria propia, identificada mediante un
+  identificador estándar IANA (p. ej. `America/Lima`, `America/Santiago`), obligatoria y validada cuando
+  `TipoCompañía = PRINCIPAL_MANDANTE`; las compañías `CONTRATISTA` no la usan funcionalmente, al no poseer
+  áreas de acceso, contextos operativos ni bloques horarios propios. Esa zona determina la interpretación de
+  las fechas y horas ingresadas y presentadas, y la evaluación de los bloques horarios de los permisos de sus
+  áreas (Historia 8, paso 13). Los timestamps DEBEN persistirse siempre como instante absoluto en UTC: la
+  zona NO DEBE usarse para almacenar representaciones distintas del mismo instante, solo para convertir entre
+  ese instante y la fecha/hora local. La evaluación temporal de vigencias DEBE seguir comparando instantes
+  UTC. Para las asociaciones cuya vigencia no sea resoluble a una única Compañía Principal —una
+  `AsignaciónPersonaCompañía` que referencia una compañía `CONTRATISTA`, y `AsignaciónTipoPersona`, que no
+  está vinculada a ninguna compañía— rige la **zona horaria global de respaldo** del sistema. Cambiar la zona
+  de una Compañía Principal NO DEBE modificar ni reinterpretar retrospectivamente los instantes UTC ya
+  persistidos; sí cambia su representación local en consultas y presentaciones futuras, por lo que DEBE ser
+  una operación controlada y auditable. La zona vigente es siempre la actualmente configurada: no se versiona
+  históricamente. *(Nuevo — Sesión 2026-09-20, D5; resuelve la ambigüedad de calendario de RF-016.)*
+- RF-081: El `TipoCompañía` de una compañía NO DEBE poder modificarse mientras existan dependencias de
+  dominio incompatibles con el tipo destino. El sistema DEBE verificarlas antes de aceptar el cambio y, si
+  existen, DEBE rechazar la operación informando qué dependencias deben resolverse previamente. NO DEBE
+  realizarse ninguna eliminación, cierre, revocación ni modificación automática o masiva de esas dependencias
+  como consecuencia del cambio de tipo. Se consideran dependencias relevantes, como mínimo: (a) áreas de
+  acceso asociadas a la compañía; (b) raíces de unidad organizativa y estructuras organizativas que dependan
+  de ella; (c) `RelaciónContratistaPrincipal` vigentes incompatibles con el tipo destino, evaluadas de forma
+  **simétrica en ambas direcciones** —una compañía `CONTRATISTA` con relaciones vigentes como Contratista
+  queda igualmente bloqueada para pasar a `PRINCIPAL_MANDANTE`— y contando **únicamente** registros reales de
+  esa entidad, nunca `AsignaciónPersonaCompañía` ni personas, porque `RelaciónContratistaPrincipal` es
+  exclusivamente una relación Compañía↔Compañía y una persona empleada directamente por una Principal se
+  modela vía `AsignaciónPersonaCompañía` con su contexto operativo fijado automáticamente (RF-053), nunca
+  como una relación de una compañía consigo misma; (d) contextos operativos asociados a la compañía; (e)
+  credenciales cuya pertenencia o contexto dependa de ella. El cambio exitoso DEBE quedar registrado por el
+  mecanismo general de auditoría (RF-026, RF-027). *(Nuevo — Sesión 2026-09-20, D6.)*
 
 ## Entidades Principales
 
 - Usuario
 - HistorialContraseña
-- AlcanceUsuarioCompañía
+- AsignaciónRolAdministrativo (asignación temporal y auditable de un rol administrativo —
+  `GLOBAL_ADMINISTRATOR` o `COMPANY_ADMINISTRATOR` — a un Usuario, con alcance GLOBAL o por compañía;
+  reemplaza a `AlcanceUsuarioCompañía` desde la Sesión 2026-09-20 — RF-074 a RF-077)
 - Compañía (clasificada como PRINCIPAL_MANDANTE o CONTRATISTA)
 - RelaciónContratistaPrincipal (relación vigente entre una Compañía CONTRATISTA y una o varias Compañías
   PRINCIPAL_MANDANTE)
@@ -1212,7 +1464,9 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   cumplen.
 - CS-032: Las consultas agregadas/transversales de auditoría, históricos e indicadores operativos (Historia
   10) respetan siempre el alcance de compañías del usuario autenticado — ningún usuario puede observar,
-  mediante estas vistas, actividad de una compañía fuera de su alcance.
+  mediante estas vistas, actividad de una compañía fuera de su alcance. **[DIFERIDO A ETAPA 2 — Sesión
+  2026-09-20, D8: describe una propiedad de RF-067 a RF-069, diferidos junto con ellos. No es verificable en
+  el baseline de Etapa 1 por ausencia deliberada de la capacidad, no por incumplimiento.]**
 - CS-033: Ninguna asociación temporal vinculada a una persona (`AsignaciónPersonaCompañía`,
   `ContextoOperativoPersonaPrincipal`, `AsignaciónPersonaUnidadOrganizativa`, `AsignaciónCredencial`,
   `AsignaciónTipoPersona`, `PermisoAcceso`) puede crearse con `FechaHoraFin` nula o con una fecha centinela;
@@ -1228,6 +1482,25 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   `FechaHoraFin` de ningún `ContextoOperativoPersonaPrincipal`, `AsignaciónPersonaUnidadOrganizativa` o
   `AsignaciónCredencial` ya existente de esa persona; solo amplía el techo temporal permitido (RF-072) para
   asociaciones creadas después de la renovación (RF-073).
+- CS-036: Un usuario cuyo único rol vigente es `COMPANY_ADMINISTRATOR` sobre una compañía no puede, en ninguna
+  operación, listar ni modificar usuarios de otra compañía, asignarse a sí mismo un alcance mayor, ni crear
+  una asignación `GLOBAL_ADMINISTRATOR`; sí puede crear otra asignación `COMPANY_ADMINISTRATOR` para su propia
+  compañía (RF-074, RF-076).
+- CS-037: Una lectura de cualquier recurso fuera del alcance del usuario autenticado responde `404` y no
+  revela la existencia del recurso, incluso cuando el identificador es correcto y conocido (RF-077).
+- CS-038: Un despliegue desde cero, sin ningún usuario en la base de datos, queda operable tras el primer
+  arranque: existe exactamente un `GLOBAL_ADMINISTRATOR` creado automáticamente, con cambio de contraseña
+  obligatorio pendiente; reiniciar la aplicación no crea un segundo (RF-078).
+- CS-039: Inactivar una Compañía Principal deniega inmediatamente el acceso a sus áreas con motivo
+  `COMPANIA_INACTIVA` sin alterar ningún contexto operativo, credencial ni permiso existente, y reactivarla
+  restablece el acceso sin ninguna otra intervención (RF-079).
+- CS-040: Dos Compañías Principales con zonas horarias IANA distintas evalúan el mismo instante UTC contra sus
+  propios bloques horarios locales, de forma independiente entre ellas; cambiar la zona de una no altera
+  ningún instante ya persistido (RF-080).
+- CS-041: Intentar cambiar el `TipoCompañía` de una compañía que tiene áreas de acceso, raíces de unidad
+  organizativa, relaciones Contratista↔Principal vigentes, contextos operativos o credenciales dependientes se
+  rechaza informando las dependencias a resolver, y ninguna de ellas se modifica; la misma operación sobre una
+  compañía sin dependencias se acepta en ambas direcciones (RF-081).
 
 ## Supuestos
 
@@ -1238,7 +1511,10 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   detalle completo — este documento se mantiene funcional y no se amplía con detalles de implementación).
 - Perú es el locale inicial.
 - Los timestamps persistidos utilizan UTC.
-- Las reglas de negocio de horario utilizan `America/Lima`.
+- Las reglas de negocio de horario se evalúan en la zona horaria de la Compañía Principal correspondiente
+  (`Compañía.ZonaHorariaIana`, RF-080), con una zona global de respaldo del sistema para los casos no
+  resolubles a una única Principal. *(Antes de la Sesión 2026-09-20 este supuesto fijaba `America/Lima` para
+  todo el sistema; Perú sigue siendo el locale inicial y el valor de respaldo por defecto.)*
 - Una persona puede tener múltiples tipos/perfiles, salvo que negocio defina lo contrario.
 - Los permisos iniciales son concesiones; el modelo de denegación explícita queda para una fase posterior.
 - El ID interno es UID/UUID y no se muestra en pantallas normales.
@@ -1260,13 +1536,24 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 
 ## Decisiones Pendientes
 
-1. Umbrales concretos de política de contraseña: número de intentos fallidos antes de bloqueo, período
-   de expiración y flujo de recuperación (MFA descartado para esta fase; ver Clarifications).
+1. ~~Umbrales concretos de política de contraseña: número de intentos fallidos antes de bloqueo, período
+   de expiración y flujo de recuperación (MFA descartado para esta fase; ver Clarifications).~~ **Resuelto
+   (Sesión 2026-09-20, D9)**: la política de contraseñas actualmente configurada queda como **autoridad
+   única y definitiva** del baseline — longitud mínima, exigencia de mayúscula/minúscula/dígito, umbral de
+   intentos fallidos para bloqueo, período de expiración e historial no reutilizable son los ya
+   parametrizados. NO se introducen umbrales especiales para el usuario de arranque (RF-078): su contraseña
+   cumple exactamente esta misma política. NO se incorpora al baseline ningún mecanismo adicional de
+   recuperación de contraseña ni ninguna política de caducidad distinta de la ya definida.
 2. ~~Si una credencial necesita un identificador físico adicional: número, código de barras, QR, UID,
    etc.~~ **Resuelto (Sesión 2026-09-14, corrección Contexto Operativo)**: NO. `TipoCredencial` es
    únicamente tipo/diseño visual; no se incorpora ningún identificador físico ni tecnología de
    identificación salvo que negocio lo solicite explícitamente en el futuro (RF-058).
-3. Requisitos legales de privacidad y retención de información.
+3. ~~Requisitos legales de privacidad y retención de información.~~ **Resuelto (Sesión 2026-09-20, D9)**: el
+   baseline NO implementa ninguna política específica de retención legal ni eliminación automática basada en
+   períodos no definidos. Los datos y registros existentes se conservan conforme al comportamiento actual del
+   sistema, que ya prohíbe la eliminación física de historial relevante para trazabilidad (Principio IV de la
+   Constitución). Definir períodos concretos de retención y eliminación legal queda **fuera del alcance
+   funcional del baseline** y requerirá una decisión específica antes de implementar esa funcionalidad.
 4. ~~Al cambiar la compañía vigente de una persona (nueva `AsignaciónPersonaCompañía`), ¿deben cerrarse
    automáticamente sus contextos operativos, asignaciones de unidad organizativa y credenciales vigentes, o
    permanecen abiertos hasta su cierre manual o vencimiento natural de su propia vigencia?~~ **Resuelto —
@@ -1280,20 +1567,28 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
    final de consistencia)**: NO; la exclusividad estricta por par `(PersonaId, CompañíaPrincipalId)` de
    RF-052 se confirma como decisión final. Ningún caso de negocio establecido requiere múltiples contextos
    simultáneos con la misma Principal.
-6. ¿Debe aplicarse la misma revocación automática en cascada cuando finaliza una
+6. ~~¿Debe aplicarse la misma revocación automática en cascada cuando finaliza una
    `RelaciónContratistaPrincipal` (en vez de una pertenencia Persona–Compañía), o cuando una `Compañía` es
-   marcada `INACTIVO` administrativamente (afectando potencialmente a todo su personal a la vez)? Ninguno de
-   los dos casos fue especificado por negocio en esta corrección (que se limitó explícitamente al cese de
-   pertenencia Persona–Compañía); por ahora ambos permanecen protegidos únicamente por la re-validación
-   dinámica de la evaluación de acceso (RF-059/RF-065), sin cascada de escritura equivalente a RF-061.
-   Requiere confirmación de negocio si se desea extender el mismo mecanismo.
-7. **(Nueva — Sesión 2026-09-14, integración `ux-ui.md`)** RF-066 hace que la evaluación de acceso (Historia
+   marcada `INACTIVO` administrativamente (afectando potencialmente a todo su personal a la vez)?~~
+   **Resuelto para la inactivación de compañía (Sesión 2026-09-20, D4)**: NO se aplica cascada de escritura.
+   Se adopta la denegación por **evaluación dinámica**: la evaluación de acceso comprueba
+   `Compañía.Estado = ACTIVO` tanto de la Principal propietaria del área como de la compañía de pertenencia
+   vigente de la persona, y deniega con `COMPANIA_INACTIVA` sin modificar ningún registro dependiente — efecto
+   inmediato y reversible (RF-079, Historia 8 pasos 5 y 6, research.md §30). **Nota importante**: hasta esa
+   sesión, tanto este documento como `research.md` §14.5 afirmaban que la re-validación dinámica ya cubría
+   este caso; era incorrecto — el motor de evaluación nunca consultaba `Compañía.Estado`. RF-079 es lo que
+   convierte esa afirmación en comportamiento exigido. **El caso del fin de una `RelaciónContratistaPrincipal`
+   sigue abierto** y permanece protegido únicamente por la re-validación dinámica ya existente
+   (RF-059/RF-065), sin cascada de escritura equivalente a RF-061; extender ese mecanismo requeriría una
+   decisión de negocio explícita adicional.
+7. ~~**(Nueva — Sesión 2026-09-14, integración `ux-ui.md`)** RF-066 hace que la evaluación de acceso (Historia
    8, P1) dependa funcionalmente de que exista una `AsignaciónCredencial` vigente (Historia 9, actualmente
-   P2): sin credencial asignada, ninguna persona puede obtener `CONCEDIDO`, sin importar cuán completos sean
-   sus permisos. ¿Debe elevarse la prioridad de Historia 9 a P1 para reflejar que dejó de ser una
-   funcionalidad complementaria y pasó a ser un prerrequisito operativo de Historia 8? Esta sesión de
-   clarificación resolvió la regla de negocio (RF-066) pero **no** la pregunta de alcance/priorización de
-   entrega — queda pendiente de decisión explícita antes de que se vea reflejada en `tasks.md`.
+   P2)... ¿Debe elevarse la prioridad de Historia 9 a P1?~~ **Resuelto (Sesión 2026-09-20, D9)**: Historia 9
+   **mantiene la prioridad P2**. La decisión es documental y de priorización, sin impacto técnico sobre el
+   baseline: no modifica el modelo de dominio, la autorización, la API, la persistencia ni los criterios de
+   cierre de Etapa 1, y no genera tareas de implementación. La dependencia funcional que RF-066 introdujo ya
+   quedó satisfecha en la práctica, porque la funcionalidad de credenciales de Historia 9 se construyó dentro
+   del baseline con independencia de su etiqueta de prioridad.
 8. ~~`AsignaciónPersonaCompañía`, `ContextoOperativoPersonaPrincipal` y `AsignaciónPersonaUnidadOrganizativa`
    conservan en `data-model.md` la misma redacción de campo que `AsignaciónCredencial` tenía antes de la
    sesión de auditoría de RF-066 ("`FechaHoraFin`... `null` mientras esté vigente"). ¿Tienen la misma

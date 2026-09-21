@@ -81,6 +81,11 @@ paths:
     put:
       tags: [Companias]
       summary: Actualizar compañía
+      description: >
+        Cambiar tipoCompania se rechaza (Sesión 2026-09-20, D6, research.md §32) si la compañía tiene
+        dependencias incompatibles con el tipo destino (áreas de acceso, raíces de unidad organizativa,
+        relaciones Contratista↔Principal vigentes en cualquier dirección, contextos operativos, o
+        credenciales) — simétrico en ambas direcciones, sin cascada automática.
       requestBody:
         required: true
         content:
@@ -94,6 +99,13 @@ paths:
               schema: { $ref: "#/components/schemas/Compania" }
         "404":
           description: No encontrada o fuera de alcance
+        "409":
+          description: >
+            CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS — el tipoCompania destino es incompatible con
+            dependencias existentes (detalle en ProblemDetails.detail)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
   /api/companias/{contratistaId}/relaciones-principales:
     parameters:
       - name: contratistaId
@@ -176,7 +188,19 @@ components:
         tipoDocumentoId: { type: string, format: uuid }
         numeroDocumento: { type: string }
         tipoCompania: { $ref: "#/components/schemas/TipoCompania" }
-        estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        estado:
+          type: string
+          enum: [ACTIVO, INACTIVO]
+          description: >
+            INACTIVO deniega dinámicamente el acceso evaluado a través de esta compañía (Sesión
+            2026-09-20, D4, research.md §30) — sin cascada de escritura; reversible al reactivar.
+        zonaHorariaIana:
+          type: string
+          nullable: true
+          example: America/Lima
+          description: >
+            Sesión 2026-09-20 (D5, research.md §31). Obligatoria y validada cuando
+            tipoCompania = PRINCIPAL_MANDANTE; sin uso funcional para CONTRATISTA.
     CompaniaRequest:
       type: object
       required: [nombre, tipoDocumentoId, numeroDocumento, tipoCompania, estado]
@@ -186,6 +210,11 @@ components:
         numeroDocumento: { type: string, minLength: 1, maxLength: 20 }
         tipoCompania: { $ref: "#/components/schemas/TipoCompania" }
         estado: { type: string, enum: [ACTIVO, INACTIVO] }
+        zonaHorariaIana:
+          type: string
+          nullable: true
+          example: America/Lima
+          description: Obligatoria cuando tipoCompania = PRINCIPAL_MANDANTE (D5)
     PaginaCompanias:
       type: object
       properties:

@@ -45,6 +45,12 @@ services:
       ConnectionStrings__SqlServer: "${SQLSERVER_CONNECTION_STRING:?Defina SQLSERVER_CONNECTION_STRING}"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?Defina JWT_SIGNING_KEY (mínimo 32 caracteres)}"
 
+      # Primer administrador global (RF-078). Sin ambas, la API no arranca: es preferible a levantar
+      # con un administrador adivinable. La contraseña NUNCA se versiona: llega por secreto o entorno,
+      # debe cumplir la política vigente y su cambio es obligatorio en el primer inicio de sesión.
+      Bootstrap__AdminEmail: "${BOOTSTRAP_ADMIN_EMAIL:?Defina BOOTSTRAP_ADMIN_EMAIL (correo del administrador inicial)}"
+      Bootstrap__AdminPassword: "${BOOTSTRAP_ADMIN_PASSWORD:?Defina BOOTSTRAP_ADMIN_PASSWORD (nunca la versione en el repositorio)}"
+
       # Opcionales: sin valor, se usan los de appsettings.json.
       Jwt__Issuer: "${JWT_ISSUER:-enterprise-access-control}"
       Jwt__Audience: "${JWT_AUDIENCE:-enterprise-access-control-spa}"

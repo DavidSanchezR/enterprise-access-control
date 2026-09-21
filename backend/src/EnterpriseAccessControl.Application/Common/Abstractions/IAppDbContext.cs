@@ -22,7 +22,7 @@ public interface IAppDbContext
 
     DbSet<HistorialContrasena> HistorialContrasenas { get; }
 
-    DbSet<AlcanceUsuarioCompania> AlcancesUsuarioCompania { get; }
+    DbSet<AsignacionRolAdministrativo> AsignacionesRolAdministrativo { get; }
 
     DbSet<Compania> Companias { get; }
 

@@ -60,17 +60,45 @@ public sealed class HistorialContrasenaConfiguration : IEntityTypeConfiguration<
     }
 }
 
-public sealed class AlcanceUsuarioCompaniaConfiguration : IEntityTypeConfiguration<AlcanceUsuarioCompania>
+public sealed class AsignacionRolAdministrativoConfiguration
+    : IEntityTypeConfiguration<AsignacionRolAdministrativo>
 {
-    public void Configure(EntityTypeBuilder<AlcanceUsuarioCompania> builder)
+    /// <summary>
+    /// Nombre del <c>CHECK</c> que impone la regla fundamental de <c>CompaniaId</c> (RF-074).
+    /// </summary>
+    /// <remarks>
+    /// Se expone para que la migración y las pruebas se refieran a la misma restricción sin
+    /// duplicar el literal.
+    /// </remarks>
+    public const string CheckReglaFundamental = "CK_AsignacionRolAdministrativo_RolCompania";
+
+    public void Configure(EntityTypeBuilder<AsignacionRolAdministrativo> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("AlcanceUsuarioCompania");
-        builder.HasKey(a => a.Id);
+        // Declarar el trigger es obligatorio: con rowversion, EF emitiría la escritura con cláusula
+        // OUTPUT y SQL Server la rechaza (error 334) en tablas con triggers habilitados.
+        builder.ToTable(
+            "AsignacionRolAdministrativo",
+            t =>
+            {
+                t.HasTrigger(Triggers.AsignacionRolAdministrativo);
+
+                t.HasCheckConstraint(
+                    CheckReglaFundamental,
+                    "([Rol] = 'GLOBAL_ADMINISTRATOR' AND [CompaniaId] IS NULL) "
+                    + "OR ([Rol] = 'COMPANY_ADMINISTRATOR' AND [CompaniaId] IS NOT NULL)");
+            });
 
         builder.Property(a => a.UsuarioId).IsRequired();
-        builder.Property(a => a.CompaniaId).IsRequired();
+        builder.Property(a => a.Rol).IsRequired();
+
+        // Anulable a propósito: es NULL exactamente para GLOBAL_ADMINISTRATOR (RF-074).
+        builder.Property(a => a.CompaniaId);
+
+        builder.Property(a => a.FechaHoraInicio).IsRequired();
+        builder.Property(a => a.FechaHoraFin).IsRequired();
+        builder.Property(a => a.RowVersion).ComoRowVersion();
 
         builder
             .HasOne<Usuario>()
@@ -84,10 +112,17 @@ public sealed class AlcanceUsuarioCompaniaConfiguration : IEntityTypeConfigurati
             .HasForeignKey(a => a.CompaniaId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Una compañía aparece a lo sumo una vez en el alcance de un usuario.
+        // Entidad de histórico: nunca se borra una asignación vencida, se acumulan (research.md §20).
+        builder.ConClusterPorCreatedAt();
+
+        // La resolución del alcance en cada request consulta las asignaciones vigentes del usuario.
         builder
-            .HasIndex(a => new { a.UsuarioId, a.CompaniaId })
-            .IsUnique()
-            .HasDatabaseName("UX_AlcanceUsuarioCompania_Usuario_Compania");
+            .HasIndex(a => new { a.UsuarioId, a.FechaHoraFin })
+            .HasDatabaseName("IX_AsignacionRolAdministrativo_Usuario_FechaHoraFin");
+
+        // El listado por compañía (Resource Ownership de usuarios) filtra por CompaniaId.
+        builder
+            .HasIndex(a => new { a.CompaniaId, a.FechaHoraFin })
+            .HasDatabaseName("IX_AsignacionRolAdministrativo_Compania_FechaHoraFin");
     }
 }

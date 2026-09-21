@@ -3,10 +3,22 @@ import { esProblemDetails, mensajeDeProblema, type ProblemDetails } from './prob
 
 const SESION_STORAGE_KEY = 'eac.sesion'
 
+/** contracts/users.yaml — RolAdministrativo. Catálogo cerrado de dos valores (RF-074). */
+export const ROLES_ADMINISTRATIVOS = ['GLOBAL_ADMINISTRATOR', 'COMPANY_ADMINISTRATOR'] as const
+export type RolAdministrativo = (typeof ROLES_ADMINISTRATIVOS)[number]
+
+/**
+ * Sesión almacenada localmente.
+ *
+ * `companiaIds` solo se informa para `COMPANY_ADMINISTRATOR`: el alcance de un
+ * `GLOBAL_ADMINISTRATOR` es toda compañía y no se enumera (RF-074), incluidas las que se creen
+ * después de iniciar sesión. Por eso la interfaz consulta `rol` antes de razonar sobre `companiaIds`.
+ */
 export interface SesionAlmacenada {
   accessToken: string
   expiraEn: string
-  alcanceCompanias: string[]
+  rol: RolAdministrativo | null
+  companiaIds: string[]
   requiereCambioPassword: boolean
 }
 

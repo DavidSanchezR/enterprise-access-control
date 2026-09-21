@@ -11,11 +11,17 @@ namespace EnterpriseAccessControl.Application.People;
 /// Registro y búsqueda de personas (Historia 4, RF-012, RF-013, RF-035, RF-041).
 /// </summary>
 /// <remarks>
-/// **Alcance (RF-035)**: una persona es visible para el usuario solo si su pertenencia vigente apunta
-/// a una compañía dentro del alcance de ese usuario. Una persona sin ninguna pertenencia vigente no
-/// pertenece al alcance de nadie y no aparece en las búsquedas: es la lectura por defecto-denegar del
-/// Principio I. Sí sigue siendo registrable —el alta de la persona precede a su contratación— y
-/// visible para quien acaba de crearla dentro de la misma operación.
+/// **Alcance (RF-035, RF-077)**: a diferencia de un área o una unidad organizativa, una persona no
+/// tiene una compañía propietaria única, así que su Resource Ownership se resuelve por **unión**
+/// (D3): está dentro del alcance si su compañía de pertenencia vigente está en el alcance **o** si
+/// tiene al menos un contexto operativo vigente con una Compañía Principal del alcance. Sin esa
+/// unión, el personal de contratista sería invisible para la Principal en cuyas instalaciones
+/// trabaja, que es justo quien necesita administrarlo.
+///
+/// Una persona sin ninguna pertenencia ni contexto vigente no pertenece al alcance de nadie y no
+/// aparece en las búsquedas: es la lectura por defecto-denegar del Principio I. Sí sigue siendo
+/// registrable —el alta de la persona precede a su contratación— y visible para quien acaba de
+/// crearla dentro de la misma operación.
 /// </remarks>
 public sealed class PersonaService(
     IAppDbContext db,
@@ -32,7 +38,7 @@ public sealed class PersonaService(
 
         var companias = CompaniasConsultables(filtro.CompaniaId);
 
-        if (companias.Count == 0)
+        if (companias is { Count: 0 })
         {
             // Filtrar por una compañía fuera del alcance no es un error: sencillamente no hay nada
             // que ver. Devolver 403 confirmaría que esa compañía existe.
@@ -146,8 +152,17 @@ public sealed class PersonaService(
     /// Compañías sobre las que puede consultarse, intersecando el alcance del usuario con el filtro
     /// opcional de la petición.
     /// </summary>
-    private List<Guid> CompaniasConsultables(Guid? filtroCompaniaId)
+    /// <remarks>
+    /// <c>null</c> significa "sin restricción por compañía": es el alcance GLOBAL, que no se enumera
+    /// (RF-074). Un <c>List</c> vacío, en cambio, significa "ninguna compañía consultable".
+    /// </remarks>
+    private List<Guid>? CompaniasConsultables(Guid? filtroCompaniaId)
     {
+        if (alcance.EsGlobal)
+        {
+            return filtroCompaniaId is null ? null : [filtroCompaniaId.Value];
+        }
+
         var enAlcance = alcance.CompaniaIds;
 
         if (filtroCompaniaId is null)
@@ -159,21 +174,34 @@ public sealed class PersonaService(
     }
 
     /// <summary>
-    /// Personas cuya pertenencia vigente apunta a alguna de las compañías indicadas (RF-035).
+    /// Personas alcanzables por unión: pertenencia vigente **o** contexto operativo vigente con una
+    /// Principal del alcance (RF-035, RF-077).
     /// </summary>
-    private IQueryable<Persona> PersonasEnAlcance(List<Guid> companias)
+    private IQueryable<Persona> PersonasEnAlcance(List<Guid>? companias)
     {
+        var consulta = db.Personas.AsNoTracking();
+
+        if (companias is null)
+        {
+            // Alcance GLOBAL: toda persona es alcanzable, sin enumerar compañías.
+            return consulta;
+        }
+
         var ahora = reloj.UtcNow;
 
-        // Se expresa como semi-join sobre la pertenencia y no cargando pertenencias en memoria: con
-        // 100.000 personas, resolverlo en el cliente no sostendría el objetivo de CS-002.
-        return db.Personas
-            .AsNoTracking()
-            .Where(p => db.AsignacionesPersonaCompania.Any(a =>
+        // Se expresa como semi-join y no cargando pertenencias en memoria: con 100.000 personas,
+        // resolverlo en el cliente no sostendría el objetivo de CS-002.
+        return consulta.Where(p =>
+            db.AsignacionesPersonaCompania.Any(a =>
                 a.PersonaId == p.Id
                 && companias.Contains(a.CompaniaId)
                 && a.FechaHoraInicio <= ahora
-                && ahora < a.FechaHoraFin));
+                && ahora < a.FechaHoraFin)
+            || db.ContextosOperativos.Any(c =>
+                c.PersonaId == p.Id
+                && companias.Contains(c.CompaniaPrincipalId)
+                && c.FechaHoraInicio <= ahora
+                && ahora < c.FechaHoraFin));
     }
 
     private static IQueryable<Persona> AplicarFiltrosDeTexto(
@@ -229,6 +257,11 @@ public sealed class PersonaService(
             throw NoEncontrada();
         }
 
+        if (alcance.EsGlobal)
+        {
+            return;
+        }
+
         var historial = await db.AsignacionesPersonaCompania
             .AsNoTracking()
             .Where(a => a.PersonaId == personaId)
@@ -236,14 +269,23 @@ public sealed class PersonaService(
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
+        // La unión de D3 también rige en el histórico: el personal de contratista debe seguir siendo
+        // administrable por la Principal en la que tuvo contexto operativo (RF-077).
+        var principales = await db.ContextosOperativos
+            .AsNoTracking()
+            .Where(c => c.PersonaId == personaId)
+            .Select(c => c.CompaniaPrincipalId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
         // Sin historial la persona todavía no es de nadie: cualquier administrador puede darle su
         // primera pertenencia. Es el caso del alta seguida de contratación.
-        if (historial.Count == 0)
+        if (historial.Count == 0 && principales.Count == 0)
         {
             return;
         }
 
-        if (!historial.Exists(alcance.EstaEnAlcance))
+        if (!historial.Exists(alcance.EstaEnAlcance) && !principales.Exists(alcance.EstaEnAlcance))
         {
             throw NoEncontrada();
         }

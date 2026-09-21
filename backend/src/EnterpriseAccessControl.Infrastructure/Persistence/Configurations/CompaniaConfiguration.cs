@@ -22,6 +22,10 @@ public sealed class CompaniaConfiguration : IEntityTypeConfiguration<Compania>
 
         builder.Property(c => c.Estado).IsRequired();
 
+        // Anulable en la columna porque solo una PRINCIPAL_MANDANTE la exige (RF-080); la
+        // obligatoriedad condicional la impone la capa de aplicación, que conoce el tipo.
+        builder.Property(c => c.ZonaHorariaIana).HasMaxLength(64);
+
         builder.Property(c => c.RowVersion).ComoRowVersion();
 
         // Una compañía se identifica de forma única por su documento tributario/legal, no por nombre.

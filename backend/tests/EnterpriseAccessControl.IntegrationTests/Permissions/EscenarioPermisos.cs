@@ -68,7 +68,8 @@ internal sealed class EscenarioPermisos(SqlServerFixture fixture)
     {
         _us5 = await new EscenarioUs5(fixture).MontarAsync();
 
-        DiaEvaluado = ADiaSemana(RelojLocal().DiaSemanaLocal(Instante));
+        // La zona es la de la Principal propietaria del área evaluada (RF-080), no una del proceso.
+        DiaEvaluado = ADiaSemana(RelojLocal().DiaSemanaLocal(Instante, PrincipalA.ZonaHorariaIana));
 
         var companiaPertenencia = comoContratista ? Contratista.Id : PrincipalA.Id;
         await _us5.PertenenciaVigenteAsync(companiaPertenencia);
@@ -214,8 +215,8 @@ internal sealed class EscenarioPermisos(SqlServerFixture fixture)
 
     private IRelojEmpresarial RelojLocal()
     {
-        // El mismo componente que usa la aplicación: si la zona horaria cambiara por configuración,
-        // la prueba se movería con ella en lugar de quedarse con un desfase escrito a mano.
+        // El mismo componente que usa la aplicación: si la zona de la Principal cambiara, la prueba
+        // se movería con ella en lugar de quedarse con un desfase escrito a mano.
         using var ambito = fixture.Api.Services.CreateScope();
         return ambito.ServiceProvider.GetRequiredService<IRelojEmpresarial>();
     }

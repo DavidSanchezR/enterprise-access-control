@@ -33,10 +33,11 @@ public sealed class RelacionContratistaPrincipalService(
 
         // Se listan sólo las relaciones cuya Principal también está dentro del alcance: la Principal
         // es un dato de otra compañía y no debe filtrarse por el hecho de administrar la Contratista.
+        // Un GLOBAL_ADMINISTRATOR las ve todas, sin enumerar compañías (RF-074).
         return await db.RelacionesContratistaPrincipal
             .AsNoTracking()
             .Where(r => r.CompaniaContratistaId == contratistaId
-                        && enAlcance.Contains(r.CompaniaPrincipalId))
+                        && (alcance.EsGlobal || enAlcance.Contains(r.CompaniaPrincipalId)))
             .OrderByDescending(r => r.FechaHoraInicio)
             .Select(r => new RelacionContratistaPrincipalDto(
                 r.Id, r.CompaniaContratistaId, r.CompaniaPrincipalId, r.FechaHoraInicio, r.FechaHoraFin))

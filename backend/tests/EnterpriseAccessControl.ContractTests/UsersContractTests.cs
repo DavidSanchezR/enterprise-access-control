@@ -3,6 +3,7 @@ using EnterpriseAccessControl.Application.Auth;
 using EnterpriseAccessControl.Application.Auth.Validators;
 using EnterpriseAccessControl.Application.Common.Options;
 using EnterpriseAccessControl.ContractTests.Infraestructura;
+using EnterpriseAccessControl.Domain.Enums;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 
@@ -64,8 +65,9 @@ public sealed class UsersContractTests(ApiContratoFixture fixture)
     [InlineData("/api/usuarios/{id}", "get")]
     [InlineData("/api/usuarios/{id}", "put")]
     [InlineData("/api/usuarios/{id}/desbloquear", "post")]
-    [InlineData("/api/usuarios/{id}/alcance-companias", "get")]
-    [InlineData("/api/usuarios/{id}/alcance-companias", "put")]
+    [InlineData("/api/usuarios/{id}/roles", "get")]
+    [InlineData("/api/usuarios/{id}/roles", "post")]
+    [InlineData("/api/usuarios/{id}/roles/{asignacionId}/finalizar", "post")]
     public void La_api_declara_todos_los_codigos_de_estado_del_contrato(string ruta, string metodo)
     {
         var esperados = Contrato.Estados[(ruta, metodo)];
@@ -119,6 +121,44 @@ public sealed class UsersContractTests(ApiContratoFixture fixture)
     }
 
     [Fact]
+    public void El_listado_declara_el_parametro_de_busqueda_del_contrato()
+    {
+        // `OpenApiSnapshotTests` compara rutas, estados y cuerpos, no parámetros de consulta: sin esta
+        // aserción, el contrato podría declarar `texto` (v2.1.0, UX-22) y la API no implementarlo sin
+        // que ninguna prueba lo notara — exactamente la divergencia que D-4 vino a cerrar.
+        var enElContrato = Contrato.ParametrosDeConsulta("/api/usuarios", "get");
+
+        enElContrato.Should().Contain("texto");
+
+        var enLaApi = fixture.DocumentoApi.Operacion("/api/usuarios", "get")
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(p => p.GetProperty("name").GetString())
+            .ToList();
+
+        enLaApi.Should().Contain("texto");
+    }
+
+    [Fact]
+    public void La_renovacion_de_asignacion_existe_y_acepta_fechaHoraFin()
+    {
+        // Cierre de D-1: la ruta estuvo declarada en el contrato sin implementación. El nombre del
+        // campo importa: el contrato de renovación de personas usa `fechaHoraFin`, y un `nuevaFechaHoraFin`
+        // obligaría al cliente a recordar dos nombres para la misma operación.
+        const string ruta = "/api/usuarios/{id}/roles/{asignacionId}/renovar";
+
+        fixture.DocumentoApi.TieneOperacion(ruta, "post").Should().BeTrue();
+
+        fixture.DocumentoApi.EstadosDeclarados(ruta, "post")
+            .Should().Contain(["204", "400", "403", "404", "409"]);
+
+        var propiedades = fixture.DocumentoApi.PropiedadesDeEsquema(
+            nameof(RenovarAsignacionRolRequest));
+
+        propiedades.Should().BeEquivalentTo(["fechaHoraFin"]);
+    }
+
+    [Fact]
     public void Los_errores_se_documentan_con_ProblemDetails_y_no_con_un_esquema_propio()
     {
         // research.md §21: ProblemDetails RFC 7807/9457 es el único formato de error del sistema.
@@ -133,26 +173,79 @@ public sealed class UsersContractTests(ApiContratoFixture fixture)
     }
 
     [Fact]
-    public void El_alta_de_usuario_exige_al_menos_una_compania_en_el_alcance()
+    public void El_alta_de_usuario_impone_la_regla_fundamental_de_rol_y_compania()
     {
-        // minItems: 1 en el contrato — un usuario sin alcance no podría administrar nada (RF-005).
-        // Se verifica sobre el validador y no sólo sobre el documento, porque es ahí donde la
-        // restricción se impone de verdad: un contrato que la declare y una API que la ignore sería
-        // exactamente la divergencia que estas pruebas existen para detectar.
+        // RF-074: CompañíaId debe ser NULL para GLOBAL_ADMINISTRATOR y obligatoria para
+        // COMPANY_ADMINISTRATOR. Se verifica sobre el validador y no sólo sobre el documento, porque
+        // es ahí donde la restricción se impone de verdad: un contrato que la declare y una API que la
+        // ignore sería exactamente la divergencia que estas pruebas existen para detectar.
         var validador = new CrearUsuarioRequestValidator(
             new PasswordPolicyValidator(Options.Create(new PasswordPolicyOptions())));
 
-        var sinCompanias = new CrearUsuarioRequest("admin@empresa.cl", "Contrasena1Valida", []);
+        var inicio = new DateTime(2026, 9, 20, 0, 0, 0, DateTimeKind.Utc);
+        var fin = inicio.AddYears(1);
 
-        validador.Validate(sinCompanias).IsValid.Should().BeFalse(
-            "el contrato declara minItems: 1 para companiaIds");
-
-        var conCompania = new CrearUsuarioRequest(
+        var globalConCompania = new CrearUsuarioRequest(
             "admin@empresa.cl",
             "Contrasena1Valida",
-            [Guid.CreateVersion7()]);
+            RolAdministrativo.GLOBAL_ADMINISTRATOR,
+            Guid.CreateVersion7(),
+            inicio,
+            fin);
 
-        validador.Validate(conCompania).IsValid.Should().BeTrue();
+        validador.Validate(globalConCompania).IsValid.Should().BeFalse(
+            "un GLOBAL_ADMINISTRATOR no admite compañía");
+
+        var companySinCompania = new CrearUsuarioRequest(
+            "admin@empresa.cl",
+            "Contrasena1Valida",
+            RolAdministrativo.COMPANY_ADMINISTRATOR,
+            null,
+            inicio,
+            fin);
+
+        validador.Validate(companySinCompania).IsValid.Should().BeFalse(
+            "un COMPANY_ADMINISTRATOR exige una compañía");
+
+        var global = new CrearUsuarioRequest(
+            "admin@empresa.cl",
+            "Contrasena1Valida",
+            RolAdministrativo.GLOBAL_ADMINISTRATOR,
+            null,
+            inicio,
+            fin);
+
+        validador.Validate(global).IsValid.Should().BeTrue();
+
+        var porCompania = new CrearUsuarioRequest(
+            "admin@empresa.cl",
+            "Contrasena1Valida",
+            RolAdministrativo.COMPANY_ADMINISTRATOR,
+            Guid.CreateVersion7(),
+            inicio,
+            fin);
+
+        validador.Validate(porCompania).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void La_vigencia_de_la_primera_asignacion_es_obligatoria_y_real()
+    {
+        // RF-075: nunca null ni fecha centinela, y el fin debe ser posterior al inicio.
+        var validador = new CrearUsuarioRequestValidator(
+            new PasswordPolicyValidator(Options.Create(new PasswordPolicyOptions())));
+
+        var inicio = new DateTime(2026, 9, 20, 0, 0, 0, DateTimeKind.Utc);
+
+        var invertida = new CrearUsuarioRequest(
+            "admin@empresa.cl",
+            "Contrasena1Valida",
+            RolAdministrativo.GLOBAL_ADMINISTRATOR,
+            null,
+            inicio,
+            inicio.AddDays(-1));
+
+        validador.Validate(invertida).IsValid.Should().BeFalse();
     }
 
     [Fact]

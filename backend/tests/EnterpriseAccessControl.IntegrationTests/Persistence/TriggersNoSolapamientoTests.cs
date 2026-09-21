@@ -9,13 +9,13 @@ using Microsoft.EntityFrameworkCore;
 namespace EnterpriseAccessControl.IntegrationTests.Persistence;
 
 /// <summary>
-/// Revisión de los cinco triggers de no-solapamiento (T164; research.md §5, Principio IV).
+/// Revisión de los seis triggers de no-solapamiento (T164, T172; research.md §5, Principio IV).
 /// </summary>
 /// <remarks>
 /// Verifica tres cosas sobre el SQL Server del contenedor, que se construye exclusivamente aplicando las
 /// migraciones de EF Core:
 /// <list type="number">
-///   <item>que existen exactamente los cinco triggers, habilitados, <c>AFTER INSERT, UPDATE</c>, sobre la
+///   <item>que existen exactamente los seis triggers, habilitados, <c>AFTER INSERT, UPDATE</c>, sobre la
 ///   tabla correcta, y que llegaron a la base de datos por migraciones versionadas;</item>
 ///   <item>que cada uno particiona por las columnas que declara research.md §5;</item>
 ///   <item>que cada uno se dispara de verdad ante un solapamiento escrito saltándose la aplicación.</item>
@@ -31,12 +31,14 @@ public sealed class TriggersNoSolapamientoTests(SqlServerFixture fixture)
         { "trg_ContextoOperativoPersonaPrincipal_NoSolapamiento", "ContextoOperativoPersonaPrincipal", ["t.[PersonaId] = i.[PersonaId]", "t.[CompaniaPrincipalId] = i.[CompaniaPrincipalId]"] },
         { "trg_AsignacionPersonaUnidadOrganizativa_NoSolapamiento", "AsignacionPersonaUnidadOrganizativa", ["t.[ContextoOperativoId] = i.[ContextoOperativoId]"] },
         { "trg_AsignacionCredencial_NoSolapamiento", "AsignacionCredencial", ["t.[PersonaId] = i.[PersonaId]", "t.[CompaniaPrincipalId] = i.[CompaniaPrincipalId]", "t.[Estado] = 'ASIGNADO'", "i.[Estado] = 'ASIGNADO'"] },
+        // Sesión 2026-09-20 (RF-075): particiona por (UsuarioId, CompaniaId) y excluye al rol GLOBAL.
+        { "trg_AsignacionRolAdministrativo_NoSolapamiento", "AsignacionRolAdministrativo", ["t.[UsuarioId] = i.[UsuarioId]", "t.[CompaniaId] = i.[CompaniaId]", "t.[Rol] = 'COMPANY_ADMINISTRATOR'", "i.[Rol] = 'COMPANY_ADMINISTRATOR'"] },
     };
 
     private sealed record FilaTrigger(string Nombre, string Tabla, bool Deshabilitado, bool EsInsteadOf, string Definicion);
 
     [Fact]
-    public async Task Existen_exactamente_los_cinco_triggers_de_no_solapamiento()
+    public async Task Existen_exactamente_los_seis_triggers_de_no_solapamiento()
     {
         var nombres = (await TriggersAsync()).Select(t => t.Nombre).ToList();
 
@@ -47,6 +49,7 @@ public sealed class TriggersNoSolapamientoTests(SqlServerFixture fixture)
             "trg_ContextoOperativoPersonaPrincipal_NoSolapamiento",
             "trg_AsignacionPersonaUnidadOrganizativa_NoSolapamiento",
             "trg_AsignacionCredencial_NoSolapamiento",
+            "trg_AsignacionRolAdministrativo_NoSolapamiento",
         ]);
     }
 
@@ -83,6 +86,10 @@ public sealed class TriggersNoSolapamientoTests(SqlServerFixture fixture)
 
         aplicadas.Should().Contain(m => m.EndsWith("_AddRelacionContratistaPrincipalTrigger", StringComparison.Ordinal));
         aplicadas.Should().Contain(m => m.EndsWith("_AddTriggersNoSolapamientoUS5", StringComparison.Ordinal));
+
+        // El sexto trigger llega en la migración del modelo RBAC, no en una aplicada a mano (T172).
+        aplicadas.Should().Contain(
+            m => m.EndsWith("_RolesAdministrativos_ZonaHoraria_Etapa1", StringComparison.Ordinal));
 
         List<string> pendientes = [];
         await fixture.Api.ConDbContextAsync(async db =>

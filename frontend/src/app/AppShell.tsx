@@ -22,9 +22,13 @@ export function AppShell(): ReactElement {
         <span className="shell-marca">Control de Acceso Empresarial</span>
 
         <div className="shell-sesion">
+          {/* El alcance GLOBAL no se enumera: mostrar "0 compañías" sería falso (RF-074). */}
           <span className="shell-alcance">
-            {sesion?.alcanceCompanias.length ?? 0} compañía
-            {sesion?.alcanceCompanias.length === 1 ? '' : 's'} en su alcance
+            {sesion?.rol === 'GLOBAL_ADMINISTRATOR'
+              ? 'Alcance global: todas las compañías'
+              : `${sesion?.companiaIds.length ?? 0} compañía${
+                  sesion?.companiaIds.length === 1 ? '' : 's'
+                } en su alcance`}
           </span>
 
           <button
@@ -68,9 +72,15 @@ export function AppShell(): ReactElement {
             <li>
               <NavLink to="/maestros">Datos maestros</NavLink>
             </li>
-            <li>
-              <NavLink to="/usuarios">Usuarios</NavLink>
-            </li>
+
+            {/* Configuración → Usuarios y roles administrativos (ux-ui.md §7 y §35). La entrada solo
+                se ofrece a quien tiene una asignación vigente: sin rol, la API responde 403 y
+                mostrarla sería ofrecer una acción que la autorización va a rechazar (§32). */}
+            {sesion?.rol !== null && sesion?.rol !== undefined && (
+              <li>
+                <NavLink to="/usuarios">Usuarios y roles administrativos</NavLink>
+              </li>
+            )}
           </ul>
         </nav>
 

@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análisis de impacto — Desviación D-1 (renovación de roles)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--success);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--success);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+
+  /* ---------- Fases ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage { min-width: 0; }
+  }
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .fase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .fase-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+  .fase-card .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fase-card h3 { font-size: 14px; }
+  .fase-card .rango { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--primary); }
+  .metrica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+  .metrica { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; }
+  .metrica .valor { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metrica .etiqueta { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .metrica.ok .valor { color: var(--success); }
+  .check-list { display: grid; gap: 8px; }
+  .check-item { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 10px; align-items: start; font-size: 14px; }
+  .check-item .tick { color: var(--success); font-weight: 700; }
+  .trace td:nth-child(2) { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+</style>
+<style>
+  /* Variante neutral del bloque de cabecera: esta página no recomienda una alternativa, así que
+     evita el borde verde de éxito que usan los informes de veredicto. */
+  .pending {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--warning);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .pending-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .pending-head .status { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--warning); }
+  .pending ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+
+  /* Dos columnas simétricas para las alternativas A / B, sin jerarquía visual entre ellas. */
+  .alt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .alt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 12px;
+    align-content: start;
+  }
+  .alt-card .alt-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .alt-card h3 { font-size: 16px; }
+  .alt-card ol, .alt-card ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; }
+  .alt-card ol li::marker, .alt-card ul li::marker { color: var(--muted); font-size: 12px; }
+  .alt-card code { font-size: 0.82em; }
+  @media (max-width: 900px) { .alt-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .contract-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .clasif-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .clasif-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; display: grid; gap: 8px; align-content: start;
+  }
+  .clasif-card .tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .clasif-card.a .tag { color: var(--success); }
+  .clasif-card.b .tag { color: var(--primary); }
+  .clasif-card.c .tag { color: var(--warning); }
+  @media (max-width: 900px) { .clasif-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  table.cmp th:nth-child(2), table.cmp td:nth-child(2),
+  table.cmp th:nth-child(3), table.cmp td:nth-child(3) { min-width: 220px; }
+</style>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Análisis de impacto · Solo lectura · Sin ejecución de comandos Speckit</p>
+    <h1>Desviación D-1 — Renovación de asignaciones de rol</h1>
+    <div class="meta">
+      <span>Feature <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Rama <b class="mono">feature/baseline-decisions</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Origen <b class="mono">/speckit-implement</b> (T204)</span>
+      <span>Estado <b>Ningún archivo modificado</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#pendiente"><span>?</span><span>Qué falta decidir</span></a></li>
+      <li><a href="#evidencia"><span>0</span><span>Evidencia recogida</span></a></li>
+      <li><a href="#alternativa-a"><span>A</span><span>En el baseline</span></a></li>
+      <li><a href="#alternativa-b"><span>B</span><span>Fuera del baseline</span></a></li>
+      <li><a href="#matriz"><span>1</span><span>Matriz comparativa</span></a></li>
+      <li><a href="#artefactos"><span>2</span><span>Artefactos afectados</span></a></li>
+      <li><a href="#clasificacion"><span>3</span><span>Clasificación de D-1</span></a></li>
+      <li><a href="#decision"><span>4</span><span>Qué decidir</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ===================== PENDIENTE DE DECISIÓN ===================== -->
+    <section id="pendiente">
+      <div class="pending">
+        <div class="pending-head">
+          <span class="status">Pendiente de decisión — no hay alternativa recomendada</span>
+          <span class="pill warn">Requisito parcial</span>
+          <span class="pill neutral">Documentos aprobados en tensión</span>
+        </div>
+
+        <p class="prose">Durante <code>/speckit-implement</code>, T204 pedía implementar <em>finalizar y
+        renovar</em> una asignación de rol administrativo (UX-20). El dominio ya construye
+        <code>RenovarAsync</code> con las reglas de RF-073, pero no se expuso ningún endpoint HTTP: hacerlo
+        habría introducido una ruta que <code>contracts/users.yaml</code> no declara, rompiendo la
+        conformidad que vigilan las pruebas de contrato.</p>
+
+        <ul>
+          <li><code>ux-ui.md</code> (UX-20, §35, §31) afirma que renovar es una operación disponible del
+          baseline.</li>
+          <li><code>research.md</code> §27 y <code>contracts/users.yaml</code> documentan deliberadamente
+          solo crear y finalizar una asignación de rol.</li>
+          <li>Ningún artefacto resuelve esa divergencia por sí solo — este informe no la resuelve tampoco:
+          presenta ambas alternativas de forma neutral para que se decida explícitamente.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===================== EVIDENCIA ===================== -->
+    <section id="evidencia">
+      <div class="section-head"><span class="letter">0</span><h2>Evidencia recogida en los artefactos actuales</h2></div>
+
+      <p class="prose">Antes de comparar alternativas, esto es lo que cada documento dice hoy sobre renovar
+      una <code>AsignaciónRolAdministrativo</code> — no una interpretación, sino la cita o el resultado de
+      la búsqueda.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Artefacto</th><th>Qué dice</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">spec.md — RF-075</td>
+              <td>«La extensión de la vigencia de una asignación <b>DEBE seguir</b> las reglas de renovación
+              ya establecidas en RF-073: solo hacia una fecha posterior y solo mientras la asignación siga
+              vigente dinámicamente.»</td>
+            </tr>
+            <tr>
+              <td class="id">spec.md — RF-073</td>
+              <td>Alcance textual limitado a <code>AsignaciónPersonaCompañía</code>: «DEBE <b>poder</b>
+              extenderse…». No menciona <code>AsignaciónRolAdministrativo</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">spec.md — CS-036 a CS-041</td>
+              <td><span class="pill neutral">0 menciones</span> de renovación.</td>
+            </tr>
+            <tr>
+              <td class="id">ux-ui.md — UX-20</td>
+              <td>«Finalizar <b>o renovar</b> una asignación administrativa cuando esté permitido.»</td>
+            </tr>
+            <tr>
+              <td class="id">ux-ui.md — §35</td>
+              <td>«Operaciones disponibles: <b>finalizar</b> … <b>renovar</b> — extiende
+              <code>FechaHoraFin</code> … (RF-075, con las reglas de RF-073).»</td>
+            </tr>
+            <tr>
+              <td class="id">ux-ui.md — §35, pestaña Histórico</td>
+              <td>«trazabilidad de altas, finalizaciones <b>y renovaciones</b> de asignaciones.»</td>
+            </tr>
+            <tr>
+              <td class="id">contracts/users.yaml</td>
+              <td>Rutas declaradas: <code>/api/usuarios</code>, <code>/{id}</code>,
+              <code>/{id}/desbloquear</code>, <code>/{id}/roles</code>,
+              <code>/{id}/roles/{asignacionId}/finalizar</code>. <b>No existe ruta de renovación.</b></td>
+            </tr>
+            <tr>
+              <td class="id">research.md §27 (D1)</td>
+              <td>Diseño de API: «crear/finalizar una asignación individual». <code>renovar</code>
+              <b>no figura</b> entre las operaciones de API previstas.</td>
+            </tr>
+            <tr>
+              <td class="id">data-model.md</td>
+              <td>La sección <code>AsignaciónRolAdministrativo</code> no describe operación de renovación —a
+              diferencia de <code>AsignaciónPersonaCompañía</code>, que sí tiene un bloque propio
+              «Renovación (RF-073)».</td>
+            </tr>
+            <tr>
+              <td class="id">quickstart.md</td>
+              <td><span class="pill neutral">0 menciones</span> de renovación de rol.</td>
+            </tr>
+            <tr>
+              <td class="id">contracts/people.yaml (precedente)</td>
+              <td><code>POST /api/personas/{id}/historial-companias/{asignacionId}/renovar</code> — ya
+              existe para <code>AsignaciónPersonaCompañía</code>, con body
+              <code>{fechaHoraFin}</code> y respuestas <code>204</code> / <code>409</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="prose muted"><strong>Estado actual del código.</strong>
+      <code>RenovarAsync</code> existe en <code>AsignacionRolAdministrativoService</code> y
+      <code>UsuarioService.RenovarRolAsync</code>, con su DTO y validador. No existe ruta en
+      <code>UsuariosController</code>, ni <code>renovarRol</code> en el cliente HTTP del frontend, ni hook
+      asociado.</p>
+    </section>
+
+    <!-- ===================== ALTERNATIVA A ===================== -->
+    <section id="alternativa-a">
+      <div class="section-head"><span class="letter">A</span><h2>Renovación dentro del baseline</h2></div>
+
+      <div class="alt-grid">
+        <div class="alt-card">
+          <span class="alt-tag">1 · Requisitos afectados</span>
+          <ul>
+            <li><b>RF-075</b> (ya aprobado): su cláusula de extensión pasa de regla latente a regla
+            ejercitable.</li>
+            <li><b>RF-073</b> (ya aprobado): se invocaría por referencia; su texto actual no se extiende a
+            esta entidad — decidir si se cita por analogía o se amplía.</li>
+            <li><b>RF-076</b> (ya aprobado): la autorización de renovar sigue la misma restricción que
+            asignar/finalizar.</li>
+            <li>Ningún CS cubre esto hoy; puede ejecutarse sin CS nuevo o añadir uno — eso sí sería alcance
+            nuevo.</li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">2 · ux-ui.md</span>
+          <p>Se <b>mantiene sin cambios</b>: UX-20, §35 «Modificar una asignación», pestaña Histórico y §31
+          criterio 19 ya describen esta operación tal como quedaría construida.</p>
+        </div>
+
+        <div class="alt-card" style="grid-column: 1 / -1;">
+          <span class="alt-tag">3-4 · Contrato HTTP a agregar</span>
+          <p class="muted">Derivado del precedente de <code>people.yaml</code> y de las reglas ya aprobadas,
+          sin inventar ninguna regla nueva:</p>
+          <div class="contract-block">POST /api/usuarios/{id}/roles/{asignacionId}/renovar
+body:      { "fechaHoraFin": "&lt;date-time&gt;" }   (requerido)
+200 / 204  AsignacionRolAdministrativo o sin cuerpo — a decidir consistencia con /finalizar
+400        fechaHoraFin ausente o mal formada
+403        ROL_NO_AUTORIZADO            (RF-076, igual que /finalizar)
+404        no encontrada o fuera de alcance (RF-077)
+409        ASIGNACION_ROL_NO_VIGENTE    (ya expirada — RF-073/RF-075)
+409        RENOVACION_NO_POSTERIOR      (fin no estrictamente posterior)
+409        SOLAPAMIENTO_VIGENCIA        (la extensión invade otra asignación del mismo par)</div>
+          <p class="muted">Los cuatro códigos de error ya existen en <code>CodigosError.cs</code>.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">5 · Tareas a completar</span>
+          <ul>
+            <li><b>T194</b> — ampliar: exponer la ruta en el controlador.</li>
+            <li><b>T199</b> — incompleta: falta <code>renovarRol</code> y su hook.</li>
+            <li><b>T204</b> — incompleta: falta la mitad «renovar» con confirmación.</li>
+            <li><b>T220</b> — ampliar: prueba de contrato de la ruta nueva.</li>
+            <li><b>T221</b> — ampliar: prueba de componente de renovar.</li>
+            <li><b>T223</b> — ampliar: paso E2E de UX-20 sobre renovar.</li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">6 · Pruebas necesarias</span>
+          <ul>
+            <li>Contrato: ruta + códigos de estado declarados.</li>
+            <li>Integración: extiende sin crear fila; expirada → 409; no posterior → 409; solapamiento →
+            409; ajeno → 403/404.</li>
+            <li>Componente: diálogo de renovar + confirmación.</li>
+            <li>E2E: paso adicional dentro de UX-20.</li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">7 · Archivos a modificar</span>
+          <ul class="tight">
+            <li><code>contracts/users.yaml</code></li>
+            <li><code>UsuariosController.cs</code></li>
+            <li><code>features/users/api.ts</code> y <code>hooks.ts</code></li>
+            <li><code>UsuarioDetalle.tsx</code>, <code>mensajesRol.ts</code></li>
+            <li><code>UsersContractTests.cs</code>, <code>RolesAdministrativosTests.cs</code></li>
+            <li><code>UsuariosPage.test.tsx</code>, <code>administracion-usuarios.spec.ts</code></li>
+            <li><code>tasks.md</code>; opcional <code>research.md</code> §27 y <code>data-model.md</code></li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">8 · ¿Decisión nueva?</span>
+          <p><b>Mixto.</b> La <em>regla</em> de cómo renovar está aprobada (RF-075 + RF-073). Lo que no está
+          determinado es si la operación debe <b>exponerse por HTTP en esta etapa</b>:
+          <code>research.md</code> §27 y <code>contracts/users.yaml</code> documentan explícitamente solo
+          crear/finalizar. Añadir la ruta es decisión de alcance del contrato, no invención de regla de
+          negocio.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">9 · Impacto en el cierre</span>
+          <p>El baseline no podría declararse cerrado hasta que la ruta, su implementación y sus pruebas
+          existan. Trabajo acotado: la lógica de dominio ya está construida y probada.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ALTERNATIVA B ===================== -->
+    <section id="alternativa-b">
+      <div class="section-head"><span class="letter">B</span><h2>Renovación fuera del baseline</h2></div>
+
+      <div class="alt-grid">
+        <div class="alt-card">
+          <span class="alt-tag">1 · Texto de UX-20 a cambiar</span>
+          <ul>
+            <li><code>ux-ui.md</code> (UX-20) → eliminar «o renovar», o anotar
+            <code>[DIFERIDA A ETAPA 2]</code>.</li>
+            <li><code>ux-ui.md</code> §35 «Modificar una asignación» → retirar el bullet «renovar» o
+            anotarlo como diferido.</li>
+            <li><code>ux-ui.md</code> §35, pestaña Histórico → «y renovaciones» queda sin referente en esta
+            etapa.</li>
+            <li>§31 criterio 19 → declarar explícitamente qué parte de UX-20 queda cubierta.</li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">2 · ¿RF-073 permanece?</span>
+          <p><b>Sí, sin cambios.</b> RF-073 rige <code>AsignaciónPersonaCompañía</code> y ya está
+          implementado y expuesto (<code>people.yaml</code>, <code>PersonasController.cs</code>). B no lo
+          toca.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">3 · ¿Permanece RenovarAsync?</span>
+          <p class="muted">Dos opciones, ambas defendibles, ninguna obligada:</p>
+          <ul>
+            <li><b>Conservarlo</b> como capacidad de dominio no expuesta, documentando por qué. Riesgo:
+            código sin consumidor.</li>
+            <li><b>Retirarlo</b> junto con su DTO, validador y pruebas. Riesgo: rehacerlo en Etapa 2.</li>
+          </ul>
+          <p class="muted">RF-075 seguiría exigiendo que cualquier extensión siga las reglas de RF-073,
+          aunque no haya operación que la produzca.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">4 · Documentos a actualizar</span>
+          <ul class="tight">
+            <li><code>ux-ui.md</code> (§35, UX-20, §31)</li>
+            <li><code>tasks.md</code> (T199, T204, T221, T223 — acotar su texto)</li>
+            <li>Anotación en <code>spec.md</code> RF-075</li>
+          </ul>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">5 · Cómo documentarlo</span>
+          <p>Con el patrón inline ya usado en el documento —
+          <code>[DIFERIDA A ETAPA 2 — Sesión 2026-09-XX]</code>— más una entrada en
+          <code>docs/auditorias/</code> que registre la decisión, igual que se hizo con D8 para
+          RF-067/068/069.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">6 · Pruebas actuales</span>
+          <p>Las unitarias de T213 (<code>EsRenovableEn</code>) se conservan si el dominio permanece; se
+          retiran si se retira el código. No hay pruebas de contrato, integración ni E2E que eliminar —
+          nunca existieron.</p>
+        </div>
+
+        <div class="alt-card">
+          <span class="alt-tag">7 · Impacto en el cierre</span>
+          <p>El baseline puede cerrarse <b>sin trabajo de construcción adicional</b>, a costa de que UX-20
+          quede parcialmente cubierto y de dejar constancia explícita de ello.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MATRIZ ===================== -->
+    <section id="matriz">
+      <div class="section-head"><span class="letter">1</span><h2>Matriz comparativa A vs B</h2></div>
+
+      <div class="table-wrap">
+        <table class="cmp">
+          <thead>
+            <tr><th>Dimensión</th><th>A — En baseline</th><th>B — Fuera del baseline</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Cambia <code>contracts/users.yaml</code></td><td>Sí (ruta nueva)</td><td>No</td></tr>
+            <tr><td>Cambia <code>ux-ui.md</code></td><td>No</td><td>Sí (UX-20, §35, §31)</td></tr>
+            <tr><td>Cambia <code>spec.md</code></td><td>No (opcional: matizar RF-073/RF-075)</td><td>Sí (anotación en RF-075)</td></tr>
+            <tr><td>Código de dominio</td><td>Se reutiliza tal cual</td><td>Queda sin exponer o se retira</td></tr>
+            <tr><td>Tareas a reabrir</td><td>T194, T199, T204, T220, T221, T223</td><td>T199, T204, T221, T223 (acotar texto)</td></tr>
+            <tr><td>Pruebas nuevas</td><td>Contrato, integración, componente, E2E</td><td>Ninguna nueva</td></tr>
+            <tr><td>Cobertura de UX-20</td><td>Completa</td><td>Parcial y declarada</td></tr>
+            <tr><td>Trabajo de construcción</td><td>Acotado (lógica ya hecha)</td><td>Nulo</td></tr>
+            <tr><td>Deuda que deja</td><td>Ninguna en este punto</td><td>Renovación pendiente + posible código sin consumidor</td></tr>
+            <tr><td>Riesgo principal</td><td>Ampliar el contrato en fase de cierre</td><td>Cerrar con un requisito UX parcialmente cubierto</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== ARTEFACTOS ===================== -->
+    <section id="artefactos">
+      <div class="section-head"><span class="letter">2</span><h2>Artefactos afectados (lista exacta)</h2></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <h3>Solo si se elige A</h3>
+          <ul class="tight">
+            <li><code>contracts/users.yaml</code></li>
+            <li><code>UsuariosController.cs</code></li>
+            <li><code>features/users/api.ts</code></li>
+            <li><code>features/users/hooks.ts</code></li>
+            <li><code>UsuarioDetalle.tsx</code></li>
+            <li><code>mensajesRol.ts</code></li>
+            <li><code>UsersContractTests.cs</code></li>
+            <li><code>RolesAdministrativosTests.cs</code></li>
+            <li><code>UsuariosPage.test.tsx</code></li>
+            <li><code>administracion-usuarios.spec.ts</code></li>
+            <li class="muted">Opcional: <code>research.md</code> §27, <code>data-model.md</code></li>
+          </ul>
+        </div>
+
+        <div class="panel">
+          <h3>Solo si se elige B</h3>
+          <ul class="tight">
+            <li><code>ux-ui.md</code> (líneas de UX-20, §35, §31 criterio 19)</li>
+            <li><code>spec.md</code> (anotación en RF-075)</li>
+            <li class="muted">Opcional: retirar <code>RenovarAsync</code>, <code>AuthDtos.cs</code>,
+            <code>AuthValidators.cs</code>, <code>UsuarioService.RenovarRolAsync</code> y parte de
+            <code>AsignacionRolAdministrativoTests.cs</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 4px;">
+        <h3>En ambas alternativas</h3>
+        <ul class="tight">
+          <li><code>tasks.md</code> — T199, T204, T221, T223</li>
+          <li>Un registro nuevo en <code>docs/auditorias/</code> dejando constancia de la decisión tomada</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===================== CLASIFICACIÓN ===================== -->
+    <section id="clasificacion">
+      <div class="section-head"><span class="letter">3</span><h2>Clasificación de D-1</h2></div>
+
+      <p class="prose">D-1 es <b>híbrida</b>. Separarla en sus tres componentes es lo que permite decidir
+      sin reabrir lo ya aprobado.</p>
+
+      <div class="clasif-grid">
+        <div class="clasif-card a">
+          <span class="tag">(a) Requisito ya aprobado</span>
+          <p>Cómo debe comportarse una extensión de vigencia: RF-075 + las reglas de RF-073. No está en
+          discusión.</p>
+        </div>
+        <div class="clasif-card a">
+          <span class="tag">(a) Requisito aprobado, en tensión</span>
+          <p>UX-20 y §35 listan «renovar» como operación disponible, y §32 declara que esa sección solo
+          representa reglas ya definidas en <code>spec.md</code>. RF-075 regula la extensión pero nunca dice
+          «DEBE poder renovarse», a diferencia de RF-073 para pertenencia.</p>
+        </div>
+        <div class="clasif-card b">
+          <span class="tag">(b) Consecuencia técnica</span>
+          <p>Sin ruta en <code>contracts/users.yaml</code>, exponerla habría roto las pruebas de
+          conformidad — por eso la tarea se detuvo en lugar de resolverse sola.</p>
+        </div>
+        <div class="clasif-card c" style="grid-column: 1 / -1;">
+          <span class="tag">(c) Decisión de alcance pendiente</span>
+          <p>Si la renovación de asignaciones de rol debe formar parte del <b>contrato HTTP de Etapa 1</b>.
+          <code>research.md</code> §27 documenta deliberadamente solo crear/finalizar; <code>ux-ui.md</code>
+          documenta finalizar y renovar. Esa divergencia entre dos documentos aprobados es el núcleo de D-1
+          y no se resuelve leyendo más artefactos.</p>
+        </div>
+      </div>
+
+      <p class="prose muted">Ningún artefacto implica inequívocamente que la renovación deba estar en el
+      baseline: <code>ux-ui.md</code> lo afirma; <code>research.md</code> §27,
+      <code>contracts/users.yaml</code>, <code>data-model.md</code>, <code>quickstart.md</code> y los
+      criterios CS-036 a CS-041 lo omiten. RF-075 es compatible con ambas lecturas.</p>
+    </section>
+
+    <!-- ===================== DECISIÓN ===================== -->
+    <section id="decision">
+      <div class="section-head"><span class="letter">4</span><h2>Qué decidir explícitamente antes del cierre</h2></div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill warn">Decisión raíz</span><span class="note">de la que se derivan las demás</span></div>
+        <ol>
+          <li>¿La renovación de una asignación de rol es una capacidad de Etapa 1?</li>
+        </ol>
+      </div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill neutral">Precedencia documental</span></div>
+        <ol>
+          <li>¿Qué documento prevalece cuando <code>ux-ui.md</code> y <code>research.md</code> §27
+          divergen? Fijarlo evita que la misma situación se repita.</li>
+        </ol>
+      </div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill neutral">Si se elige A</span></div>
+        <ol>
+          <li>¿La respuesta es <code>204</code> (como <code>/finalizar</code> y el precedente de
+          <code>people.yaml</code>) o <code>200</code> con el DTO?</li>
+          <li>¿Se amplía el texto de RF-073 para cubrir <code>AsignaciónRolAdministrativo</code>, o se
+          mantiene la referencia cruzada desde RF-075?</li>
+        </ol>
+      </div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill neutral">Si se elige B</span></div>
+        <ol>
+          <li>¿<code>RenovarAsync</code> y sus pruebas se conservan como dominio no expuesto, o se
+          retiran?</li>
+          <li>¿Basta la anotación inline en <code>ux-ui.md</code>, o UX-20 se reescribe para mencionar solo
+          finalizar?</li>
+        </ol>
+      </div>
+
+      <div class="rec-group">
+        <div class="rec-group-head"><span class="pill neutral">Dato de negocio ausente en los documentos</span></div>
+        <ol>
+          <li>Con qué frecuencia se espera prorrogar la vigencia de un administrador frente a finalizarla y
+          crear una nueva. Finalizar + crear produce el mismo alcance efectivo con dos filas en lugar de una
+          extendida; si esa diferencia en el rastro de auditoría es irrelevante para la operación, B pierde
+          coste — si es relevante, A lo gana.</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Informe generado el 20/09/2026 como análisis de impacto de la desviación D-1, detectada al finalizar
+      <code>/speckit-implement</code> sobre T169 a T228. Análisis de solo lectura: ningún archivo del
+      repositorio fue modificado, no se ejecutó ningún comando Speckit adicional y no hubo commits ni push.
+      Presenta las alternativas A y B de forma neutral, sin recomendar ninguna. Documento local: los enlaces
+      funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

@@ -297,8 +297,17 @@ public sealed class PermisoAccesoService(IAppDbContext db, IAlcanceCompaniaAcces
     // --- Alcance administrativo (RF-049) --------------------------------------------------------
 
     /// <summary>Restringe la consulta a los permisos de áreas cuya Principal el usuario administra.</summary>
+    /// <remarks>
+    /// Un GLOBAL_ADMINISTRATOR no enumera compañías (RF-074): filtrar por su conjunto vacío lo
+    /// dejaría sin ver ningún permiso, que es lo contrario de su alcance.
+    /// </remarks>
     private IQueryable<PermisoAcceso> EnAlcance(IQueryable<PermisoAcceso> consulta)
     {
+        if (alcance.EsGlobal)
+        {
+            return consulta;
+        }
+
         var companias = alcance.CompaniaIds.ToList();
 
         return consulta.Where(p => db.AreasAcceso
@@ -312,7 +321,8 @@ public sealed class PermisoAccesoService(IAppDbContext db, IAlcanceCompaniaAcces
         var visible = await db.AreasAcceso
             .AsNoTracking()
             .AnyAsync(
-                a => a.Id == areaAccesoId && companias.Contains(a.CompaniaPrincipalId),
+                a => a.Id == areaAccesoId
+                     && (alcance.EsGlobal || companias.Contains(a.CompaniaPrincipalId)),
                 ct)
             .ConfigureAwait(false);
 

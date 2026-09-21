@@ -121,11 +121,13 @@ public sealed class PasswordPolicyTests(SqlServerFixture fixture)
             PasswordInicial,
             EstadoUsuario.BLOQUEADO);
 
-        var compania = await fixture.Api.SembrarCompaniaAsync("Minera Desbloqueo");
+        // El usuario bloqueado no tiene ninguna asignación de rol, así que no pertenece al alcance de
+        // ningún COMPANY_ADMINISTRATOR (RF-077). El desbloqueo administrativo lo ejecuta un
+        // GLOBAL_ADMINISTRATOR, que sí administra a cualquier usuario (RF-074, RF-076).
         var admin = await fixture.Api.SembrarUsuarioAsync(
             CorreoUnico("admin"),
             PasswordInicial,
-            alcanceCompanias: [compania.Id]);
+            global: true);
 
         using var cliente = await fixture.Api.CrearClienteAutenticadoAsync(admin.Id, admin.Correo);
 

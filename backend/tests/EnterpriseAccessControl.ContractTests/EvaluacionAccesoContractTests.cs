@@ -63,11 +63,11 @@ public sealed class EvaluacionAccesoContractTests(ApiContratoFixture fixture)
     }
 
     [Fact]
-    public void El_enumerado_MotivoDenegacion_tiene_los_once_valores_del_contrato()
+    public void El_enumerado_MotivoDenegacion_tiene_los_doce_valores_del_contrato()
     {
         var enContrato = Contrato.ValoresPorEnumerado["MotivoDenegacion"];
 
-        enContrato.Should().HaveCount(11);
+        enContrato.Should().HaveCount(12);
         enContrato.Should().Contain("SIN_CREDENCIAL_VIGENTE");
 
         // El dominio y el contrato deben coincidir exactamente: un motivo que solo existiera en uno
@@ -100,7 +100,7 @@ public sealed class EvaluacionAccesoContractTests(ApiContratoFixture fixture)
         // enuncia y esta prueba impide que se pierda al editarlo.
         var texto = File.ReadAllText(RutaContrato());
 
-        texto.Should().Contain("14 pasos", "el flujo pasó de 13 a 14 pasos al añadir la credencial");
+        texto.Should().Contain("15 pasos", "el flujo pasó de 14 a 15 pasos al añadir el estado de la compañía (RF-079)");
         texto.Should().Contain("RF-066");
         texto.Should().Contain("SIN_CREDENCIAL_VIGENTE");
     }

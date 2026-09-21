@@ -22,41 +22,6 @@ namespace EnterpriseAccessControl.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AlcanceUsuarioCompania", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompaniaId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2(3)");
-
-                    b.Property<Guid?>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2(3)");
-
-                    b.Property<Guid?>("UpdatedById")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompaniaId");
-
-                    b.HasIndex("UsuarioId", "CompaniaId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_AlcanceUsuarioCompania_Usuario_Compania");
-
-                    b.ToTable("AlcanceUsuarioCompania", (string)null);
-                });
-
             modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AreaAcceso", b =>
                 {
                     b.Property<Guid>("Id")
@@ -343,6 +308,72 @@ namespace EnterpriseAccessControl.Infrastructure.Persistence.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AsignacionRolAdministrativo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CompaniaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("FechaHoraFin")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<DateTime>("FechaHoraInicio")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<string>("Rol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"), false);
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_AsignacionRolAdministrativo_CreatedAt_Clustered");
+
+                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("CreatedAt"));
+
+                    b.HasIndex("CompaniaId", "FechaHoraFin")
+                        .HasDatabaseName("IX_AsignacionRolAdministrativo_Compania_FechaHoraFin");
+
+                    b.HasIndex("UsuarioId", "FechaHoraFin")
+                        .HasDatabaseName("IX_AsignacionRolAdministrativo_Usuario_FechaHoraFin");
+
+                    b.ToTable("AsignacionRolAdministrativo", null, t =>
+                        {
+                            t.HasTrigger("trg_AsignacionRolAdministrativo_NoSolapamiento");
+
+                            t.HasCheckConstraint("CK_AsignacionRolAdministrativo_RolCompania", "([Rol] = 'GLOBAL_ADMINISTRATOR' AND [CompaniaId] IS NULL) OR ([Rol] = 'COMPANY_ADMINISTRATOR' AND [CompaniaId] IS NOT NULL)");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AsignacionTipoPersona", b =>
                 {
                     b.Property<Guid>("Id")
@@ -480,6 +511,10 @@ namespace EnterpriseAccessControl.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("UpdatedById")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ZonaHorariaIana")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.HasKey("Id");
 
@@ -1140,21 +1175,6 @@ namespace EnterpriseAccessControl.Infrastructure.Persistence.Migrations
                     b.ToTable("Usuario", (string)null);
                 });
 
-            modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AlcanceUsuarioCompania", b =>
-                {
-                    b.HasOne("EnterpriseAccessControl.Domain.Entities.Compania", null)
-                        .WithMany()
-                        .HasForeignKey("CompaniaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EnterpriseAccessControl.Domain.Entities.Usuario", null)
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AreaAcceso", b =>
                 {
                     b.HasOne("EnterpriseAccessControl.Domain.Entities.AreaAcceso", null)
@@ -1248,6 +1268,20 @@ namespace EnterpriseAccessControl.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UnidadOrganizativaId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnterpriseAccessControl.Domain.Entities.AsignacionRolAdministrativo", b =>
+                {
+                    b.HasOne("EnterpriseAccessControl.Domain.Entities.Compania", null)
+                        .WithMany()
+                        .HasForeignKey("CompaniaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnterpriseAccessControl.Domain.Entities.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

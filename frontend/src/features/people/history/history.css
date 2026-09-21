@@ -120,3 +120,27 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Cierre de Etapa 1: entrada a Historia 5 desde la interfaz (D7) ------------------------- */
+
+.historial-acciones {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+}
+
+.perfiles-persona .perfiles-lista {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.perfiles-persona .perfiles-lista li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--borde);
+}

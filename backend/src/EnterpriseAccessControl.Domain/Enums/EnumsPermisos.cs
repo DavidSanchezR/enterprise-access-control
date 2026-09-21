@@ -17,7 +17,8 @@ public enum AlcancePermiso
 }
 
 /// <summary>
-/// Día de la semana de un bloque horario, en hora local <c>America/Lima</c> (RF-022).
+/// Día de la semana de un bloque horario, en la zona horaria de la Compañía Principal propietaria
+/// del área (RF-022, RF-080).
 /// </summary>
 /// <remarks>
 /// No se reutiliza <see cref="System.DayOfWeek"/> porque es un valor de negocio persistido: su
@@ -46,11 +47,12 @@ public enum ResultadoEvaluacion
 /// Causa de una denegación de acceso (contracts/access-evaluation.yaml, research.md §7).
 /// </summary>
 /// <remarks>
-/// Los once valores son parte del contrato público y están en correspondencia con los cortes del
-/// algoritmo de 14 pasos. Varios pasos comparten motivo a propósito: el contrato agrupa bajo
+/// Los doce valores son parte del contrato público y están en correspondencia con los cortes del
+/// algoritmo de 15 pasos. Varios pasos comparten motivo a propósito: el contrato agrupa bajo
 /// <see cref="SIN_CONTEXTO_OPERATIVO_VIGENTE"/> tanto la ausencia de contexto como su pérdida de
-/// legitimidad, y bajo <see cref="SIN_CREDENCIAL_VIGENTE"/> los cuatro casos de credencial no
-/// vigente, sin distinguirlos en la respuesta.
+/// legitimidad, bajo <see cref="SIN_CREDENCIAL_VIGENTE"/> los cuatro casos de credencial no
+/// vigente, y bajo <see cref="COMPANIA_INACTIVA"/> los dos disparadores del estado de compañía, sin
+/// distinguirlos en la respuesta.
 /// </remarks>
 public enum MotivoDenegacion
 {
@@ -65,4 +67,15 @@ public enum MotivoDenegacion
     SIN_PERMISO_APLICABLE = 9,
     PERMISO_FUERA_DE_VIGENCIA = 10,
     FUERA_DE_BLOQUE_HORARIO = 11,
+
+    /// <summary>
+    /// La Compañía Principal propietaria del área, o la compañía de pertenencia vigente de la
+    /// persona, está INACTIVA (RF-079, pasos 5 y 6).
+    /// </summary>
+    /// <remarks>
+    /// Un solo código para ambos disparadores, con el detalle en texto libre: mismo patrón que
+    /// <see cref="SIN_CONTEXTO_OPERATIVO_VIGENTE"/>. La denegación es dinámica y reversible —no
+    /// escribe nada—, así que reactivar la compañía restablece el acceso sin más intervención.
+    /// </remarks>
+    COMPANIA_INACTIVA = 12,
 }

@@ -44,7 +44,7 @@ public sealed class LoginTests(SqlServerFixture fixture)
         cuerpo!.AccessToken.Should().NotBeNullOrWhiteSpace();
         cuerpo.ExpiraEn.Should().BeAfter(DateTime.UtcNow);
         cuerpo.RequiereCambioPassword.Should().BeFalse();
-        cuerpo.AlcanceCompanias.Should().ContainSingle().Which.Should().Be(compania.Id);
+        cuerpo.CompaniaIds.Should().ContainSingle().Which.Should().Be(compania.Id);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public sealed class LoginTests(SqlServerFixture fixture)
         var actual = await sesion.Content.ReadFromJsonAsync<SesionActual>(ApiFactory.Json);
         actual!.UsuarioId.Should().Be(usuario.Id);
         actual.Correo.Should().Be(correo);
-        actual.AlcanceCompanias.Should().ContainSingle().Which.Should().Be(compania.Id);
+        actual.CompaniaIds.Should().ContainSingle().Which.Should().Be(compania.Id);
     }
 
     [Fact]

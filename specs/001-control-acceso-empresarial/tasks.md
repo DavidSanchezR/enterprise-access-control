@@ -1120,3 +1120,407 @@ Con varios desarrolladores:
   ningún endpoint que mapear a una tarea de implementación — generar tareas para un contrato inexistente
   habría significado inventar la forma del endpoint, violando la instrucción de no inventar diseño no
   especificado.
+
+---
+
+# Cierre de Etapa 1 — Tareas posteriores a T168 (Sesión 2026-09-20)
+
+**Origen**: decisiones D1 a D9 (matriz de 16 preguntas, todas cerradas), RF-074 a RF-081, CS-036 a CS-041, y
+la formalización de la administración de usuarios en `ux-ui.md` §35 (UX-17 a UX-22).
+
+**Regla de numeración**: estas tareas comienzan en **T169** y son estrictamente aditivas. **T001 a T168 no se
+regeneran, no se renumeran y no se reinterpretan**: pertenecen al baseline histórico ya implementado y
+validado. Ninguna tarea de este bloque repite trabajo ya cubierto por ellas.
+
+**Fuera de alcance (Etapa 2)**: no se genera ninguna tarea para RF-067, RF-068, RF-069 ni CS-032 (consultas
+transversales de auditoría, históricos e indicadores — Historia 10), diferidos explícitamente por la decisión
+D8 y anotados `[DIFERIDA A ETAPA 2]` en `spec.md`.
+
+**Correcciones documentales ya aplicadas**: las sesiones previas sincronizaron `spec.md`, `plan.md`,
+`research.md`, `data-model.md`, `contracts/`, `quickstart.md`, `ux-ui.md` y `README.md`. No se generan tareas
+para repetirlas; solo se incluye documentación cuando es consecuencia directa de implementar una tarea nueva.
+
+---
+
+## Phase 14: Modelo de datos y migraciones
+
+**Purpose**: Estructuras de persistencia que bloquean todo lo demás de este bloque.
+
+**⚠️ CRITICAL**: Ninguna tarea de las fases 15 a 22 puede comenzar hasta completar esta fase.
+
+- [X] T169 [P] [US1] Crear enum `RolAdministrativo` con exactamente dos valores (`GLOBAL_ADMINISTRATOR`, `COMPANY_ADMINISTRATOR`) como enum cerrado del dominio, con value conversion a `nvarchar` (research.md §17, RF-074) en `backend/src/EnterpriseAccessControl.Domain/Enums/RolAdministrativo.cs`
+- [X] T170 [US1] Crear entidad `AsignacionRolAdministrativo` (`UsuarioId`, `Rol`, `CompaniaId` nullable, `FechaHoraInicio`, `FechaHoraFin` **NOT NULL**, `RowVersion`, auditoría heredada) y su `IEntityTypeConfiguration` (RF-074, RF-075) en `backend/src/EnterpriseAccessControl.Domain/Entities/AsignacionRolAdministrativo.cs`
+- [X] T171 [US1] Migración EF Core que crea la tabla `AsignacionRolAdministrativo`, el `CHECK` de la regla fundamental (`Rol = GLOBAL_ADMINISTRATOR` ⇒ `CompaniaId IS NULL`; `Rol = COMPANY_ADMINISTRATOR` ⇒ `CompaniaId IS NOT NULL`) y el índice clúster sobre `CreatedAt` conforme research.md §20 (RF-074) en `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Migrations/`
+- [X] T172 [US1] Agregar en la misma migración el **trigger SQL Server de no-solapamiento** particionado por `(UsuarioId, CompaniaId)` y filtrado a filas `Rol = COMPANY_ADMINISTRATOR`, siguiendo la plantilla de research.md §5; `GLOBAL_ADMINISTRATOR` queda exento (RF-075) en `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Migrations/`
+- [X] T173 [US1] Eliminar la entidad `AlcanceUsuarioCompania`, su `DbSet`, su configuración y su tabla mediante una migración de esquema — sin transformar ni conservar sus filas: el proyecto es greenfield, sin datos de producción ni de desarrollo que deban preservarse. Queda reemplazada por `AsignacionRolAdministrativo` (RF-074) en `backend/src/EnterpriseAccessControl.Domain/Entities/AlcanceUsuarioCompania.cs` y `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/`
+- [X] T174 [P] [US2] Agregar el campo `ZonaHorariaIana` (string, identificador IANA) a la entidad `Compania`, con migración y valor obligatorio cuando `TipoCompania = PRINCIPAL_MANDANTE` (RF-080) en `backend/src/EnterpriseAccessControl.Domain/Entities/Compania.cs` y `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Migrations/`
+
+**Checkpoint**: esquema listo — el modelo RBAC y la zona horaria por Principal existen en base de datos.
+
+---
+
+## Phase 15: Dominio y reglas de negocio
+
+**Purpose**: Reglas que no dependen de la capa de autorización ni de la API.
+
+- [X] T175 [US1] Implementar `AsignacionRolAdministrativoService` con las operaciones crear, listar, finalizar y renovar: valida la regla fundamental de `CompaniaId`, exige `FechaHoraInicio`/`FechaHoraFin` reales, rechaza solapamientos y aplica las reglas de renovación de RF-073 (solo hacia adelante y solo mientras siga vigente dinámicamente) — RF-074, RF-075 — en `backend/src/EnterpriseAccessControl.Application/Auth/AsignacionRolAdministrativoService.cs`
+- [X] T176 [P] [US2] Implementar `DependenciasTipoCompaniaValidator` que cuenta las cinco categorías de dependencia incompatible (áreas de acceso, raíces de unidad organizativa, `RelacionContratistaPrincipal` vigentes en **ambas** direcciones, contextos operativos, credenciales) sin inspeccionar `AsignacionPersonaCompania` ni personas (RF-081) en `backend/src/EnterpriseAccessControl.Application/Companies/DependenciasTipoCompaniaValidator.cs`
+- [X] T177 [US2] Integrar ese validador en `CompaniaService.ActualizarAsync` para rechazar el cambio de `TipoCompania` con `409 CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS` y detalle accionable, sin cascada ni modificación automática de dependientes (RF-081, RF-033) en `backend/src/EnterpriseAccessControl.Application/Companies/CompaniaService.cs`
+- [X] T178 [US8] Ampliar `EvaluadorDeAcceso` con el **paso 5** (Compañía Principal propietaria del área con `Estado = ACTIVO`) y con la verificación de `Estado = ACTIVO` de la compañía de pertenencia vigente dentro del **paso 6**, denegando con `COMPANIA_INACTIVA` sin escribir nada y de forma reversible (RF-079, research.md §7 y §30) en `backend/src/EnterpriseAccessControl.Application/Permissions/`
+- [X] T179 [US8] Rediseñar `IRelojEmpresarial` para recibir la Compañía Principal cuya zona debe resolverse, y `RelojEmpresarial` para obtener `Compania.ZonaHorariaIana` con respaldo en `ZonaHoraria:TimeZoneId`; `IRelojSistema` (`UtcNow`) no cambia (RF-080, research.md §31) en `backend/src/EnterpriseAccessControl.Domain/Common/IRelojEmpresarial.cs` y `backend/src/EnterpriseAccessControl.Infrastructure/Security/RelojEmpresarial.cs`
+- [X] T180 [US8] Actualizar el **paso 13** de `EvaluadorDeAcceso` para evaluar día de semana y bloque horario en la zona de la Principal determinada en el paso 4, y exponer esa zona en `evaluadoEnZonaHoraria` (RF-080) en `backend/src/EnterpriseAccessControl.Application/Permissions/`
+- [X] T181 [US2] Validar el identificador IANA de `ZonaHorariaIana` **por request** al crear o actualizar una compañía (hoy solo se valida una vez al arrancar), rechazando zonas no reconocidas (RF-080) en `backend/src/EnterpriseAccessControl.Application/Companies/`
+
+**Checkpoint**: reglas de dominio completas — evaluables por prueba unitaria sin API ni autorización.
+
+---
+
+## Phase 16: Autorización, RBAC y Resource Ownership
+
+**Purpose**: Cierra F-01 y F-02, el defecto crítico que impedía congelar el baseline.
+
+- [X] T182 [US1] Redefinir `IAlcanceCompaniaAccessor`/`AlcanceCompaniaAccessor` para resolver el alcance efectivo desde las asignaciones vigentes: `GLOBAL_ADMINISTRATOR` ⇒ `EstaEnAlcance` verdadero para toda compañía sin enumerarlas; en caso contrario, membresía contra las compañías de sus asignaciones `COMPANY_ADMINISTRATOR` vigentes (RF-074, RF-077) en `backend/src/EnterpriseAccessControl.Infrastructure/Security/AlcanceCompaniaAccessor.cs`
+- [X] T183 [US1] Redefinir `CompaniaScopeAuthorizationHandler` para exigir al menos una asignación de rol vigente en vez de `CompaniaIds.Count > 0`, que hoy denegaría a un `GLOBAL_ADMINISTRATOR` sin compañías enumeradas (RF-074, RF-077) en `backend/src/EnterpriseAccessControl.Infrastructure/Security/CompaniaScopeAuthorizationHandler.cs`
+- [X] T184 [US1] Emitir en el JWT un claim de rol y, solo para `COMPANY_ADMINISTRATOR`, un claim por compañía asignada, reemplazando el esquema actual de "un claim por compañía" que no puede representar el alcance GLOBAL (RF-074) en `backend/src/EnterpriseAccessControl.Infrastructure/Security/JwtTokenService.cs` y `ClaimsPersonalizados.cs`
+- [X] T185 [US1] Reescribir las siete operaciones de `UsuarioService` aplicando Resource Ownership y las restricciones de `COMPANY_ADMINISTRATOR`: filtrar listado y detalle por alcance, restringir creación al rol/compañía que el solicitante puede asignar, y reemplazar `ObtenerAlcanceAsync`/`ReemplazarAlcanceAsync` por operaciones sobre asignaciones individuales (RF-076, RF-077) en `backend/src/EnterpriseAccessControl.Application/Auth/UsuarioService.cs`
+- [X] T186 [P] [US6] Aplicar Resource Ownership en `UnidadOrganizativaService` y `AreaAccesoService`, hoy sin ningún control de alcance pese a RF-049 (RF-077) en `backend/src/EnterpriseAccessControl.Application/OrgUnits/UnidadOrganizativaService.cs` y `backend/src/EnterpriseAccessControl.Application/AreaAccess/AreaAccesoService.cs`
+- [X] T187 [P] [US5] Aplicar Resource Ownership en `AsignacionUnidadOrganizativaService`, `EstadoEfectivoService` y `RevocacionService`, hoy sin ningún control de alcance (RF-077, corrige F-02) en `backend/src/EnterpriseAccessControl.Application/People/`
+- [X] T188 [US4] Implementar la regla de alcance de `Persona` por **unión** —compañía de pertenencia vigente **o** cualquier contexto operativo vigente con una Principal del alcance— en `PersonaService` y `HistorialPersonaService` (RF-077) en `backend/src/EnterpriseAccessControl.Application/People/`
+- [X] T189 [US1] Auditar y completar la verificación de recurso concreto en los servicios que ya referencian el alcance parcialmente (`CompaniaService`, `CredencialService`, `ContextoOperativoService`, `RelacionContratistaPrincipalService`), asegurando lectura fuera de alcance ⇒ `404` sin revelar existencia (RF-077) en `backend/src/EnterpriseAccessControl.Application/`
+
+**Checkpoint**: F-01 y F-02 cerrados — ningún usuario puede operar fuera de su alcance.
+
+---
+
+## Phase 17: Bootstrap del primer administrador
+
+**Purpose**: Un despliegue desde cero queda operable sin intervención manual en base de datos.
+
+- [X] T190 [P] [US1] Crear `BootstrapOptions` (`Bootstrap:AdminEmail` obligatorio y con formato de correo válido; `Bootstrap:AdminPassword` obligatorio) enlazado por Options Pattern con `ValidateOnStart()`, admitiendo `Bootstrap__AdminPassword` como variable de entorno y **sin valor por defecto versionado** (RF-078) en `backend/src/EnterpriseAccessControl.Application/Common/Options/BootstrapOptions.cs`
+- [X] T191 [US1] Definir la constante `MAX_VALIDITY_DATE` (`2999-12-31T23:59:59Z`) usada **exclusivamente** por la asignación de bootstrap, sin exponerla como opción de configuración ni reutilizarla en ninguna otra asignación (RF-075, RF-078) en `backend/src/EnterpriseAccessControl.Domain/Common/`
+- [X] T192 [US1] Implementar la rutina de arranque **idempotente** que, después de aplicar migraciones, crea el `Usuario` y su `AsignacionRolAdministrativo` `GLOBAL_ADMINISTRATOR` solo si no existe ninguna, validando la contraseña contra `PasswordPolicyValidator`, fijando `RequiereCambioPassword = true` y `FechaHoraFin = MAX_VALIDITY_DATE`, con `CreatedById`/`UpdatedById` nulos (creado por el sistema) — RF-078 — en `backend/src/EnterpriseAccessControl.Api/Program.cs` o un `IHostedService` dedicado
+- [X] T193 [US1] Documentar las dos variables de bootstrap en el despliegue de producción como consecuencia directa de T190/T192, sin valor de respaldo committeado (RF-078) en `README.md` y `docker-compose.prod.yml`
+
+**Checkpoint**: una base recién migrada arranca con un administrador operable y contraseña por cambiar.
+
+---
+
+## Phase 18: API y contratos
+
+**Purpose**: Alinear el código con los contratos ya actualizados documentalmente.
+
+- [X] T194 [US1] Reescribir `UsuariosController` conforme a `contracts/users.yaml` v2: crear usuario con rol y vigencia, `GET/POST /api/usuarios/{id}/roles`, `POST /api/usuarios/{id}/roles/{asignacionId}/finalizar`, y retirar `alcance-companias` (RF-074 a RF-077) en `backend/src/EnterpriseAccessControl.Api/Controllers/UsuariosController.cs`
+- [X] T195 [P] [US1] Actualizar el flujo de login para devolver `rol` y `companiaIds` en lugar de `alcanceCompanias`, conforme a `contracts/auth.yaml` (RF-074) en `backend/src/EnterpriseAccessControl.Application/Auth/AutenticacionService.cs` y `backend/src/EnterpriseAccessControl.Api/Controllers/AuthController.cs`
+- [X] T196 [P] [US2] Exponer `zonaHorariaIana` en crear y actualizar compañía, y el `409` de dependencias incompatibles, conforme a `contracts/companies.yaml` (RF-080, RF-081) en `backend/src/EnterpriseAccessControl.Api/Controllers/CompaniasController.cs`
+- [X] T197 [P] [US8] Incorporar el motivo `COMPANIA_INACTIVA` al enum de respuesta y poblar `evaluadoEnZonaHoraria` con la zona de la Principal, conforme a `contracts/access-evaluation.yaml` (RF-079, RF-080) en `backend/src/EnterpriseAccessControl.Application/Permissions/EvaluacionAccesoDtos.cs`
+- [X] T198 [P] Registrar los códigos de negocio nuevos (`CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS` y los de asignación de rol) en el catálogo de códigos de error, y declararlos en los contratos donde falten (RF-033, cierra F-11 para los códigos nuevos) en `backend/src/EnterpriseAccessControl.Application/Common/Errores/CodigosError.cs`
+
+**Checkpoint**: el documento OpenAPI publicado vuelve a coincidir con `contracts/`.
+
+---
+
+## Phase 19: Frontend — Administración de usuarios (G7)
+
+**Goal**: Operar RF-074 a RF-077 desde la interfaz, conforme a `ux-ui.md` §35.
+
+**Independent Test**: un `COMPANY_ADMINISTRATOR` solo ve y opera usuarios de su compañía; un `GLOBAL_ADMINISTRATOR` opera sobre todas.
+
+- [X] T199 [US1] Crear el cliente HTTP y los hooks de usuarios y asignaciones de rol (listar, crear, asignar, finalizar, renovar) en `frontend/src/features/users/api.ts` y `frontend/src/features/users/hooks.ts`
+- [X] T200 [US1] Implementar el listado con columnas, filtros y aislamiento de alcance —sin revelar usuarios ajenos en resultados, totales ni paginación— (UX-22, `ux-ui.md` §35) en `frontend/src/features/users/UsuariosPage.tsx`
+- [X] T201 [US1] Implementar el wizard de creación de usuario en cinco pasos (identidad, rol, compañía condicional, vigencia obligatoria, confirmación), ocultando el rol que el operador no puede asignar (UX-17) en `frontend/src/features/users/CrearUsuarioWizard.tsx`
+- [X] T202 [US1] Implementar el detalle de usuario con tabs Resumen, Asignaciones e Histórico, distinguiendo estado de la asignación y vigencia efectiva por fechas (UX-18, `ux-ui.md` §16) en `frontend/src/features/users/UsuarioDetalle.tsx`
+- [X] T203 [US1] Implementar la asignación de rol a un usuario existente, dejando explícito que agrega y no reemplaza asignaciones (UX-19) en `frontend/src/features/users/AsignarRolDialogo.tsx`
+- [X] T204 [US1] Implementar finalizar y renovar una asignación, con confirmación para ambas y sin permitir editar rol ni compañía de una asignación existente (UX-20) en `frontend/src/features/users/`
+- [X] T205 [P] [US1] Implementar los mensajes de error específicos de la tabla de `ux-ui.md` §35 (rol o compañía no permitidos, alcance insuficiente, correo duplicado, solapamiento, vigencia inválida, contraseña fuera de política), sin revelar datos fuera de alcance (UX-21) en `frontend/src/features/users/`
+- [X] T206 [P] [US1] Añadir la entrada **Configuración → Usuarios y roles administrativos** a la navegación y sus rutas, con guard por rol (`ux-ui.md` §7 y §35) en `frontend/src/app/`
+
+**Checkpoint**: G7 operable de extremo a extremo desde la interfaz.
+
+---
+
+## Phase 20: Frontend — Interfaz de Historia 5, Casos A y B
+
+**Goal**: Completar el alcance funcional real de T116 dentro de Etapa 1 (decisión D7), sin convertirlo en funcionalidad de Etapa 2.
+
+**Independent Test**: crear pertenencia, abrir contexto y asignar unidad organizativa y perfil, íntegramente desde la interfaz, produciendo las mismas relaciones de dominio que la API.
+
+- [X] T207 [US5] Implementar el wizard de asignación con comportamiento Caso A (Principal fijada automáticamente, RF-053) y Caso B (selector de Principal limitado a relaciones vigentes de la Contratista, RF-054), invocando los hooks ya existentes `useCrearPertenencia` y `useAbrirContexto` en `frontend/src/features/people/AsignacionUnidadOrganizativa/`
+- [X] T208 [US5] Reemplazar el selector plano de unidad organizativa por el componente `Tree` ya existente, mostrando exclusivamente el árbol de la Principal del contexto (CS-021) en `frontend/src/features/people/AsignacionUnidadOrganizativa/AsignacionUnidadOrganizativa.tsx` reutilizando `frontend/src/components/Tree/Tree.tsx`
+- [X] T209 [P] [US5] Crear el cliente HTTP, los hooks y la interfaz de asociación de perfil (`AsignacionTipoPersona`) contra el endpoint `/personas/{id}/perfiles` ya existente, hoy sin ninguna pieza en el frontend en `frontend/src/features/people/`
+- [X] T210 [P] [US5] Exponer desde `PersonaHistorialPage` los puntos de entrada a crear pertenencia y abrir contexto, hoy inalcanzables pese a tener hooks funcionales en `frontend/src/features/people/history/PersonaHistorialPage.tsx`
+- [X] T211 [P] [US5] Interpretar y presentar las fechas de los formularios en la zona horaria de la Compañía Principal correspondiente, con respaldo global cuando no sea resoluble (RF-080) en `frontend/src/lib/`
+- [X] T212 [P] [US5] Sustituir el UUID mostrado como respaldo cuando no resuelve el nombre de una unidad organizativa por un estado de carga o marcador, conforme RF-013, dentro del wizard de asignación de Historia 5 en `frontend/src/features/people/AsignacionUnidadOrganizativa/AsignacionUnidadOrganizativa.tsx`
+
+**Checkpoint**: Historia 5 deja de ser operable solo por API.
+
+---
+
+## Phase 21: Pruebas
+
+**Purpose**: Demostrar cada regla nueva. Ninguna prueba de T001 a T168 cubre automáticamente una regla de RF-074 a RF-081.
+
+- [X] T213 [P] [US1] Pruebas unitarias del dominio de asignaciones de rol: regla fundamental de `CompaniaId`, vigencia obligatoria, rechazo de solapamiento, multiplicidad por compañías distintas y renovación conforme RF-073 en `backend/tests/EnterpriseAccessControl.UnitTests/Auth/`
+- [X] T214 [US1] Pruebas de integración de RBAC y alcance que cubren **CS-036**: un `COMPANY_ADMINISTRATOR` no lista ni modifica usuarios de otra compañía, no se autoeleva, no crea `GLOBAL_ADMINISTRATOR`, y sí crea pares de su mismo nivel en su compañía en `backend/tests/EnterpriseAccessControl.IntegrationTests/Auth/`
+- [X] T215 [US1] Pruebas de integración de aislamiento que cubren **CS-037**: toda lectura fuera de alcance responde `404` con identificador correcto y conocido, en usuarios, compañías, unidades organizativas, áreas, personas, contextos y credenciales en `backend/tests/EnterpriseAccessControl.IntegrationTests/`
+- [X] T216 [US1] Prueba de integración del bootstrap que cubre **CS-038**: base vacía ⇒ se crea exactamente un `GLOBAL_ADMINISTRATOR` con cambio de contraseña pendiente; segundo arranque ⇒ no se crea otro; la contraseña sembrada cumple la política y `MAX_VALIDITY_DATE` no aparece en ninguna otra asignación en `backend/tests/EnterpriseAccessControl.IntegrationTests/Auth/`
+- [X] T217 [P] [US8] Prueba de integración que cubre **CS-039**: inactivar la Principal deniega con `COMPANIA_INACTIVA` sin alterar contextos, credenciales ni permisos; reactivar restablece el acceso sin más intervención; repetir para la compañía de pertenencia de la persona en `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/`
+- [X] T218 [P] [US8] Prueba de integración que cubre **CS-040**: dos Principales con zonas IANA distintas evalúan el mismo instante UTC contra sus propios bloques horarios; cambiar la zona de una no altera ningún instante persistido en `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/`
+- [X] T219 [P] [US2] Prueba de integración que cubre **CS-041**: el cambio de `TipoCompania` se rechaza por cada una de las cinco categorías de dependencia y en ambas direcciones, y se acepta sin dependencias en `backend/tests/EnterpriseAccessControl.IntegrationTests/Companies/`
+- [X] T220 [P] Actualizar las clases de prueba de contrato ya existentes (`UsersContractTests`, `AuthContractTests`, `CompaniasContractTests`, `EvaluacionAccesoContractTests`, `OpenApiSnapshotTests`) para reflejar los contratos vigentes de `users.yaml`, `auth.yaml`, `companies.yaml`, `access-evaluation.yaml` y `permissions.yaml` — no implica regenerarlas desde cero — cubriendo RF-074, RF-079, RF-080 y RF-081, incluido el snapshot del documento OpenAPI en `backend/tests/EnterpriseAccessControl.ContractTests/`
+- [X] T221 [P] [US1] Pruebas de componente del módulo de usuarios (listado con aislamiento, wizard, asignación, finalizar/renovar, mensajes de error) en `frontend/tests/unit/`
+- [X] T222 [P] [US5] Pruebas de componente del wizard de Historia 5 y del árbol de unidad organizativa, manteniendo en verde las existentes de `AsignacionUnidadOrganizativa` y `PersonaHistorialPage` en `frontend/tests/unit/`
+- [X] T223 [US1] Prueba end-to-end que ejercita **UX-17 a UX-22** desde la interfaz en `frontend/tests/e2e/`
+- [X] T224 [US5] Prueba end-to-end de los Casos A y B desde la interfaz, verificando las relaciones de dominio resultantes con `GET /api/personas/{id}/estado-efectivo` en `frontend/tests/e2e/`
+
+**Checkpoint**: cada regla nueva tiene al menos una prueba que falla si se revierte.
+
+---
+
+## Phase 22: Cierre y validación final
+
+- [X] T225 Ejecutar la regresión completa de las cinco suites (unitarias, contrato, integración, Vitest, Playwright) y confirmar que ninguna prueba del baseline histórico se rompe
+- [X] T226 Ejecutar los seis escenarios de validación de `quickstart.md` §7 correspondientes a D1 a D7
+- [X] T227 Actualizar en `README.md` el estado de implementación de las reglas nuevas, como consecuencia directa de las tareas anteriores, en `README.md`
+- [X] T228 Repetir el gate de cierre de Etapa 1 contra el código corregido y registrar el resultado en `docs/auditorias/`
+
+**Checkpoint**: baseline de Etapa 1 listo para congelar.
+
+---
+
+## Dependencies & Execution Order — bloque T169 a T228
+
+### Orden de fases
+
+- **Phase 14 (modelo/datos)** — sin dependencias dentro del bloque; **bloquea todo lo demás**.
+- **Phase 15 (dominio)** — depende de Phase 14.
+- **Phase 16 (autorización)** — depende de Phase 14 y de T175.
+- **Phase 17 (bootstrap)** — depende de T170 (Phase 14, entidad `AsignacionRolAdministrativo`) y T175 (Phase 15, servicio de asignación de rol); no depende de Phase 16 (autorización/RBAC), porque la rutina de arranque crea el primer usuario y su asignación directamente vía persistencia, sin pasar por el pipeline de autorización HTTP, `CompaniaScopeAuthorizationHandler` ni los claims JWT.
+- **Phase 18 (API/contratos)** — depende de Phase 15, 16 y 17.
+- **Phase 19 y 20 (frontend)** — dependen de Phase 18; entre sí son independientes y pueden ir en paralelo.
+- **Phase 21 (pruebas)** — cada prueba depende de la capacidad que verifica; T220 depende de Phase 18; T223 de Phase 19; T224 de Phase 20.
+- **Phase 22 (cierre)** — depende de todo lo anterior.
+
+### Dependencias puntuales
+
+- T171 y T172 dependen de T170; T173 depende de T171.
+- T177 depende de T176; T180 depende de T179; T181 depende de T174.
+- T183, T184 y T185 dependen de T182; T185 depende además de T175.
+- T192 depende de T170 y T175 (además de T190 y T191); no depende de ninguna tarea de Phase 16. T193 depende de T192.
+- T194 depende de T185; T195 de T184; T196 de T174, T177 y T181; T197 de T178 y T180.
+- T200 a T206 dependen de T199. T207 a T210 pueden avanzar en paralelo una vez disponible Phase 18.
+- T214 a T219 dependen de sus capacidades respectivas; T225 depende de todas las de Phase 21.
+
+### Oportunidades de paralelismo
+
+- T169 y T174 en paralelo (archivos distintos).
+- T186, T187 y T188 en paralelo entre sí (servicios distintos), una vez hecho T182.
+- T195, T196, T197 y T198 en paralelo (controladores y catálogos distintos).
+- T205, T206, T209, T210, T211 y T212 en paralelo.
+- Todas las pruebas marcadas `[P]` de Phase 21 en paralelo.
+
+---
+
+## Trazabilidad RF/CS → tareas (bloque T169 a T228)
+
+| Requisito | Tareas |
+|---|---|
+| RF-074 (catálogo cerrado de roles, entidad, regla fundamental) | T169, T170, T171, T173, T175, T182, T183, T184, T194, T195, T220 |
+| RF-075 (vigencia obligatoria, no solapamiento, renovación) | T170, T172, T175, T191, T213 |
+| RF-076 (restricciones del Company Administrator) | T185, T201, T203, T214 |
+| RF-077 (alcance efectivo, Resource Ownership, 404 en lectura) | T182, T183, T185, T186, T187, T188, T189, T200, T215 |
+| RF-078 (bootstrap) | T190, T191, T192, T193, T216 |
+| RF-079 (Compañía INACTIVA en la evaluación) | T178, T197, T217, T220 |
+| RF-080 (zona horaria por Principal) | T174, T179, T180, T181, T196, T197, T211, T218, T220 |
+| RF-081 (dependencias que bloquean el cambio de tipo) | T176, T177, T196, T219, T220 |
+| CS-036 | T214 |
+| CS-037 | T215 |
+| CS-038 | T216 |
+| CS-039 | T217 |
+| CS-040 | T218 |
+| CS-041 | T219 |
+| CS-021 (árbol en la asignación de UO, ya vigente) | T208, T222, T224 |
+| UX-17 a UX-22 (`ux-ui.md` §35) | T199 a T206, T221, T223 |
+| D7 / alcance real de T116 | T207 a T211, T222, T224 |
+
+---
+
+## Notas del bloque T169 a T228
+
+- **T001 a T168 no se regeneraron, renumeraron ni modificaron**: este bloque es estrictamente aditivo y
+  comienza en T169.
+- **Sin tareas para RF-067, RF-068, RF-069 ni CS-032**: diferidos a Etapa 2 por la decisión D8 y anotados
+  como tales en `spec.md`. Tampoco se generan tareas para Historia 10 en su acepción de consultas
+  transversales; las tareas T156 a T158 del baseline histórico cubren la verificación del interceptor de
+  auditoría automática, que es una capacidad distinta y ya completa.
+- **T116 no se reabre ni se renumera**: la decisión D7 se materializa en tareas nuevas (T207 a T211) porque el
+  alcance funcional que exige —wizard, creación de pertenencia y contexto desde la interfaz, árbol y perfil—
+  excede lo que el texto original de T115 y T116 describía.
+- **Eliminación de `AlcanceUsuarioCompania` (T173), sin migración de datos**: el proyecto es greenfield — no
+  existe información de producción ni de desarrollo que deba preservarse; cualquier dato existente es de
+  prueba y descartable. T173 elimina el modelo y su tabla directamente, sin transformar ni conservar filas.
+  Los datos administrativos necesarios se regeneran mediante el arranque de RF-078 (T190–T192) y los
+  mecanismos de prueba/seed correspondientes.
+- **Documentación**: solo se incluyen T193 y T227, ambas consecuencia directa de implementar tareas de este
+  bloque. Las correcciones documentales I4 a I8 y las dos posteriores ya se aplicaron y no se repiten.
+
+---
+
+## Phase 23: D-1 — Renovación de asignación de rol administrativo
+
+**Goal**: Exponer como operación HTTP la renovación que el dominio ya implementa, bajo los mismos controles de
+autorización y alcance que crear o finalizar una asignación.
+
+**Independent Test**: un `GLOBAL_ADMINISTRATOR` extiende la vigencia de una asignación vigente y obtiene la
+misma asignación con nueva `fechaHoraFin`, sin registro adicional; un `COMPANY_ADMINISTRATOR` no puede
+renovar fuera de su alcance ni una asignación `GLOBAL_ADMINISTRATOR`.
+
+> **Nomenclatura**: `D-1`, `D-2` y `D-4` (con guion) son las **desviaciones de implementación** detectadas al
+> terminar T169–T228 y auditadas con `/speckit-analyze`; no son las decisiones de negocio `D1`–`D9` (sin
+> guion) del bloque anterior. `D-3` se cerró como implementación válida y `D-5` por configuración y
+> documentación: ninguna de las dos genera tareas (research.md §34).
+
+- [X] T229 [US1] Sustituir en la renovación de asignación de rol la `ReglaNegocioInvalidaException` (⇒ `400`) de `RENOVACION_NO_POSTERIOR` por `ConflictoEstadoException` (⇒ `409`), unificándola con `HistorialPersonaService` y con el contrato, y renombrar `RenovarAsignacionRolRequest.NuevaFechaHoraFin` a `FechaHoraFin` para que el JSON sea exactamente `fechaHoraFin`; sin alterar la regla de negocio (la nueva fecha sigue debiendo ser estrictamente posterior a la vigente) ni crear una segunda implementación de renovación (RF-075, research.md §34.1) en `backend/src/EnterpriseAccessControl.Application/Auth/AsignacionRolAdministrativoService.cs` y `backend/src/EnterpriseAccessControl.Application/Auth/AuthDtos.cs`
+- [X] T230 [US1] Exponer `POST /api/usuarios/{id}/roles/{asignacionId}/renovar` con cuerpo `{ "fechaHoraFin": "<date-time>" }` y respuesta `204`, reutilizando `UsuarioService.RenovarRolAsync` —que ya aplica la autorización de RF-076 y el alcance de RF-077— sin ruta alternativa ni lógica nueva, y retirar el comentario que documenta que la renovación no está expuesta (RF-075, RF-076, RF-077; `contracts/users.yaml` v2.1.0, research.md §34.1) en `backend/src/EnterpriseAccessControl.Api/Controllers/UsuariosController.cs`
+- [X] T231 [US1] Implementar el cliente `renovarRol` y el hook `useRenovarRol` contra el endpoint aprobado, invalidando la caché de usuarios igual que el resto de escrituras del módulo (RF-075, research.md §34.1) en `frontend/src/features/users/api.ts` y `frontend/src/features/users/hooks.ts`
+- [X] T232 [US1] Incorporar la acción **Renovar** de una asignación de rol en el detalle de usuario, con ingreso de la nueva `fechaHoraFin`, confirmación explícita previa —igual que finalizar, cuya semántica no cambia— y mensajes propios para `400`, `403`, `404` y `409` (UX-20, `ux-ui.md` §35; quickstart.md §8.1) en `frontend/src/features/users/UsuarioDetalle.tsx` y `frontend/src/features/users/mensajesRol.ts`
+
+**Checkpoint**: la renovación deja de existir solo en el dominio y es operable de extremo a extremo.
+
+---
+
+## Phase 24: D-4 — Búsqueda server-side de usuarios
+
+**Goal**: Que buscar un usuario dentro del alcance autorizado cubra todo ese conjunto y no solo la página
+cargada, resolviéndolo en el servidor antes de paginar.
+
+**Independent Test**: con más usuarios que `tamañoPagina`, buscar un correo que cae en una página posterior lo
+encuentra desde la página 1; un `COMPANY_ADMINISTRATOR` que busca el correo exacto de un usuario ajeno
+obtiene el mismo resultado que ante un correo inexistente.
+
+- [X] T233 [US1] Implementar el parámetro opcional `texto` del listado de usuarios: filtro server-side por coincidencia parcial sobre `Correo` con `EF.Functions.Like` (misma convención que `CompaniaService`), compuesto estrictamente en el orden alcance (RF-077) → `estado` → `texto` → `CountAsync` → `OrderBy(correo)` → `Skip`/`Take`, combinando `estado` y `texto` con AND y devolviendo `200` con `items: []` y `total: 0` cuando no hay coincidencias —nunca `404`, reservado a recurso fuera de alcance—, sin introducir requisitos nuevos de ordenamiento ni de rendimiento (RF-077, UX-22; `contracts/users.yaml` v2.1.0, research.md §34.3) en `backend/src/EnterpriseAccessControl.Application/Auth/UsuarioService.cs`, `backend/src/EnterpriseAccessControl.Application/Auth/AuthDtos.cs` y `backend/src/EnterpriseAccessControl.Api/Controllers/UsuariosController.cs`
+- [X] T234 [US1] Retirar el filtrado local por correo sobre `consulta.data?.items` y pasar `texto` al hook y al cliente, sin duplicar el filtro en el frontend y conservando sin cambios el comportamiento actual de los filtros de rol, compañía y «solo con asignaciones vigentes» (UX-22, research.md §34.3) en `frontend/src/features/users/UsuariosPage.tsx` y `frontend/src/features/users/api.ts`
+
+**Checkpoint**: la búsqueda de la interfaz y la del contrato describen el mismo conjunto.
+
+---
+
+## Phase 25: Contrato y pruebas del bloque delta
+
+**Purpose**: Demostrar cada capacidad nueva y cerrar la brecha de regresión de D-2, que es exclusivamente de
+cobertura: el control de alcance de los cinco servicios auditados ya está implementado y no se modifica.
+
+- [X] T235 [P] [US1] Verificar la API contra `contracts/users.yaml` v2.1.0 —endpoint de renovación con sus cinco respuestas, parámetro `texto` del listado y composición alcance → filtros → total → paginación— actualizando las aserciones de `UsersContractTests` y el snapshot de `OpenApiSnapshotTests`, sin tocar contratos no relacionados (RF-075, RF-077, UX-22) en `backend/tests/EnterpriseAccessControl.ContractTests/`
+- [X] T236 [P] [US1] Pruebas de integración de la renovación: caso exitoso (`204`, misma asignación con la nueva `fechaHoraFin` y sin registro adicional), `RENOVACION_NO_POSTERIOR` → `409`, `SOLAPAMIENTO_VIGENCIA` → `409`, `ASIGNACION_ROL_NO_VIGENTE` → `409`, fuera de alcance → `404` y no autorizado → `403`, distinguiendo los tres conflictos por `codigo` y verificando que el cuerpo aceptado usa `fechaHoraFin` (RF-075, RF-076, RF-077; quickstart.md §8.1) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Auth/RolesAdministrativosTests.cs`
+- [X] T237 [P] [US6] Pruebas de integración de alcance para `UnidadOrganizativaService` y `AreaAccesoService`, ejercitadas a través del stack de aplicación con un actor autenticado —no por invocación directa del servicio—: un `GLOBAL_ADMINISTRATOR` opera sobre recursos de dos Compañías Principales distintas en la misma prueba, y un `COMPANY_ADMINISTRATOR` de la Principal A recibe `404` sobre recursos conocidos y existentes de la Principal B (RF-077, CS-037; research.md §34.2, quickstart.md §8.2) en `backend/tests/EnterpriseAccessControl.IntegrationTests/OrgUnits/` y `backend/tests/EnterpriseAccessControl.IntegrationTests/AreaAccess/`
+- [X] T238 [P] [US5] Completar la cobertura de alcance GLOBAL vs COMPANY para la asignación de unidad organizativa, el estado efectivo y la revocación en cascada —esta última a través de `POST /api/personas/{id}/historial-companias/{asignacionId}/finalizar`, porque `RevocacionService` no tiene endpoint propio ni control de alcance propio por diseño—, sin cambiar ninguna regla de negocio salvo que una prueba demuestre una discrepancia real con RF-077 (RF-077, CS-037; research.md §34.2, quickstart.md §8.2) en `backend/tests/EnterpriseAccessControl.IntegrationTests/People/`
+- [X] T239 [P] [US1] Pruebas de integración de la búsqueda server-side: hallar por coincidencia parcial de correo a un usuario que no está en la primera página —lo que demuestra que la búsqueda precede a la paginación—, combinación de `texto` con `estado`, búsqueda sin coincidencias → `200` con `total: 0`, y aislamiento: un `COMPANY_ADMINISTRATOR` que busca el correo exacto y conocido de un usuario fuera de su alcance obtiene el mismo resultado que ante un correo inexistente, sin revelar su existencia (RF-077, UX-22; quickstart.md §8.3) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Auth/BusquedaUsuariosTests.cs`
+- [X] T240 [P] [US1] Pruebas de componente del módulo de usuarios para la renovación de rol y para la búsqueda server-side —parámetro `texto` enviado al cliente y manejo de las respuestas relevantes—, sin duplicar las pruebas ya existentes de listado, wizard y asignación (UX-20, UX-22) en `frontend/tests/unit/UsuariosPage.test.tsx`
+- [X] T241 [US1] Prueba end-to-end sobre el flujo real de la aplicación: renovar una asignación con confirmación previa (UX-20) y localizar mediante búsqueda a un usuario que no está en la primera página, confirmando que se encuentra dentro del alcance autorizado sin recorrer la paginación (UX-20, UX-22; quickstart.md §8.1 y §8.3) en `frontend/tests/e2e/administracion-usuarios.spec.ts`
+
+**Checkpoint**: cada capacidad nueva tiene una prueba que falla si se revierte, y CS-037 deja de estar
+declarado sin verificar.
+
+---
+
+## Phase 26: Ampliación de CS-037 a los siete recursos declarados (cierre de C2)
+
+**Purpose**: T237 y T238 cubren los **cinco servicios** que la auditoría de D-2 identificó, pero T215
+declaró CS-037 sobre **siete tipos de recurso**. Esta fase cierra esa diferencia ampliando la cobertura
+—no recortando el requisito— conforme a la decisión explícita sobre el hallazgo C2.
+
+**Independent Test**: para cada uno de los siete recursos, un `COMPANY_ADMINISTRATOR` de la Principal A
+recibe `404` sobre un recurso real y de identificador conocido de la Principal B, y un
+`GLOBAL_ADMINISTRATOR` alcanza recursos de ambas Principales en la misma prueba.
+
+- [X] T242 [US1] Pruebas de integración de CS-037 para los recursos que T237 y T238 no cubren —**usuarios**, **compañías**, **personas**, **contextos operativos** y **credenciales**—, ejercitadas por HTTP con actor autenticado sobre la superficie de autorización real de cada uno (`GET /api/usuarios/{id}`, `GET /api/companias/{id}`, `GET /api/personas/{id}`, `GET /api/personas/{id}/contextos-operativos` y `GET|POST|DELETE /api/personas/{id}/credenciales[/{id}...]`), verificando en cada caso `404` con identificador conocido y válido, acceso permitido al recurso propio y alcance del `GLOBAL_ADMINISTRATOR` sobre dos Principales distintas; cierra el hallazgo C2 sin reducir el alcance de CS-037 ni modificar T215 (RF-077, CS-037, Principio VII; research.md §34.2) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Auth/AislamientoRecursosTests.cs`
+
+**Checkpoint**: CS-037 queda verificado sobre los siete recursos que declara, no sobre cinco.
+
+---
+
+## Dependencies & Execution Order — bloque T229 a T241
+
+### Orden por decisión
+
+- **D-1 (Phase 23)** — cadena estricta: T229 → T230 → T231 → T232. T229 precede a T230 porque el contrato ya
+  publicado declara `fechaHoraFin` y `409`; exponer la ruta antes de corregir el DTO y la excepción
+  publicaría un endpoint que contradice su propio contrato.
+- **D-4 (Phase 24)** — T233 → T234.
+- **D-2 (T237, T238)** — **sin dependencias dentro del bloque**: el código que verifican ya existe y no se
+  modifica. Puede ser lo primero que se ejecute.
+- **D-1 y D-4 son independientes entre sí**: sus únicas coincidencias son de archivo
+  (`UsuariosController.cs` en T230 y T233; `api.ts` en T231 y T234), que obligan a secuencia dentro del
+  archivo, no dependencia lógica entre decisiones.
+
+### Dependencias puntuales
+
+- T235 depende de T230 **y** de T233: verifica en la misma pasada la ruta de renovación y el parámetro de
+  búsqueda.
+- T236 depende de T230; T239 depende de T233.
+- T240 y T241 dependen de T232 y de T234 (ambas capacidades ya operables desde la interfaz).
+- T237 y T238 no dependen de ninguna tarea de este bloque ni de ninguna anterior.
+
+### Oportunidades de paralelismo
+
+- T237 y T238 en paralelo entre sí y con todo lo demás, desde el inicio.
+- T235, T236, T239 y T240 en paralelo una vez satisfechas sus dependencias (suites y archivos distintos).
+- T241 al final: es el único que ejercita simultáneamente las dos capacidades desde la interfaz.
+
+---
+
+## Trazabilidad RF/CS → tareas (bloque T229 a T241)
+
+| Desviación | Requisito / UX | Artefacto de diseño | Tareas | Evidencia de prueba |
+|---|---|---|---|---|
+| D-1 (renovación) | RF-075, RF-076, RF-077 | research.md §34.1, `contracts/users.yaml` v2.1.0, data-model.md, quickstart.md §8.1 | T229, T230, T231, T232 | T235, T236, T240, T241 |
+| D-2 (alcance GLOBAL vs COMPANY) | RF-077, CS-037 | research.md §34.2, quickstart.md §8.2 | T237, T238 | T237, T238 |
+| C2 (CS-037 sobre los siete recursos) | RF-077, CS-037 | research.md §34.2, quickstart.md §8.2 | T242 | T242 |
+| D-4 (búsqueda server-side) | RF-077, UX-22 | research.md §34.3, `contracts/users.yaml` v2.1.0, quickstart.md §8.3 | T233, T234 | T235, T239, T240, T241 |
+
+| Requisito | Tareas del bloque |
+|---|---|
+| RF-075 (renovación como operación expuesta) | T229, T230, T231, T232, T235, T236 |
+| RF-076 (autorización de quien renueva) | T230, T236 |
+| RF-077 (alcance, búsqueda antes de paginar, `404` sin revelar existencia) | T230, T233, T234, T235, T236, T237, T238, T239 |
+| UX-20 (finalizar y renovar con confirmación) | T232, T240, T241 |
+| UX-22 (buscar dentro del alcance autorizado) | T233, T234, T235, T239, T240, T241 |
+| CS-037 (aislamiento verificado en los siete recursos) | T237, T238, T242 |
+
+---
+
+## Notas del bloque T229 a T241
+
+- **T001 a T228 no se regeneraron, renumeraron, reabrieron ni modificaron**: este bloque es estrictamente
+  aditivo y comienza en T229. Las 228 tareas anteriores conservan su estado `[X]` y su redacción original.
+- **Por qué tareas nuevas y no ampliación de T194, T199, T204, T220, T221 o T223**: su cierre fue verificado
+  por el gate de T228; reabrirlas haría que `[X]` significara dos cosas distintas y volvería falso un
+  registro de auditoría ya emitido. Es el mismo criterio ya aplicado a T116 en el bloque anterior. La
+  trazabilidad se preserva citando la tarea antecesora aquí, sin modificarla: T230 completa T194; T231
+  completa T199; T232 completa T204 y T205; T233 amplía T185 y T194; T234 amplía T200; T235 amplía T220;
+  T236 amplía T213 y T214; T237 cubre T186; T238 cubre T187; T239 amplía T215; T240 amplía T221; T241 amplía
+  T223.
+- **T199 y T204 sí nombraban la renovación** y se cerraron sin ella porque `contracts/users.yaml` v2.0.0 no
+  declaraba la ruta y publicarla habría roto las pruebas de contrato —limitación registrada en su momento
+  como nota explícita en `UsuariosController.cs`—. Se completaron hasta donde el contrato permitía; el resto
+  queda desbloqueado solo ahora, con v2.1.0.
+- **D-2 no genera tareas de producción**: el control de alcance de `UnidadOrganizativaService`,
+  `AreaAccesoService`, `AsignacionUnidadOrganizativaService`, `EstadoEfectivoService` y `RevocacionService` ya
+  está implementado y verificado por lectura de código. T237 y T238 solo cierran la brecha de regresión que
+  exige el Principio VII, sin tocar la lógica que verifican.
+- **D-5 no genera ninguna tarea**: quedó cerrada por configuración y documentación
+  (`docker-compose.yml` sin contraseña por defecto, `README.md` y `quickstart.md` sincronizados), sin
+  modificar RF-078, cuyo texto ya era inequívoco.
+- **Sin tareas de Etapa 2**: RF-067, RF-068, RF-069, CS-032 e Historia 10 en su acepción de consultas
+  transversales siguen diferidos y fuera de este bloque, igual que en el bloque T169 a T228.
+- **`OpenApiSnapshotTests` estuvo en rojo entre la publicación del contrato v2.1.0 y la implementación de
+  T230**, con `POST /api/usuarios/{id}/roles/{asignacionId}/renovar: no existe en la API`: recorre cada
+  operación declarada en `contracts/*.yaml` y exige que exista. Era el estado esperado en ese intervalo —el
+  mismo patrón ya vivido con T194 a T198—. **Cerrado**: con T230 implementada, las 246 pruebas de contrato
+  pasan, y T235 añadió además la aserción del parámetro `texto`, que el snapshot no compara.
+- **T232 no requirió cambios en `mensajesRol.ts`**: T205 ya había añadido los mensajes de
+  `RENOVACION_NO_POSTERIOR`, `ASIGNACION_ROL_NO_VIGENTE`, `SOLAPAMIENTO_VIGENCIA`, `ROL_NO_AUTORIZADO` y
+  `RECURSO_NO_ENCONTRADO` cuando construyó la tabla de errores de `ux-ui.md` §35. La renovación los reutiliza
+  tal cual; no se duplicó ninguno.
+- **T242 es la única tarea nueva de esta ampliación** y existe porque T237/T238 cubren los cinco servicios
+  que la auditoría de D-2 nombró, mientras que CS-037 declara siete recursos. El hallazgo C2 se cerró
+  ampliando la cobertura, no recortando el criterio ni reescribiendo T215.

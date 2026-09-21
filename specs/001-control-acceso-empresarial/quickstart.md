@@ -26,9 +26,14 @@ trigger `AFTER INSERT, UPDATE` por tabla, aplicado como parte de las migraciones
 
 ## 2. Backend: restaurar, migrar y ejecutar
 
+El primer arranque crea automáticamente el administrador inicial (RF-078) y exige `Bootstrap__AdminPassword`
+por variable de entorno: no existe ningún valor por defecto en `appsettings.json` ni en
+`appsettings.Development.json`, y la API no arranca sin ella.
+
 ```bash
 cd backend
 dotnet restore
+export Bootstrap__AdminPassword='<contraseña-que-cumpla-la-política-de-contraseñas>'
 dotnet ef database update --project src/EnterpriseAccessControl.Infrastructure \
   --startup-project src/EnterpriseAccessControl.Api
 dotnet run --project src/EnterpriseAccessControl.Api
@@ -77,15 +82,27 @@ solapamientos temporales inválidos y fuga de datos entre compañías.
 Reproduce el criterio de éxito CS-009 ("un usuario debe poder crear una jerarquía de tres niveles y
 configurar un permiso horario") usando la API documentada en `contracts/`:
 
-1. **Login** — `POST /api/auth/login` con un usuario `ACTIVO` de prueba cuyo alcance incluya al menos una
-   compañía. Verificar que la respuesta incluye `alcanceCompanias` no vacío. *(Nota, Sesión 2026-09-15: el
-   sistema no incluye una semilla ni un mecanismo de alta del primer usuario administrador; en local ese
-   usuario debe crearse directamente en la base de datos. La automatización E2E de esta sección —T159— lo
-   aprovisiona en su preparación.)*
+1. **Login** — `POST /api/auth/login` con un usuario `ACTIVO` cuyo alcance incluya al menos una compañía.
+   *(Actualizado en la Sesión 2026-09-20, RF-078: el primer administrador ya no se crea a mano.)* El primer
+   arranque de la API crea automáticamente, si no existe ninguno, un usuario con rol `GLOBAL_ADMINISTRATOR`
+   tomando su correo de `Bootstrap:AdminEmail` y su contraseña de `Bootstrap:AdminPassword` (variable de
+   entorno `Bootstrap__AdminPassword` si no hay gestor de secretos; nunca un valor versionado en el
+   repositorio). La rutina es idempotente: reiniciar la API no crea un segundo administrador.
+
+   Ese primer login devuelve `requiereCambioPassword = true`, de modo que el siguiente paso obligatorio es
+   `POST /api/auth/cambiar-password` con una contraseña que cumpla la política vigente; recién después se
+   continúa con el escenario. Verificar también que la respuesta del login indique el rol
+   `GLOBAL_ADMINISTRATOR` (alcance global, sin compañías enumeradas). La automatización E2E de esta
+   sección —T159— aprovisiona su propio usuario en la preparación, sin depender de esta rutina.
 2. **Compañía Principal** — `POST /api/companias` con `tipoCompania = PRINCIPAL_MANDANTE` y `estado =
-   ACTIVO` (RF-042). Crear la compañía no la incorpora automáticamente al alcance del usuario: para operar
-   con ella en los pasos siguientes, añadirla con `PUT /api/usuarios/{id}/alcance-companias` e iniciar
-   sesión de nuevo, porque el alcance viaja en el token (RF-004, RF-005).
+   ACTIVO` (RF-042). *(Actualizado en la Sesión 2026-09-20: el alcance administrativo se expresa mediante
+   `AsignaciónRolAdministrativo`, no mediante una lista plana de compañías — RF-074 a RF-077.)* Si se continúa
+   con el administrador del paso 1, no hace falta ninguna acción: su rol `GLOBAL_ADMINISTRATOR` tiene alcance
+   sobre todas las compañías, incluidas las creadas después de su asignación (RF-074, RF-077). Para ejecutar
+   el resto del escenario como `COMPANY_ADMINISTRATOR` de esta compañía, crear la asignación con
+   `POST /api/usuarios/{id}/roles` —`rol = COMPANY_ADMINISTRATOR`, `companiaId` = la compañía recién creada, y
+   `fechaHoraInicio`/`fechaHoraFin` reales y obligatorias (RF-075)— e iniciar sesión de nuevo, porque el
+   alcance viaja en el token (RF-005, RF-077).
 3. **Jerarquía de 3 niveles de áreas de acceso** — `POST /api/areas-acceso` tres veces encadenadas:
    - Nivel 1 (raíz): `areaSuperiorId = null`, `companiaPrincipalId` = ID de la Compañía Principal del
      paso 2 (RF-046).
@@ -220,8 +237,128 @@ RF-051 a RF-060, RF-071 y RF-072 (fechas obligatorias y contención temporal en 
 el escenario de ejemplo completo de la corrección Contexto Operativo (Pedro García / Servicios ACME /
 Minera ABC / Minera XYZ).
 
-## 7. Próximos pasos
+## 7. Escenarios de validación del cierre de Etapa 1 (Decisiones D1 a D9, Sesión 2026-09-20)
+
+Estos escenarios validan las correcciones planificadas en `research.md` §27-§33. **Implementados en la
+sesión del 2026-09-20** (tareas T169 a T228) y cubiertos por pruebas automatizadas, de modo que ejecutarlos
+a mano es una verificación de confirmación y no la única evidencia:
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Aislamiento administrativo (D1, D3) | `RolesAdministrativosTests` (CS-036, CS-037) |
+| 2 — Bootstrap (D2) | `RolesAdministrativosTests.CS038_*` |
+| 3 — Inactivación de Compañía (D4) | `CompaniaInactivaYZonaHorariaTests.CS039_*` |
+| 4 — Zona horaria por compañía (D5) | `CompaniaInactivaYZonaHorariaTests.CS040_*` |
+| 5 — Cambio de TipoCompania (D6) | `CambioTipoCompaniaTests` (CS-041) |
+| 6 — Interfaz de Historia 5 (D7) | `historia5-casos-a-b.spec.ts` (Playwright) |
+
+Referencian los mismos usuarios/compañías de las secciones 5 y 6 cuando sea posible.
+
+1. **Aislamiento administrativo (D1, D3 — cierra F-01/F-02)**: con un usuario `COMPANY_ADMINISTRATOR` cuya
+   única asignación de rol es sobre Minera ABC (sección 5), listar `GET /api/usuarios` — resultado esperado:
+   solo usuarios con alguna asignación vigente en Minera ABC, nunca la lista completa del sistema.
+   `POST /api/usuarios/{id}/roles` intentando asignar `GLOBAL_ADMINISTRATOR`, o `COMPANY_ADMINISTRATOR` para
+   Minera XYZ (sección 6) — resultado esperado: `403`. `PUT /api/unidades-organizativas/{id}` sobre una
+   unidad de Minera XYZ — resultado esperado: `404` (no `403`, para no confirmar existencia fuera de
+   alcance).
+2. **Bootstrap (D2)**: desde una base recién migrada, arrancar la API sin ningún `Usuario` existente —
+   resultado esperado: se crea automáticamente un único `Usuario` con `Rol = GLOBAL_ADMINISTRATOR`,
+   correo/contraseña provenientes de `Bootstrap:AdminEmail`/`Bootstrap:AdminPassword`,
+   `requiereCambioPassword = true`. Reiniciar la API — resultado esperado: no se crea un segundo Global
+   Administrator (idempotencia).
+3. **Inactivación de Compañía (D4)**: repetir el paso 10 de la sección 5 (evaluación `CONCEDIDO`) y luego
+   `PUT /api/companias/{id}` sobre Minera ABC con `estado = INACTIVO`; repetir la evaluación — resultado
+   esperado: `DENEGADO`, `motivoDenegacion = COMPANIA_INACTIVA`, sin que ningún contexto/UO/credencial de la
+   persona cambie de estado. Reactivar (`estado = ACTIVO`) y repetir — resultado esperado: `CONCEDIDO` de
+   nuevo, sin ninguna acción adicional.
+4. **Zona horaria por compañía (D5)**: configurar `zonaHorariaIana` distinta en Minera ABC y Minera XYZ
+   (sección 6, p. ej. `America/Lima` y `America/Santiago`); evaluar acceso a un área de cada una a la misma
+   `fechaHora` UTC, con bloques horarios que solo cubran la hora local de una de las dos zonas — resultado
+   esperado: `CONCEDIDO` en la que coincide con su hora local, `DENEGADO`/`FUERA_DE_BLOQUE_HORARIO` en la
+   otra, confirmando que cada Compañía Principal usa su propia zona.
+5. **Cambio de TipoCompania con dependientes (D6)**: intentar `PUT /api/companias/{id}` cambiando Minera ABC
+   (con áreas/UO ya creadas en la sección 5) a `CONTRATISTA` — resultado esperado: `409`,
+   `codigo = CAMBIO_TIPO_COMPANIA_CON_DEPENDENCIAS`. Repetir con una compañía recién creada sin dependientes
+   — resultado esperado: `200`, cambio aceptado en cualquier dirección.
+6. **Interfaz de Historia 5 (D7)**: desde la UI (no la API), para una persona de una Contratista sin
+   pertenencia previa, completar el wizard de asignación: crear pertenencia → Caso B, seleccionar Principal
+   entre las relaciones vigentes de su Contratista → abrir contexto → seleccionar unidad organizativa
+   mediante el árbol → asociar perfil — resultado esperado: los mismos efectos de dominio que crear cada
+   recurso por API (secciones 5 y 6), verificables con `GET /api/personas/{id}/estado-efectivo`.
+
+Decisiones sin escenario de validación funcional (no requieren uno): D8 (fuera de alcance de Etapa 1, sin
+funcionalidad que probar) y D9 (ratifican comportamiento ya cubierto por las suites existentes de política de
+contraseñas y de `CredencialService`).
+
+## 8. Escenarios de validación del cierre de desviaciones (D-1, D-2, D-4 — Sesión 2026-09-20)
+
+> Las etiquetas con guion (`D-1`, `D-2`, `D-4`) son las **desviaciones** detectadas al terminar T169–T228,
+> distintas de las decisiones `D1`–`D9` de la sección 7 pese a la coincidencia de letra (research.md §34).
+> `D-3` y `D-5` no tienen escenario: la primera se cerró como implementación válida sin cambios y la segunda
+> por configuración/documentación, ya verificable en la sección 2 (la API no arranca sin
+> `Bootstrap__AdminPassword`).
+
+Estos escenarios validan lo planificado en `research.md` §34. **Implementados en la sesión del 2026-09-20**
+(tareas T229 a T242) y cubiertos por pruebas automatizadas, de modo que ejecutarlos a mano es una
+verificación de confirmación y no la única evidencia:
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Renovación de asignación de rol (D-1) | `RolesAdministrativosTests.Renovar_*` (7 pruebas), `UsuarioDetalle.test.tsx`, `administracion-usuarios.spec.ts` |
+| 2 — Alcance GLOBAL vs COMPANY (D-2) | `AislamientoRecursosTests` (9 pruebas, los siete recursos de CS-037) |
+| 3 — Búsqueda server-side (D-4) | `BusquedaUsuariosTests` (7 pruebas), `UsuariosPage.test.tsx`, `administracion-usuarios.spec.ts` |
+
+1. **Renovación de una asignación de rol (D-1 — RF-075, RF-076, RF-077)**: con un `GLOBAL_ADMINISTRATOR`,
+   crear un usuario con una asignación vigente y renovarla con
+   `POST /api/usuarios/{id}/roles/{asignacionId}/renovar` y cuerpo `{ "fechaHoraFin": "<posterior>" }` —
+   resultado esperado: `204`, y `GET .../roles` devuelve la **misma** asignación (mismo `id`, mismo `rol`,
+   misma `companiaId`, misma `fechaHoraInicio`) con la nueva `fechaHoraFin`; nunca un registro adicional.
+   Repetir con una fecha anterior o igual a la vigente — resultado esperado: `409`,
+   `codigo = RENOVACION_NO_POSTERIOR`. Repetir sobre una asignación ya finalizada o ya expirada — resultado
+   esperado: `409`, `codigo = ASIGNACION_ROL_NO_VIGENTE`. Desde un `COMPANY_ADMINISTRATOR` de Minera ABC,
+   renovar una asignación de un usuario de Minera XYZ — resultado esperado: `404` (no `403`, para no
+   confirmar su existencia); y renovar una asignación `GLOBAL_ADMINISTRATOR` de un usuario que sí está en su
+   alcance — resultado esperado: `403`, `codigo = ROL_NO_AUTORIZADO`. Desde la interfaz, la acción
+   **Renovar** del detalle de usuario debe pedir confirmación igual que **Finalizar** (UX-20).
+2. **Alcance GLOBAL vs COMPANY en los siete recursos de CS-037 (D-2 y C2 — RF-077)**: con dos Principales
+   distintas (Minera ABC y Minera XYZ, secciones 5 y 6), operar con un `GLOBAL_ADMINISTRATOR` sobre recursos
+   de **ambas** en la misma sesión y repetir cada operación con un `COMPANY_ADMINISTRATOR` cuya única
+   asignación vigente es sobre Minera ABC, apuntando a recursos de Minera XYZ **cuyos identificadores se
+   conocen y son válidos** — resultado esperado: el global procede en las dos Principales sin enumerar
+   compañías en el token; el de compañía recibe `404` en todos los casos, nunca `403` ni una respuesta
+   parcial. Los siete recursos y su superficie real de autorización:
+
+   | Recurso | Superficie que se ejercita |
+   |---|---|
+   | Usuarios | `GET /api/usuarios/{id}` |
+   | Compañías | `GET /api/companias/{id}` y el listado paginado |
+   | Unidades organizativas | `GET` y `PUT /api/unidades-organizativas/{id}` |
+   | Áreas de acceso | `GET` y `PUT /api/areas-acceso/{id}` |
+   | Personas | `GET /api/personas/{id}` y su `historial-companias` |
+   | Contextos operativos | `GET .../contextos-operativos` y `POST .../{contextoId}/unidad-organizativa` |
+   | Credenciales | `GET`, `POST .../devolver` y `DELETE` bajo `/api/personas/{id}/credenciales` |
+
+   Además, dos servicios sin recurso propio: el **estado efectivo** (`GET .../estado-efectivo`, proyección de
+   la persona) y la **cascada de revocación**, que se ejercita vía
+   `POST /api/personas/{id}/historial-companias/{asignacionId}/finalizar` porque `RevocacionService` no tiene
+   endpoint propio ni control de alcance propio por diseño (research.md §34.2). En ese último caso se
+   comprueba además que la pertenencia ajena **no se modificó**: el `404` no puede ser cosmético.
+3. **Búsqueda server-side de usuarios (D-4 — RF-077, UX-22)**: con un `GLOBAL_ADMINISTRATOR` y más usuarios
+   que `tamañoPagina`, identificar un correo que **no** esté en la primera página y consultar
+   `GET /api/usuarios?texto=<fragmento-de-ese-correo>&pagina=1` — resultado esperado: el usuario aparece en
+   la página 1 del resultado filtrado, con `total` igual al número de coincidencias y no al de usuarios del
+   sistema. Combinar `texto` con `estado` — resultado esperado: se aplican ambos (AND). Buscar un fragmento
+   sin coincidencias — resultado esperado: `200` con `items: []` y `total: 0`, nunca `404`. Desde un
+   `COMPANY_ADMINISTRATOR` de Minera ABC, buscar el correo **exacto y conocido** de un usuario cuya única
+   asignación es de Minera XYZ — resultado esperado: `items: []` y `total: 0`, idéntico a buscar un correo
+   inexistente: conocer el correo no revela su existencia ni concede acceso. Desde la interfaz, escribir en
+   el filtro **Correo** debe encontrar al usuario de la página 3 sin navegar hasta ella.
+
+## 9. Próximos pasos
 
 Este quickstart valida el comportamiento end-to-end una vez implementado. La secuencia de construcción
 (entidades → migraciones → casos de uso → endpoints → UI) se define en `tasks.md`, generado por el comando
-`/speckit-tasks` a partir de este plan.
+`/speckit-tasks` a partir de este plan. Las tareas de corrección del cierre de Etapa 1 (D1-D9) ya se
+generaron y completaron como T169–T228, sin renumerar T001–T168. Los escenarios de la sección 8 (cierre de
+las desviaciones D-1, D-2 y D-4) son los únicos pendientes: sus tareas se generarán en la próxima ejecución
+de `/speckit-tasks`, continuando la numeración a partir de T228.

@@ -39,6 +39,12 @@ services:
       # Dentro de la red de compose, SQL Server se alcanza por el nombre del servicio.
       ConnectionStrings__SqlServer: "Server=sqlserver,1433;Database=${MSSQL_DATABASE:-EnterpriseAccessControl};User Id=sa;Password=${MSSQL_SA_PASSWORD:-Dev-Password1!};TrustServerCertificate=True;Encrypt=True"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:-clave-de-firma-solo-para-desarrollo-local-min-32-chars}"
+      # Primer administrador global (RF-078). El correo admite un valor por defecto de conveniencia en
+      # desarrollo; la contraseña NUNCA tiene un valor versionado, ni en desarrollo ni en producción
+      # (RF-078; cierre de la desviación D-5) — debe suministrarse mediante BOOTSTRAP_ADMIN_PASSWORD antes
+      # de levantar el stack (ver README.md, sección "Instrucciones de desarrollo").
+      Bootstrap__AdminEmail: "${BOOTSTRAP_ADMIN_EMAIL:-administrator@eac.local}"
+      Bootstrap__AdminPassword: "${BOOTSTRAP_ADMIN_PASSWORD:?Defina BOOTSTRAP_ADMIN_PASSWORD (nunca la versione en el repositorio)}"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

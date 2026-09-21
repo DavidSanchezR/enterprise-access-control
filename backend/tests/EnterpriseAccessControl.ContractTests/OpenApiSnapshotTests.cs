@@ -167,14 +167,14 @@ public sealed class OpenApiSnapshotTests(ApiContratoFixture fixture)
     }
 
     [Fact]
-    public void Incluye_el_endpoint_de_renovacion_y_los_once_motivos_de_denegacion()
+    public void Incluye_el_endpoint_de_renovacion_y_los_doce_motivos_de_denegacion()
     {
         // Mencionados expresamente en T162: son los dos últimos añadidos al contrato y los más fáciles
         // de perder en una regeneración.
         fixture.DocumentoApi.TieneOperacion("/api/personas/{id}/historial-companias/{asignacionId}/renovar", "post")
             .Should().BeTrue();
 
-        fixture.DocumentoApi.ValoresDeEnumerado("MotivoDenegacion").Should().HaveCount(11);
+        fixture.DocumentoApi.ValoresDeEnumerado("MotivoDenegacion").Should().HaveCount(12);
     }
 
     [Fact]

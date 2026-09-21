@@ -49,18 +49,56 @@ public sealed class CrearUsuarioRequestValidator : AbstractValidator<CrearUsuari
 
         RuleFor(r => r.PasswordInicial).CumplePolitica(politica);
 
-        // contracts/users.yaml declara minItems: 1 — un usuario nuevo sin ninguna compañía en su
-        // alcance no podría operar sobre nada, así que se rechaza el alta en lugar de crearlo inerte.
-        // (En el reemplazo de alcance sí se admite vaciarlo: ahí es una acción deliberada.)
-        RuleFor(r => r.CompaniaIds)
-            .NotNull().WithMessage("Debe indicarse el alcance de compañías.")
-            .Must(ids => ids is { Count: > 0 })
-            .WithMessage("Debe indicarse al menos una compañía en el alcance del usuario.");
+        RuleFor(r => r.Rol).IsInEnum().WithMessage("El rol administrativo no es válido.");
 
-        // Un identificador vacío nunca puede corresponder a una compañía real: se rechaza en el borde
-        // en lugar de llegar a la consulta de validación de compañías.
-        RuleForEach(r => r.CompaniaIds)
-            .NotEqual(Guid.Empty).WithMessage("El identificador de compañía no es válido.");
+        RuleFor(r => r).CumpleReglaFundamental();
+
+        RuleFor(r => r.FechaHoraFin)
+            .GreaterThan(r => r.FechaHoraInicio)
+            .WithMessage("La fecha de fin debe ser posterior a la de inicio.");
+    }
+}
+
+/// <summary>
+/// Regla fundamental de <c>CompañíaId</c> frente al rol, reutilizable por los dos requests que
+/// crean una asignación (RF-074).
+/// </summary>
+/// <remarks>
+/// Se valida también en el borde HTTP —además de en el dominio y en un <c>CHECK</c> de base de
+/// datos— para que el cliente reciba un 400 con el campo concreto en lugar de un error genérico.
+/// </remarks>
+public static class ReglasAsignacionRol
+{
+    public static IRuleBuilderOptions<T, T> CumpleReglaFundamental<T>(this IRuleBuilder<T, T> regla)
+        where T : IAsignacionDeRol
+    {
+        ArgumentNullException.ThrowIfNull(regla);
+
+        return regla
+            .Must(r => r.Rol switch
+            {
+                Domain.Enums.RolAdministrativo.GLOBAL_ADMINISTRATOR => r.CompaniaId is null,
+                Domain.Enums.RolAdministrativo.COMPANY_ADMINISTRATOR =>
+                    r.CompaniaId is not null && r.CompaniaId != Guid.Empty,
+                _ => false,
+            })
+            .WithMessage(
+                "GLOBAL_ADMINISTRATOR no admite compañía; COMPANY_ADMINISTRATOR exige una compañía válida.");
+    }
+}
+
+/// <summary>Valida una nueva asignación de rol (contracts/users.yaml, 400).</summary>
+public sealed class AsignarRolRequestValidator : AbstractValidator<AsignarRolRequest>
+{
+    public AsignarRolRequestValidator()
+    {
+        RuleFor(r => r.Rol).IsInEnum().WithMessage("El rol administrativo no es válido.");
+
+        RuleFor(r => r).CumpleReglaFundamental();
+
+        RuleFor(r => r.FechaHoraFin)
+            .GreaterThan(r => r.FechaHoraInicio)
+            .WithMessage("La fecha de fin debe ser posterior a la de inicio.");
     }
 }
 
@@ -111,15 +149,11 @@ public sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
     }
 }
 
-/// <summary>Valida el reemplazo del alcance de compañías (contracts/users.yaml, 400).</summary>
-public sealed class ReemplazarAlcanceRequestValidator : AbstractValidator<ReemplazarAlcanceRequest>
+/// <summary>Valida la renovación de una asignación de rol (contracts/users.yaml, 400).</summary>
+public sealed class RenovarAsignacionRolRequestValidator
+    : AbstractValidator<RenovarAsignacionRolRequest>
 {
-    public ReemplazarAlcanceRequestValidator()
-    {
-        RuleFor(r => r.CompaniaIds)
-            .NotNull().WithMessage("Debe indicarse el alcance de compañías, aunque sea vacío.");
-
-        RuleForEach(r => r.CompaniaIds)
-            .NotEqual(Guid.Empty).WithMessage("El identificador de compañía no es válido.");
-    }
+    public RenovarAsignacionRolRequestValidator() =>
+        RuleFor(r => r.FechaHoraFin)
+            .NotEmpty().WithMessage("Debe indicarse la nueva fecha de fin.");
 }

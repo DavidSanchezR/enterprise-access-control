@@ -8,7 +8,8 @@ function sesionDe(overrides: Partial<SesionAlmacenada> = {}): SesionAlmacenada {
   return {
     accessToken: 'token',
     expiraEn: '2026-12-31T00:00:00Z',
-    alcanceCompanias: [],
+    rol: 'GLOBAL_ADMINISTRATOR' as const,
+    companiaIds: [],
     requiereCambioPassword: false,
     ...overrides,
   }

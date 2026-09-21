@@ -4,10 +4,13 @@ info:
   version: "1.0.0"
   description: >
     Evalúa si una persona tiene acceso concedido a un área en una fecha/hora dada, aplicando el flujo de
-    14 pasos de Historia 8 (RF-023 a RF-025, RF-059, RF-066) con precedencia PERSONA > UNIDAD_ORGANIZATIVA >
+    15 pasos de Historia 8 (RF-023 a RF-025, RF-059, RF-066; Sesión 2026-09-20, D4, research.md §30 —
+    amplía el flujo de 14 a 15 pasos exigiendo además que la Compañía Principal propietaria del área y la
+    compañía de pertenencia vigente de la persona estén ACTIVAS) con precedencia PERSONA > UNIDAD_ORGANIZATIVA >
     COMPAÑÍA y denegación por defecto (Principio I). El flujo determina primero la Compañía Principal
-    propietaria del área y exige un contexto operativo vigente entre la persona y esa Principal (y, si la
-    persona es de una Contratista, una relación Contratista→Principal vigente) ANTES de evaluar cualquier
+    propietaria del área, verifica que esté ACTIVA, y exige un contexto operativo vigente entre la persona y
+    esa Principal (y, si la persona es de una Contratista, una relación Contratista→Principal vigente, y que
+    la compañía de pertenencia vigente de la persona también esté ACTIVA) ANTES de evaluar cualquier
     permiso — un permiso de la Principal B nunca puede satisfacer una evaluación sobre un área de la
     Principal A (CS-018). Además, DEBE existir una AsignaciónCredencial vigente para esa misma Principal
     (RF-066, RF-070, RF-071): sin ella, el acceso se deniega aunque el resto de las reglas se cumplan — la
@@ -24,8 +27,8 @@ info:
     unidad organizativa y credenciales dependientes (RF-061 a RF-064, ver contracts/people.yaml y
     contracts/credentials.yaml); esta evaluación, además, sigue re-validando dinámicamente la legitimidad de
     cada contexto operativo contra la compañía de pertenencia vigente de la persona en la fecha evaluada
-    como defensa adicional, no como sustituto de esa revocación (RF-065, research.md §7 paso 5, §14), y
-    consulta directamente el Estado ya escrito por esa misma cascada para el gate de credencial (paso 6).
+    como defensa adicional, no como sustituto de esa revocación (RF-065, research.md §7 paso 6, §14), y
+    consulta directamente el Estado ya escrito por esa misma cascada para el gate de credencial (paso 7).
 tags:
   - name: EvaluacionAcceso
 paths:
@@ -62,7 +65,10 @@ components:
         fechaHora:
           type: string
           format: date-time
-          description: Instante UTC a evaluar; se convierte a America/Lima para bloques horarios
+          description: >
+            Instante UTC a evaluar; se convierte a la zona horaria IANA de la Compañía Principal
+            propietaria del área para bloques horarios (Sesión 2026-09-20, D5, research.md §31) — ya no
+            una zona única del sistema para todas las compañías.
     ResultadoEvaluacion:
       type: string
       enum: [CONCEDIDO, DENEGADO]
@@ -75,25 +81,30 @@ components:
         - SIN_CONTEXTO_OPERATIVO_VIGENTE
         - RELACION_CONTRATISTA_PRINCIPAL_VENCIDA
         - SIN_CREDENCIAL_VIGENTE
+        - COMPANIA_INACTIVA
         - AREA_INACTIVA
         - PERFIL_NO_AUTORIZADO_EN_AREA
         - SIN_PERMISO_APLICABLE
         - PERMISO_FUERA_DE_VIGENCIA
         - FUERA_DE_BLOQUE_HORARIO
       description: >
-        SIN_CONTEXTO_OPERATIVO_VIGENTE reemplaza al antiguo SIN_COMPANIA_VIGENTE (research.md §7, paso 5):
+        SIN_CONTEXTO_OPERATIVO_VIGENTE reemplaza al antiguo SIN_COMPANIA_VIGENTE (research.md §7, paso 6):
         la persona no tiene un ContextoOperativoPersonaPrincipal vigente con la Principal propietaria del
         área, o tiene uno pero ya no es legítimo porque su compañía de pertenencia vigente cambió (RF-061)
         — ambos casos se reportan con este mismo motivo, sin distinguirse en la respuesta.
         RELACION_CONTRATISTA_PRINCIPAL_VENCIDA aplica cuando la persona es de una Contratista y la
         RelaciónContratistaPrincipal correspondiente no está vigente en la fecha evaluada (RF-059).
-        SIN_CREDENCIAL_VIGENTE (RF-066, RF-070, research.md §7 paso 6 y §24) cubre por igual: la persona
+        SIN_CREDENCIAL_VIGENTE (RF-066, RF-070, research.md §7 paso 7 y §24) cubre por igual: la persona
         nunca tuvo una AsignacionCredencial para esa Principal; la más reciente está en Estado DEVUELTO,
         ELIMINADO o REVOCADA; o está en Estado ASIGNADO pero temporalmente expirada (FechaHoraFin ya pasado
         respecto a la fecha evaluada, sin que ello cambie su Estado) — los cuatro casos se reportan con este
         mismo motivo, sin distinguirse en la respuesta (mismo patrón que SIN_CONTEXTO_OPERATIVO_VIGENTE); el
         detalle específico puede comunicarse en ProblemDetails.detail cuando la evaluación se exponga a
-        través de ese formato.
+        través de ese formato. COMPANIA_INACTIVA (Sesión 2026-09-20, D4, research.md §30) cubre por igual:
+        la Compañía Principal propietaria del área tiene Estado = INACTIVO, o la compañía de pertenencia
+        vigente de la persona tiene Estado = INACTIVO — ambos casos se reportan con este mismo motivo, sin
+        distinguirse en la respuesta (mismo patrón); el efecto es dinámico y reversible, sin ninguna
+        escritura sobre registros dependientes.
     EvaluarAccesoResponse:
       type: object
       properties:
@@ -123,6 +134,10 @@ components:
         evaluadoEnZonaHoraria:
           type: string
           example: America/Lima
+          description: >
+            Zona IANA de la Compañía Principal propietaria del área (D5, research.md §31); si no fue
+            resoluble a una Principal (p. ej. DENEGADO antes del paso 4), se usa la zona de repaldo del
+            sistema (ZonaHoraria:TimeZoneId).
     ProblemDetails:
       type: object
       description: >

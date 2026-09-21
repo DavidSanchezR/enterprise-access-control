@@ -8,8 +8,9 @@ namespace EnterpriseAccessControl.Domain.Entities;
 /// </summary>
 /// <remarks>
 /// Es una entidad distinta de <c>Persona</c>: el usuario opera el sistema, la persona es el sujeto
-/// cuyo acceso físico se evalúa. Su alcance administrativo (<c>AlcanceUsuarioCompañía</c>) es
-/// independiente de cualquier relación operacional Persona→Compañía→UnidadOrganizativa (RF-050).
+/// cuyo acceso físico se evalúa. Su alcance administrativo (<c>AsignaciónRolAdministrativo</c>,
+/// RF-074) es independiente de cualquier relación operacional Persona→Compañía→UnidadOrganizativa
+/// (RF-050).
 /// </remarks>
 public class Usuario : EntidadBase
 {

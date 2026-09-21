@@ -1,12 +1,11 @@
 using EnterpriseAccessControl.Application.Common;
 using EnterpriseAccessControl.Application.Common.Abstractions;
 using EnterpriseAccessControl.Application.Common.Errores;
-using EnterpriseAccessControl.Application.Common.Options;
+using EnterpriseAccessControl.Domain.Common;
 using EnterpriseAccessControl.Domain.Entities;
 using EnterpriseAccessControl.Domain.Enums;
 using EnterpriseAccessControl.Domain.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace EnterpriseAccessControl.Application.Permissions;
 
@@ -27,7 +26,7 @@ public sealed class EvaluacionAccesoService(
     IAppDbContext db,
     IAlcanceCompaniaAccessor alcance,
     EvaluadorDeAcceso evaluador,
-    IOptions<ZonaHorariaOptions> zonaHoraria)
+    IRelojEmpresarial reloj)
 {
     public async Task<EvaluarAccesoResponse> EvaluarAsync(
         EvaluarAccesoRequest request,
@@ -68,7 +67,9 @@ public sealed class EvaluacionAccesoService(
             resultado.ContextoOperativoId,
             resultado.PermisoAplicadoId,
             resultado.NivelAplicado,
-            zonaHoraria.Value.TimeZoneId);
+            // La zona realmente aplicada a los bloques horarios: la de la Principal del área, o la
+            // global de respaldo si esa Principal todavía no tiene una propia (RF-080).
+            reloj.ZonaEfectiva(datos.CompaniaPrincipal?.ZonaHorariaIana));
     }
 
     private async Task<DatosDeEvaluacion> ReunirDatosAsync(
@@ -77,7 +78,13 @@ public sealed class EvaluacionAccesoService(
         DateTime instante,
         CancellationToken ct)
     {
-        // Paso 5: contexto operativo vigente con la Principal propietaria del área.
+        // Pasos 5 y 13: la Principal propietaria del área aporta su Estado y su zona horaria.
+        var principal = await db.Companias
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == area.CompaniaPrincipalId, ct)
+            .ConfigureAwait(false);
+
+        // Paso 6: contexto operativo vigente con la Principal propietaria del área.
         var contexto = await db.ContextosOperativos
             .AsNoTracking()
             .Where(c => c.PersonaId == personaId
@@ -88,7 +95,7 @@ public sealed class EvaluacionAccesoService(
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-        // Paso 5: compañía de pertenencia vigente en la fecha evaluada, re-derivada (RF-065).
+        // Paso 6: compañía de pertenencia vigente en la fecha evaluada, re-derivada (RF-065).
         var pertenencia = await db.AsignacionesPersonaCompania
             .AsNoTracking()
             .Where(a => a.PersonaId == personaId
@@ -119,7 +126,7 @@ public sealed class EvaluacionAccesoService(
                     ct)
                 .ConfigureAwait(false);
 
-        // Paso 6: credencial vigente de la persona para esa Principal en el instante evaluado
+        // Paso 7: credencial vigente de la persona para esa Principal en el instante evaluado
         // (RF-066, RF-070, RF-071): Estado ASIGNADO y FechaHoraInicio <= instante <= FechaHoraFin.
         //
         // Se filtra por el instante y no se toma "la más reciente": una persona puede tener ya
@@ -137,7 +144,7 @@ public sealed class EvaluacionAccesoService(
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
-        // Paso 8: perfiles vigentes de la persona y perfiles que el área admite.
+        // Paso 9: perfiles vigentes de la persona y perfiles que el área admite.
         var perfiles = await db.AsignacionesTipoPersona
             .AsNoTracking()
             .Where(t => t.PersonaId == personaId
@@ -154,7 +161,7 @@ public sealed class EvaluacionAccesoService(
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        // Paso 9: unidad organizativa vigente dentro de ese contexto operativo.
+        // Paso 10: unidad organizativa vigente dentro de ese contexto operativo.
         var unidadId = contexto is null
             ? null
             : await db.AsignacionesUnidadOrganizativa
@@ -167,7 +174,7 @@ public sealed class EvaluacionAccesoService(
                 .FirstOrDefaultAsync(ct)
                 .ConfigureAwait(false);
 
-        // Paso 10: permisos del área, en los tres niveles. Se acotan ya a los sujetos posibles para
+        // Paso 11: permisos del área, en los tres niveles. Se acotan ya a los sujetos posibles para
         // no traer los permisos de todas las personas del área.
         var permisos = await db.PermisosAcceso
             .AsNoTracking()
@@ -191,6 +198,7 @@ public sealed class EvaluacionAccesoService(
             FechaHoraUtc = instante,
             PersonaId = personaId,
             Area = area,
+            CompaniaPrincipal = principal,
             UsuarioTieneAlcanceSobrePrincipal = alcance.EstaEnAlcance(area.CompaniaPrincipalId),
             ContextoOperativo = contexto,
             CompaniaPertenencia = compania,

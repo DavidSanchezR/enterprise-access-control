@@ -19,15 +19,23 @@ export class ClienteApi {
     return cliente
   }
 
-  /** Paso 1 de quickstart §5: login real; el alcance viaja en el token (RF-004). */
-  async iniciarSesion(): Promise<{ accessToken: string; alcanceCompanias: string[] }> {
+  /** Paso 1 de quickstart §5: login real; el alcance viaja en el token (RF-074, RF-077). */
+  async iniciarSesion(): Promise<{
+    accessToken: string
+    rol: 'GLOBAL_ADMINISTRATOR' | 'COMPANY_ADMINISTRATOR' | null
+    companiaIds: string[]
+  }> {
     const anonimo = await request.newContext({ baseURL: this.entorno.apiUrl })
     const respuesta = await anonimo.post('/api/auth/login', {
       data: { correo: this.usuario.correo, password: this.entorno.password },
     })
 
     expect(respuesta.status(), await respuesta.text()).toBe(200)
-    const cuerpo = (await respuesta.json()) as { accessToken: string; alcanceCompanias: string[] }
+    const cuerpo = (await respuesta.json()) as {
+      accessToken: string
+      rol: 'GLOBAL_ADMINISTRATOR' | 'COMPANY_ADMINISTRATOR' | null
+      companiaIds: string[]
+    }
     await anonimo.dispose()
 
     await this.contexto?.dispose()
@@ -66,8 +74,12 @@ export class ClienteApi {
   }
 
   /**
-   * Crea una compañía y la incorpora al alcance del usuario (quickstart §5 paso 2): crear no la añade
-   * al alcance por sí solo, y el alcance viaja en el token, así que se vuelve a iniciar sesión.
+   * Crea una compañía dentro del alcance del usuario (quickstart §5 paso 2).
+   *
+   * Con el modelo RBAC (D1) el usuario `admin` es GLOBAL_ADMINISTRATOR, así que su alcance cubre
+   * toda compañía —incluidas las que se creen después— sin enumerarlas y sin volver a iniciar
+   * sesión. El flujo anterior, que se añadía compañías a sí mismo, es justo la autoelevación que
+   * RF-076 prohíbe y que CS-036 verifica.
    */
   async crearCompaniaEnAlcance(
     nombre: string,
@@ -82,24 +94,13 @@ export class ClienteApi {
         numeroDocumento: aleatorio(11),
         tipoCompania,
         estado: 'ACTIVO',
+        // RF-080: obligatoria para una Principal, sin uso funcional para una Contratista.
+        zonaHorariaIana: tipoCompania === 'PRINCIPAL_MANDANTE' ? 'America/Lima' : null,
       }),
       201,
     )
 
-    const actual = await this.exigir<string[]>(
-      this.get(`/api/usuarios/${this.usuario.id}/alcance-companias`),
-      200,
-    )
-
-    await this.exigir(
-      this.put(`/api/usuarios/${this.usuario.id}/alcance-companias`, {
-        companiaIds: [...actual, compania.id],
-      }),
-      204,
-    )
-
-    const sesion = await this.iniciarSesion()
-    expect(sesion.alcanceCompanias).toContain(compania.id)
+    await this.exigir(this.get(`/api/companias/${compania.id}`), 200)
 
     return compania.id
   }

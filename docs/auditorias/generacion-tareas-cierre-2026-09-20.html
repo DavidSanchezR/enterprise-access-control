@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generación de tareas del cierre de Etapa 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--success);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--success);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+
+  /* ---------- Fases ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage { min-width: 0; }
+  }
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .fase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .fase-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+  .fase-card .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fase-card h3 { font-size: 14px; }
+  .fase-card .rango { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--primary); }
+  .metrica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+  .metrica { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; }
+  .metrica .valor { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metrica .etiqueta { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .metrica.ok .valor { color: var(--success); }
+  .check-list { display: grid; gap: 8px; }
+  .check-item { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 10px; align-items: start; font-size: 14px; }
+  .check-item .tick { color: var(--success); font-weight: 700; }
+  .trace td:nth-child(2) { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+</style>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Estado de generación de tareas · Cierre de Etapa 1</p>
+    <h1>Generación de tareas del cierre de Etapa 1</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Comando <b class="mono">/speckit-tasks</b></span>
+      <span>Estado <b>Generación completada — implementación no iniciada</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#veredicto"><span>✓</span><span>Veredicto</span></a></li>
+      <li><a href="#contexto"><span>CTX</span><span>Qué se pidió</span></a></li>
+      <li><a href="#fases"><span>9</span><span>Fases nuevas</span></a></li>
+      <li><a href="#tareas"><span>60</span><span>Tareas T169–T228</span></a></li>
+      <li><a href="#trazabilidad"><span>→</span><span>Trazabilidad RF/CS</span></a></li>
+      <li><a href="#integridad"><span>✓</span><span>Verificaciones</span></a></li>
+      <li><a href="#frontera"><span>▶</span><span>Frontera Etapa 2</span></a></li>
+      <li><a href="#abierto"><span>!</span><span>Punto abierto</span></a></li>
+      <li><a href="#siguientes"><span>▶</span><span>Siguientes pasos</span></a></li>
+    </ol>
+    <p class="index-sep" style="margin-top:18px">Documentos</p>
+    <ol>
+      <li><a href="analisis-consistencia-2026-09-20.html"><span>→</span><span>Análisis de consistencia</span></a></li>
+      <li><a href="clasificacion-hallazgos-2026-09-16.html"><span>→</span><span>Clasificación y matriz</span></a></li>
+      <li><a href="gate-cierre-etapa1-2026-09-16.html"><span>→</span><span>Gate de cierre</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+      <li><a href="especificaciones-baseline.html"><span>→</span><span>Especificaciones</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="veredicto">
+      <div class="section-head"><span class="letter">✓</span><h2>Veredicto</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">Generación de tareas completada</span>
+          <span class="muted">El baseline sigue sin implementar; esto solo registra el plan de trabajo.</span>
+        </div>
+        <p class="prose">
+          <code>/speckit-tasks</code> se ejecutó de forma acotada: generó <strong>60 tareas nuevas
+          (T169 a T228)</strong> para cerrar RF-074 a RF-081, CS-036 a CS-041 y la formalización UX/UI de G7,
+          sin tocar ninguna de las 168 tareas históricas. Las 60 quedaron <strong>escritas y sin marcar</strong>
+          — nadie las ha implementado todavía. Es la distinción que importa: <em>generar</em> la lista de
+          tareas terminó; <em>ejecutarlas</em> (<code>/speckit-implement</code>) no se ha iniciado, tal como
+          se pidió explícitamente.
+        </p>
+        <div class="runs">
+          <span>Tareas totales <b>228</b></span>
+          <span>Históricas (T001–T168) <b>168 · [X]</b></span>
+          <span>Nuevas (T169–T228) <b>60 · [ ]</b></span>
+          <span>Fases nuevas <b>9 (14–22)</b></span>
+          <span>Huecos en la numeración <b>0</b></span>
+          <span>IDs duplicados <b>0</b></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="contexto">
+      <div class="section-head"><span class="letter">CTX</span><h2>Qué se pidió y qué origina estas tareas</h2></div>
+      <p class="prose">Esta ejecución de <code>/speckit-tasks</code> se acotó exclusivamente a los cambios de
+      baseline posteriores a T168: las nueve decisiones de negocio (<a href="clasificacion-hallazgos-2026-09-16.html?volver=generacion-tareas-cierre-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20pidi%C3%B3#d1">D1</a>
+      a <a href="clasificacion-hallazgos-2026-09-16.html?volver=generacion-tareas-cierre-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20pidi%C3%B3#d9">D9</a>),
+      formalizadas en <code>spec.md</code> como RF-074 a RF-081 y CS-036 a CS-041, más la especificación UX/UI
+      de administración de usuarios (G7) incorporada en <code>ux-ui.md</code> §35. El último
+      <a href="analisis-consistencia-2026-09-20.html">análisis de consistencia</a> confirmó 0 hallazgos
+      críticos y 0 decisiones abiertas antes de generar estas tareas.</p>
+      <div class="panel">
+        <h3>Reglas duras respetadas</h3>
+        <ul class="tight">
+          <li>T001 a T168 no se regeneraron, renumeraron ni reinterpretaron.</li>
+          <li>La numeración nueva comienza exactamente en T169 y no reutiliza ningún ID anterior.</li>
+          <li>No se generó ninguna tarea para RF-067 a RF-069 ni CS-032 (diferidos a Etapa 2 por D8).</li>
+          <li>No se introdujo ninguna decisión de negocio nueva ni se modificó RF-074 a RF-081.</li>
+          <li>No se implementó código, no se ejecutó <code>/speckit-implement</code>, sin commits ni push.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="fases">
+      <div class="section-head"><span class="letter">9</span><h2>Fases nuevas (14 a 22)</h2></div>
+      <p class="prose muted">Continúan la numeración de fases del documento histórico, que terminaba en
+      Phase 13. Orden de dependencia estructural: modelo/datos → dominio → autorización → bootstrap →
+      API/contratos → frontend → pruebas → cierre.</p>
+      <div class="fase-grid">
+        <div class="fase-card"><span class="num">Phase 14</span><h3>Modelo de datos y migraciones</h3><span class="rango">T169–T174 · 6 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 15</span><h3>Dominio y reglas de negocio</h3><span class="rango">T175–T181 · 7 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 16</span><h3>Autorización, RBAC y Resource Ownership</h3><span class="rango">T182–T189 · 8 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 17</span><h3>Bootstrap del primer administrador</h3><span class="rango">T190–T193 · 4 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 18</span><h3>API y contratos</h3><span class="rango">T194–T198 · 5 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 19</span><h3>Frontend — Administración de usuarios (G7)</h3><span class="rango">T199–T206 · 8 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 20</span><h3>Frontend — Historia 5, Casos A y B</h3><span class="rango">T207–T212 · 6 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 21</span><h3>Pruebas</h3><span class="rango">T213–T224 · 12 tareas</span></div>
+        <div class="fase-card"><span class="num">Phase 22</span><h3>Cierre y validación final</h3><span class="rango">T225–T228 · 4 tareas</span></div>
+      </div>
+    </section>
+
+    <section id="tareas">
+      <div class="section-head"><span class="letter">60</span><h2>Resumen de las tareas T169 a T228</h2></div>
+      <div class="table-wrap">
+        <table class="coverage">
+          <thead><tr><th>Bloque</th><th>Cubre</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="id">T169–T174</td><td>Enum de roles, entidad <code>AsignacionRolAdministrativo</code>, migración con CHECK y trigger de no-solapamiento, retiro de <code>AlcanceUsuarioCompania</code>, campo <code>ZonaHorariaIana</code></td><td>Bloquea todo lo demás del bloque</td></tr>
+            <tr><td class="id">T175–T181</td><td>Servicio de asignación de rol, validador de dependencias de <code>TipoCompania</code>, ampliación de <code>EvaluadorDeAcceso</code> (pasos 5 y 6), rediseño de <code>IRelojEmpresarial</code>, zona por Principal en el paso 13</td><td>Sin dependencia de autorización ni API</td></tr>
+            <tr><td class="id">T182–T189</td><td>Redefinición de <code>IAlcanceCompaniaAccessor</code> y <code>CompaniaScopeAuthorizationHandler</code>, claims de rol en el JWT, reescritura de <code>UsuarioService</code>, Resource Ownership en unidades/áreas/histórico/persona</td><td>Cierra F-01 y F-02</td></tr>
+            <tr><td class="id">T190–T193</td><td><code>BootstrapOptions</code>, constante <code>MAX_VALIDITY_DATE</code> acotada, rutina de arranque idempotente, documentación de despliegue</td><td>Depende del modelo y de la autorización</td></tr>
+            <tr><td class="id">T194–T198</td><td>Controladores de usuarios/roles, login con rol y compañías, zona horaria y 409 en compañías, motivo <code>COMPANIA_INACTIVA</code>, catálogo de códigos de error</td><td>Alinea código con contratos ya actualizados</td></tr>
+            <tr><td class="id">T199–T206</td><td>Cliente HTTP y hooks, listado con aislamiento, wizard de creación, detalle con tabs, asignar/finalizar/renovar rol, mensajes de error, navegación</td><td>G7 — UX-17 a UX-22</td></tr>
+            <tr><td class="id">T207–T212</td><td>Wizard Caso A/B, árbol de unidad organizativa, cliente de perfiles, puntos de entrada en el histórico, zona horaria en formularios, UUID como respaldo</td><td>D7 — alcance real de T116</td></tr>
+            <tr><td class="id">T213–T224</td><td>Unitarias de asignación de rol; integración de CS-036 a CS-041; contrato regenerado; componente de usuarios e Historia 5; E2E de UX-17–22 y Casos A/B</td><td>Ninguna prueba histórica cubre estas reglas por sí sola</td></tr>
+            <tr><td class="id">T225–T228</td><td>Regresión de las 5 suites, escenarios de <code>quickstart.md</code> §7, actualización de estado en <code>README.md</code>, repetición del gate de cierre</td><td>Depende de todo el bloque</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="trazabilidad">
+      <div class="section-head"><span class="letter">→</span><h2>Trazabilidad RF/CS → tareas</h2></div>
+      <div class="table-wrap">
+        <table class="trace">
+          <thead><tr><th>Requisito</th><th>Tareas</th></tr></thead>
+          <tbody>
+            <tr><td>RF-074 — catálogo cerrado de roles, entidad, regla fundamental</td><td>T169, T170, T171, T173, T175, T182, T183, T184, T194, T195</td></tr>
+            <tr><td>RF-075 — vigencia obligatoria, no solapamiento, renovación</td><td>T170, T172, T175, T191, T213</td></tr>
+            <tr><td>RF-076 — restricciones del Company Administrator</td><td>T185, T201, T203, T214</td></tr>
+            <tr><td>RF-077 — alcance efectivo, Resource Ownership, 404 en lectura</td><td>T182, T183, T185, T186, T187, T188, T189, T200, T215</td></tr>
+            <tr><td>RF-078 — bootstrap</td><td>T190, T191, T192, T193, T216</td></tr>
+            <tr><td>RF-079 — Compañía INACTIVA en la evaluación</td><td>T178, T197, T217</td></tr>
+            <tr><td>RF-080 — zona horaria por Principal</td><td>T174, T179, T180, T181, T196, T197, T211, T218</td></tr>
+            <tr><td>RF-081 — dependencias que bloquean el cambio de tipo</td><td>T176, T177, T196, T219</td></tr>
+            <tr><td>CS-036</td><td>T214</td></tr>
+            <tr><td>CS-037</td><td>T215</td></tr>
+            <tr><td>CS-038</td><td>T216</td></tr>
+            <tr><td>CS-039</td><td>T217</td></tr>
+            <tr><td>CS-040</td><td>T218</td></tr>
+            <tr><td>CS-041</td><td>T219</td></tr>
+            <tr><td>CS-021 — árbol en la asignación de UO, ya vigente</td><td>T208, T222, T224</td></tr>
+            <tr><td>UX-17 a UX-22 (<code>ux-ui.md</code> §35)</td><td>T199 a T206, T221, T223</td></tr>
+            <tr><td>D7 / alcance real de T116</td><td>T207 a T211, T222, T224</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="integridad">
+      <div class="section-head"><span class="letter">✓</span><h2>Verificaciones de integridad realizadas</h2></div>
+      <p class="prose muted">Antes de reportar esta generación como terminada, se comprobó lo siguiente
+      directamente sobre <code>tasks.md</code>:</p>
+      <div class="check-list">
+        <div class="check-item"><span class="tick">✓</span><span>Las líneas 1 a 1122 (T001–T168) son <strong>byte a byte idénticas</strong> a una copia tomada antes de ejecutar <code>/speckit-tasks</code>.</span></div>
+        <div class="check-item"><span class="tick">✓</span><span>La secuencia T169–T228 no tiene huecos ni está fuera de rango, y queda en orden ascendente.</span></div>
+        <div class="check-item"><span class="tick">✓</span><span>Ningún ID nuevo coincide con uno histórico.</span></div>
+        <div class="check-item"><span class="tick">✓</span><span>Las 60 tareas nuevas cumplen el formato de checklist exigido (checkbox, ID, <code>[P]</code>/<code>[US#]</code> donde aplica, ruta de archivo).</span></div>
+        <div class="check-item"><span class="tick">✓</span><span>Cero tareas para RF-067, RF-068, RF-069, CS-032 o cualquier ítem anotado <code>[DIFERIDA A ETAPA 2]</code>.</span></div>
+      </div>
+      <div class="metrica-grid">
+        <div class="metrica ok"><span class="valor">1122/1122</span><span class="etiqueta">líneas históricas idénticas</span></div>
+        <div class="metrica ok"><span class="valor">0</span><span class="etiqueta">huecos en T169–T228</span></div>
+        <div class="metrica ok"><span class="valor">0</span><span class="etiqueta">IDs duplicados</span></div>
+        <div class="metrica ok"><span class="valor">60/60</span><span class="etiqueta">formato de checklist válido</span></div>
+      </div>
+    </section>
+
+    <section id="frontera">
+      <div class="section-head"><span class="letter">▶</span><h2>Frontera con Etapa 2</h2></div>
+      <p class="prose">Confirmado explícitamente: <strong>RF-067, RF-068, RF-069 y CS-032</strong> permanecen
+      fuera de esta generación de tareas, por estar diferidos a Etapa 2 mediante la decisión
+      <a href="clasificacion-hallazgos-2026-09-16.html?volver=generacion-tareas-cierre-2026-09-20.html%23frontera&desde=Frontera%20con%20Etapa%202#d8">D8</a>
+      y anotados <code>[DIFERIDA A ETAPA 2]</code> en <code>spec.md</code>. Las tareas T156 a T158 del baseline
+      histórico —que verifican el interceptor de auditoría automática— son una capacidad distinta, ya completa,
+      y no deben confundirse con las consultas transversales de Historia 10.</p>
+    </section>
+
+    <section id="abierto">
+      <div class="section-head"><span class="letter">!</span><h2>Punto abierto para tu atención</h2></div>
+      <div class="verdict" style="border-top-color: var(--warning);">
+        <div class="verdict-head">
+          <span class="status" style="color: var(--warning); font-size: 18px;">T173 — migración de datos de <code>AlcanceUsuarioCompania</code></span>
+        </div>
+        <p class="prose">La especificación define que la entidad queda reemplazada por
+        <code>AsignacionRolAdministrativo</code>, pero <strong>no define qué rol ni qué vigencia
+        corresponderían a filas preexistentes</strong>. La tarea, tal como quedó redactada, elimina la tabla
+        anterior sin convertir sus filas — razonable porque el baseline no tiene despliegue productivo y el
+        arranque de RF-078 regenera los datos administrativos. Si existiera un entorno con datos que deban
+        conservarse, esa conversión requeriría una decisión de negocio explícita previa; no se asumió
+        ninguna.</p>
+      </div>
+    </section>
+
+    <section id="siguientes">
+      <div class="section-head"><span class="letter">▶</span><h2>Siguientes pasos</h2></div>
+      <p class="prose">El siguiente paso natural es <code>/speckit-implement</code> sobre T169 en adelante,
+      siguiendo el orden de fases de la sección anterior. No se ha ejecutado ni preparado — queda a la espera
+      de autorización explícita.</p>
+    </section>
+
+    <footer class="foot">
+      Informe generado el 20/09/2026 sobre el resultado de <code>/speckit-tasks</code> aplicado a
+      <code>specs/001-control-acceso-empresarial/tasks.md</code>. Documenta el estado de la generación de
+      tareas, no de su implementación: ningún código fue escrito, ninguna prueba fue ejecutada, y no hubo
+      commits ni push. Documento local: los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

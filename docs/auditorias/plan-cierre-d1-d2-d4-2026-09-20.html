@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan de cierre — D-1, D-2, D-4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; font-size: 11px; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 26px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 74ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto / nota ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--success);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; color: var(--success); }
+  .verdict ol, .verdict ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 80ch; }
+
+  .nota {
+    background: var(--info-soft);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    padding: 16px 20px;
+    display: grid;
+    gap: 8px;
+    font-size: 13.5px;
+  }
+  .nota .nota-tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--primary);
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  table.tareas { min-width: 880px; }
+  table.tareas td:nth-child(1) { white-space: nowrap; }
+  table.tareas td:nth-child(3) { white-space: nowrap; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+  table.tareas td:nth-child(4) { white-space: nowrap; }
+  table.trace td { font-size: 13px; }
+  table.trace code { white-space: nowrap; }
+
+  /* ---------- Chips de clasificación ---------- */
+  .clase {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 5px;
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 700;
+    flex: none;
+  }
+  .clase.a { background: var(--success-soft); color: var(--success); }
+  .clase.b { background: var(--info-soft); color: var(--primary); }
+  .clase.c { background: var(--warning-soft); color: var(--warning); }
+  .clase.d { background: var(--danger-soft); color: var(--danger); }
+
+  .veredicto-linea {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--ground); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; font-size: 13.5px;
+  }
+
+  /* ---------- Evidencia / paneles de dos columnas ---------- */
+  .evid-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .evid-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; display: grid; gap: 10px; align-content: start;
+  }
+  .evid-card .evid-tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+  }
+  .evid-card ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; }
+  .evid-card.ok .evid-tag { color: var(--success); }
+  .evid-card.warn .evid-tag { color: var(--warning); }
+  @media (max-width: 900px) { .evid-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ---------- Diagrama de composición (D-4) ---------- */
+  .flujo {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 18px 20px;
+  }
+  .flujo .paso {
+    background: var(--ground); border: 1px solid var(--border); border-radius: 5px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .flujo .paso.activo { border-color: var(--primary); color: var(--primary); background: var(--info-soft); }
+  .flujo .flecha { color: var(--muted); font-size: 15px; }
+  .flujo-mal {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 12px 20px 4px; font-size: 13px; color: var(--muted);
+  }
+  .flujo-mal .paso { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger);
+    border-radius: 5px; padding: 6px 12px; font-weight: 600; white-space: nowrap; text-decoration: line-through; }
+  .flujo-mal .flecha { color: var(--muted); }
+  @media (max-width: 620px) { .flujo, .flujo-mal { flex-direction: column; align-items: stretch; } .flujo .flecha, .flujo-mal .flecha { transform: rotate(90deg); align-self: center; } }
+
+  /* ---------- Hallazgos puntuales (defectos D-1) ---------- */
+  .defectos { display: grid; gap: 14px; }
+  .defecto {
+    background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--danger);
+    border-radius: 6px; padding: 16px 20px; display: grid; gap: 8px;
+  }
+  .defecto h3 { font-size: 14.5px; }
+  .antes-despues { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; }
+  .antes-despues .estado { display: flex; align-items: center; gap: 6px; }
+  .antes-despues code { white-space: nowrap; }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  .check-list { display: grid; gap: 8px; }
+  .check-item { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 10px; align-items: start; font-size: 14px; }
+  .check-item .tick { color: var(--success); font-weight: 700; }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, code, .verdict, .clase { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .evid-card, tr, .defecto, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.tareas { min-width: 0; }
+  }
+</style>
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">/speckit-plan · Fase 0/1 · Sin tareas, sin implementación, sin commits</p>
+    <h1>Plan de cierre — desviaciones D-1, D-2 y D-4</h1>
+    <div class="meta">
+      <span>Feature <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Rama <b class="mono">feature/baseline-decisions</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Origen <b class="mono">/speckit-analyze</b> (auditoría D-2 a D-5)</span>
+      <span>D-5 <b>cerrada, fuera de este plan</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#estado"><span>Σ</span><span>Estado de la sesión</span></a></li>
+      <li><a href="#d1"><span>D-1</span><span>Renovación de rol</span></a></li>
+      <li><a href="#d2"><span>D-2</span><span>Cobertura de alcance</span></a></li>
+      <li><a href="#d4"><span>D-4</span><span>Búsqueda server-side</span></a></li>
+      <li><a href="#tareas"><span>T229+</span><span>Tareas y dependencias</span></a></li>
+      <li><a href="#trazabilidad"><span>→</span><span>Trazabilidad</span></a></li>
+      <li><a href="#contratos"><span>⇄</span><span>Contratos HTTP</span></a></li>
+      <li><a href="#pruebas"><span>✓</span><span>Estrategia de pruebas</span></a></li>
+      <li><a href="#cierre"><span>◆</span><span>Criterios de cierre</span></a></li>
+      <li><a href="#verificacion"><span>✔</span><span>Verificaciones</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ===================== ESTADO DE LA SESIÓN ===================== -->
+    <section id="estado">
+      <div class="section-head"><span class="letter">Σ</span><h2>Estado de la sesión</h2></div>
+
+      <p class="prose">Esta ejecución de <code>/speckit-plan</code> continuó una sesión interrumpida. Antes de
+      escribir nada se verificó el estado real del repositorio: la ejecución anterior había completado solo
+      la fase de investigación (lectura de contratos, servicios, tests y tareas) y no había escrito ningún
+      artefacto — <code>research.md</code> terminaba en §33 y <code>contracts/users.yaml</code> seguía en
+      v2.0.0, sin <code>/renovar</code> ni parámetro de búsqueda.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Qué</th><th>Estado al retomar</th><th>Acción de esta sesión</th></tr></thead>
+          <tbody>
+            <tr><td>Commit <code>69a7b41</code> (D-4/D-5 formalizadas en <code>spec.md</code>/<code>ux-ui.md</code>/<code>docker-compose.yml</code>)</td><td>Intacto</td><td>Conservado sin tocar</td></tr>
+            <tr><td><code>spec.md</code>, <code>ux-ui.md</code></td><td>Ya contenían RF-075, RF-077 y UX-22 enmendados</td><td>Sin modificar</td></tr>
+            <tr><td><code>research.md</code></td><td>Terminaba en §33</td><td>§34 nueva (D-1, D-2, D-4)</td></tr>
+            <tr><td><code>contracts/users.yaml</code></td><td>v2.0.0, sin <code>/renovar</code> ni <code>texto</code></td><td>v2.1.0</td></tr>
+            <tr><td><code>data-model.md</code>, <code>quickstart.md</code>, <code>plan.md</code></td><td>Sin sección de cierre</td><td>Completados</td></tr>
+            <tr><td><code>tasks.md</code></td><td>Modificado, pero de una sesión previa</td><td>No tocado</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="nota">
+        <span class="nota-tag">Nomenclatura — aviso repetido en cada artefacto tocado</span>
+        <p><code>D-1</code>, <code>D-2</code>, <code>D-4</code> (con guion) son las <b>desviaciones de
+        implementación</b> detectadas al terminar T169–T228 y auditadas con <code>/speckit-analyze</code>. No
+        son las decisiones de negocio <code>D1</code>–<code>D9</code> (sin guion) de la matriz de 16
+        preguntas del cierre de Etapa 1. La coincidencia de letra es accidental — p. ej. <code>D4</code> es
+        inactivación de compañía; <code>D-4</code> es la búsqueda de usuarios de este plan.</p>
+      </div>
+    </section>
+
+    <!-- ===================== D-1 ===================== -->
+    <section id="d1">
+      <div class="section-head"><span class="letter">D-1</span><h2>Renovación de <code>AsignaciónRolAdministrativo</code></h2></div>
+
+      <div class="veredicto-linea">
+        <span class="pill ok">Dominio correcto</span>
+        <span>Solo falta <strong>exponerlo</strong> — más dos correcciones de consistencia encontradas al verificar.</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card ok">
+          <span class="evid-tag">Ya implementado, no se reescribe</span>
+          <ul>
+            <li><code>AsignacionRolAdministrativoService.RenovarAsync</code>: renovable solo si vigente
+            dinámicamente, fecha estrictamente posterior, revalida no-solapamiento.</li>
+            <li><code>UsuarioService.RenovarRolAsync</code>: antepone <code>ObtenerEnAlcanceAsync</code>
+            (RF-077 ⇒ <code>404</code>) y <code>ValidarPuedeAsignar</code> (RF-076 ⇒ <code>403</code>).</li>
+            <li>Mismo patrón ya publicado por <code>contracts/people.yaml</code> para
+            <code>AsignaciónPersonaCompañía</code> (RF-073): contraparte inversa de <code>/finalizar</code>.</li>
+          </ul>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Contrato definido en este plan</span>
+          <p><code>POST /api/usuarios/{id}/roles/{asignacionId}/renovar</code></p>
+          <p>Cuerpo: <code>{ "fechaHoraFin": "&lt;date-time&gt;" }</code> → <code>204</code></p>
+          <ul>
+            <li><code>400</code> — cuerpo ausente o mal formado</li>
+            <li><code>403 ROL_NO_AUTORIZADO</code> — quien no podría crearla tampoco puede extenderla</li>
+            <li><code>404</code> — no encontrada o fuera de alcance (nunca <code>403</code>, no confirma existencia)</li>
+            <li><code>409</code> — <code>ASIGNACION_ROL_NO_VIGENTE</code> / <code>RENOVACION_NO_POSTERIOR</code> / <code>SOLAPAMIENTO_VIGENCIA</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Dos defectos reales encontrados al verificar (correcciones, no funcionalidad nueva)</h3>
+      <div class="defectos">
+        <div class="defecto">
+          <h3>1 — Nombre del campo del cuerpo no coincide con el precedente</h3>
+          <div class="antes-despues">
+            <span class="estado"><span class="pill bad">Hoy</span> <code>RenovarAsignacionRolRequest(DateTime NuevaFechaHoraFin)</code> → serializa <code>nuevaFechaHoraFin</code></span>
+          </div>
+          <div class="antes-despues">
+            <span class="estado"><span class="pill ok">Objetivo</span> <code>FechaHoraFin</code> → <code>fechaHoraFin</code>, igual que <code>people.yaml</code> y el cuerpo ya aprobado</span>
+          </div>
+          <p class="muted">El DTO todavía no es alcanzable por HTTP: el cambio no rompe ningún consumidor existente.</p>
+        </div>
+        <div class="defecto">
+          <h3>2 — El mismo código de error responde con dos estados HTTP distintos según la entidad</h3>
+          <div class="antes-despues">
+            <span class="estado"><span class="pill bad">Hoy</span> <code>AsignacionRolAdministrativoService</code> lanza <code>ReglaNegocioInvalidaException</code> ⇒ <code>400</code> para <code>RENOVACION_NO_POSTERIOR</code></span>
+          </div>
+          <div class="antes-despues">
+            <span class="estado"><span class="pill ok">Objetivo</span> <code>HistorialPersonaService</code> ya lanza <code>ConflictoEstadoException</code> ⇒ <code>409</code> para el mismo código; <code>people.yaml</code> documenta <code>409</code> — se unifica en <code>ConflictoEstadoException</code></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== D-2 ===================== -->
+    <section id="d2">
+      <div class="section-head"><span class="letter">D-2</span><h2>Cobertura de alcance GLOBAL vs COMPANY</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="clase d">D</span>
+        <span><strong>Ningún cambio de código de producción.</strong> Solo cobertura de pruebas nueva.</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card ok">
+          <span class="evid-tag">El control de alcance ya está aplicado</span>
+          <ul>
+            <li><code>UnidadOrganizativaService</code> / <code>AreaAccesoService</code> — lo resuelven
+            directamente.</li>
+            <li><code>AsignacionUnidadOrganizativaService</code> / <code>EstadoEfectivoService</code> — lo
+            delegan en <code>PersonaService.ExigirAlcanceHistoricoAsync</code>, al inicio de cada operación
+            pública.</li>
+            <li><code>RevocacionService</code> — <b>no tiene ni debe tener control propio</b>: no es punto de
+            entrada, es colaborador interno cuyo único invocador (<code>HistorialPersonaService</code>) ya
+            validó el alcance.</li>
+          </ul>
+        </div>
+        <div class="evid-card warn">
+          <span class="evid-tag">Lo que falta: red de regresión (Principio VII)</span>
+          <ul>
+            <li><code>RolesAdministrativosTests</code> declara <b>CS-037</b> en el comentario de clase, pero
+            <b>no contiene ningún método <code>CS037_*</code></b> — cubre CS-036 (recurso <code>Usuario</code>)
+            y CS-038 (bootstrap), nunca los cinco servicios.</li>
+            <li>Las tres suites de aislamiento existentes (<code>AislamientoMultiPrincipalTests</code>,
+            <code>AislamientoAreasMultiPrincipalTests</code>, <code>AislamientoPertenenciasTests</code>) son
+            <b>anteriores a RBAC</b>: no mencionan los roles, prueban aislamiento de datos entre Principales,
+            no aislamiento por rol del actor autenticado.</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="prose">La cobertura a agregar tiene dos casos por servicio: <b>(a)</b> un
+      <code>GLOBAL_ADMINISTRATOR</code> opera sobre recursos de <b>dos Principales distintas en la misma
+      prueba</b> — lo único que falsaría una regresión que volviera a exigir
+      <code>CompaniaIds.Count > 0</code>; <b>(b)</b> un <code>COMPANY_ADMINISTRATOR</code> de la Principal A
+      recibe <code>404</code> sobre un recurso de la Principal B, nunca <code>403</code>. Para
+      <code>RevocacionService</code>, el caso se ejercita a través de su invocador
+      (<code>POST /api/personas/{id}/historial-companias/{asignacionId}/finalizar</code>).</p>
+    </section>
+
+    <!-- ===================== D-4 ===================== -->
+    <section id="d4">
+      <div class="section-head"><span class="letter">D-4</span><h2>Búsqueda server-side de usuarios</h2></div>
+
+      <div class="veredicto-linea">
+        <span class="pill neutral">texto</span>
+        <span>Parámetro nuevo en <code>GET /api/usuarios</code>, reutilizando la convención ya usada en
+        <code>people.yaml</code> y <code>companies.yaml</code>.</span>
+      </div>
+
+      <h3>Orden de composición — el contenido sustantivo de la decisión</h3>
+      <div class="flujo">
+        <span class="paso">Alcance (RF-077)</span><span class="flecha">→</span>
+        <span class="paso activo">Búsqueda server-side (texto)</span><span class="flecha">→</span>
+        <span class="paso">Paginación</span><span class="flecha">→</span>
+        <span class="paso">Respuesta</span>
+      </div>
+      <div class="flujo-mal">
+        <span>Descartado —</span>
+        <span class="paso">Paginación</span><span class="flecha">→</span>
+        <span class="paso">Filtrado en cliente de la página actual</span>
+      </div>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Semántica</span>
+          <ul>
+            <li>Coincidencia parcial sobre <code>correo</code> vía <code>EF.Functions.Like</code> — el mismo
+            mecanismo que <code>CompaniaService.ListarAsync</code> ya usa.</li>
+            <li>Aplicado sobre el <code>IQueryable</code> <b>ya restringido al alcance</b> y <b>antes</b> de
+            <code>CountAsync</code>/paginar: nunca amplía el alcance, <code>total</code> refleja solo las
+            coincidencias dentro de él.</li>
+            <li><code>estado</code> y <code>texto</code> combinan con <b>AND</b>.</li>
+            <li>Sin coincidencias ⇒ <code>200</code> con <code>items: []</code>, <code>total: 0</code> —
+            <b>nunca <code>404</code></b>, que en este contrato significa "fuera de alcance".</li>
+          </ul>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Fuera de esta decisión</span>
+          <ul>
+            <li>Nombre de parámetro / multi-criterio / ordenamiento / rendimiento: ya resueltos por el
+            parámetro <code>texto</code> reutilizado, sin inventar nada nuevo.</li>
+            <li>Migrar los filtros de rol, compañía o "solo vigentes" al servidor — la decisión y las
+            enmiendas de RF-077/UX-22 hablan de la <b>búsqueda</b>, no de esos filtros.</li>
+            <li>CS-002 fija rendimiento para la búsqueda de <b>personas</b>, no de usuarios administrativos —
+            no se inventa un umbral nuevo.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== TAREAS ===================== -->
+    <section id="tareas">
+      <div class="section-head"><span class="letter">T229+</span><h2>Tareas y dependencias</h2></div>
+
+      <div class="nota">
+        <span class="nota-tag">Por qué tareas nuevas y no reabrir T169–T228</span>
+        <p>Su cierre fue verificado por el gate de T228; reabrirlas haría que <code>[X]</code> significara dos
+        cosas distintas y volvería falso un registro de auditoría ya emitido. Es el criterio que este
+        proyecto ya aplicó en el caso idéntico de D7/T116: "el trabajo debe reflejarse en tareas nuevas,
+        nunca reescribir ni renumerar retroactivamente". La trazabilidad se preserva citando la antecesora en
+        el texto de cada tarea nueva, no modificándola. Matiz honesto: <b>T199</b> y <b>T204</b> sí nombraban
+        la renovación y se cerraron sin ella porque el contrato v2.0.0 no la declaraba — se completaron hasta
+        donde el contrato permitía.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="tareas">
+          <thead><tr><th>#</th><th>Trabajo</th><th>Antecesora</th><th>Capa</th></tr></thead>
+          <tbody>
+            <tr><td class="id">T229</td><td>Unificar <code>RENOVACION_NO_POSTERIOR</code> en <code>ConflictoEstadoException</code> (409) y renombrar <code>NuevaFechaHoraFin</code> → <code>FechaHoraFin</code></td><td>— (corrección)</td><td>backend</td></tr>
+            <tr><td class="id">T230</td><td>Exponer <code>POST .../renovar</code> (204) reutilizando <code>RenovarRolAsync</code>; retirar la nota de ausencia en el controller</td><td>completa T194</td><td>backend</td></tr>
+            <tr><td class="id">T231</td><td><code>renovarRol</code> en <code>api.ts</code>, <code>useRenovarRol</code> en <code>hooks.ts</code></td><td>completa T199</td><td>frontend</td></tr>
+            <tr><td class="id">T232</td><td>Acción <b>Renovar</b> en <code>UsuarioDetalle.tsx</code> con confirmación (UX-20) y mensajes en <code>mensajesRol.ts</code></td><td>completa T204/T205</td><td>frontend</td></tr>
+            <tr><td class="id">T233</td><td>Filtro <code>texto</code> server-side en <code>ListarAsync</code> (registro <code>FiltroUsuarios</code>) y parámetro en el controller</td><td>amplía T185/T194</td><td>backend</td></tr>
+            <tr><td class="id">T234</td><td><code>UsuariosPage.tsx</code> deja de filtrar por correo en cliente; pasa <code>texto</code> al hook</td><td>amplía T200</td><td>frontend</td></tr>
+            <tr><td class="id">T235</td><td>Contrato v2.1.0: ruta <code>/renovar</code> y parámetro <code>texto</code> (incl. snapshot OpenAPI)</td><td>amplía T220</td><td>pruebas</td></tr>
+            <tr><td class="id">T236</td><td>Integración de renovación: caso feliz, tres <code>409</code>, <code>404</code> fuera de alcance, <code>403</code> sin autorización</td><td>amplía T213/T214</td><td>pruebas</td></tr>
+            <tr><td class="id">T237</td><td>Integración de alcance GLOBAL/COMPANY en <code>UnidadOrganizativaService</code> y <code>AreaAccesoService</code></td><td>cubre T186, cierra CS-037</td><td>pruebas</td></tr>
+            <tr><td class="id">T238</td><td>Integración de alcance GLOBAL/COMPANY en <code>AsignacionUnidadOrganizativaService</code>, <code>EstadoEfectivoService</code> y <code>RevocacionService</code> (vía <code>/finalizar</code>)</td><td>cubre T187, cierra CS-037</td><td>pruebas</td></tr>
+            <tr><td class="id">T239</td><td>Integración de búsqueda: hallazgo entre páginas, AND con <code>estado</code>, resultado vacío, aislamiento con correo exacto conocido</td><td>amplía T215</td><td>pruebas</td></tr>
+            <tr><td class="id">T240</td><td>Vitest del módulo de usuarios: renovar y búsqueda server-side</td><td>amplía T221</td><td>pruebas</td></tr>
+            <tr><td class="id">T241</td><td>E2E: renovar desde UX-20 y encontrar por búsqueda un usuario fuera de la página 1</td><td>amplía T223</td><td>pruebas</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="prose muted">La numeración final la fija <code>/speckit-tasks</code>; aquí solo se fija el
+      alcance y el orden. <code>UsuariosController.cs</code> (T230/T233) y <code>api.ts</code> (T231/T234)
+      reciben cambios independientes en el mismo archivo: sus tareas no deben marcarse <code>[P]</code> entre
+      sí.</p>
+
+      <h3>Dependencias reales</h3>
+      <ul class="tight" style="margin:0; padding-left:20px; display:grid; gap:8px; max-width:80ch;">
+        <li><b>D-1</b>: T229 → T230 → T231 → T232. T229 precede a T230 porque el contrato ya declara
+        <code>fechaHoraFin</code> y <code>409</code>; exponer la ruta antes contradiría su propio contrato.
+        T235/T236 dependen de T230; T240/T241 de T232.</li>
+        <li><b>D-2</b>: T237 y T238 <b>no dependen de nada</b> — el código que verifican ya existe.
+        Paralelizables entre sí y con todo lo demás; es el trabajo que puede empezar primero.</li>
+        <li><b>D-4</b>: T233 → T234. T235/T239 dependen de T233; T240/T241 de T234.</li>
+        <li><b>Entre decisiones</b>: independientes. Las únicas coincidencias son de archivo y de suite
+        compartida, que obligan a secuencia dentro del archivo, no dependencia lógica entre decisiones.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== TRAZABILIDAD ===================== -->
+    <section id="trazabilidad">
+      <div class="section-head"><span class="letter">→</span><h2>Trazabilidad</h2></div>
+
+      <div class="table-wrap">
+        <table class="trace">
+          <thead><tr><th>Decisión</th><th>Requisito / UX</th><th>Artefacto de diseño</th><th>Tareas</th><th>Evidencia de prueba</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">D-1</td>
+              <td>RF-075, RF-076, RF-077</td>
+              <td>research.md §34.1 · <code>users.yaml</code> <code>/renovar</code> · data-model.md · quickstart.md §8.1</td>
+              <td>T229–T232</td>
+              <td>T235, T236, T240, T241</td>
+            </tr>
+            <tr>
+              <td class="id">D-2</td>
+              <td>RF-077</td>
+              <td>research.md §34.2 · quickstart.md §8.2</td>
+              <td>T237, T238</td>
+              <td>T237, T238 (son la evidencia; cierran CS-037)</td>
+            </tr>
+            <tr>
+              <td class="id">D-4</td>
+              <td>RF-077, UX-22 (<code>ux-ui.md</code> §35)</td>
+              <td>research.md §34.3 · <code>users.yaml</code> parámetro <code>texto</code> · quickstart.md §8.3</td>
+              <td>T233, T234</td>
+              <td>T235, T239, T240, T241</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== CONTRATOS ===================== -->
+    <section id="contratos">
+      <div class="section-head"><span class="letter">⇄</span><h2>Contratos HTTP afectados</h2></div>
+
+      <p class="prose">Único contrato tocado: <code>contracts/users.yaml</code> <b>v2.0.0 → v2.1.0</b> — ruta
+      <code>/renovar</code> nueva con sus cinco respuestas, parámetro <code>texto</code> en el listado, y la
+      descripción del <code>GET</code> explicitando el orden alcance → filtros → total → paginación.</p>
+
+      <div class="nota" style="border-left-color: var(--warning); background: var(--warning-soft);">
+        <span class="nota-tag" style="color: var(--warning);">Aviso operativo</span>
+        <p><code>OpenApiSnapshotTests</code> queda <b>en rojo desde ahora</b> con
+        <code>POST /api/usuarios/{id}/roles/{asignacionId}/renovar: no existe en la API</code> — recorre cada
+        operación declarada en los contratos y exige que exista. Es el estado esperado (el contrato precede
+        al código, igual que con T194–T198), pero conviene saberlo antes de correr la suite. El parámetro
+        <code>texto</code> no rompe nada mientras tanto: ese snapshot compara rutas, códigos y forma del
+        cuerpo, no parámetros de consulta — su verificación exige una aserción dedicada en
+        <code>UsersContractTests</code> (parte de T235).</p>
+      </div>
+    </section>
+
+    <!-- ===================== PRUEBAS ===================== -->
+    <section id="pruebas">
+      <div class="section-head"><span class="letter">✓</span><h2>Estrategia de pruebas</h2></div>
+
+      <p class="prose">Cada prueba debe fallar si se revierte la capacidad que verifica; no basta ejercitar el
+      camino feliz.</p>
+
+      <div class="evid-grid">
+        <div class="evid-card">
+          <span class="evid-tag">Integración (Testcontainers, SQL Server real)</span>
+          <ul>
+            <li>Los tres <code>409</code> de la renovación se distinguen por <code>codigo</code>, no por el
+            estado HTTP.</li>
+            <li>El aislamiento se prueba siempre con identificadores <b>conocidos y válidos</b> de otra
+            Principal — lo que se verifica es que conocerlos no concede acceso (RF-077).</li>
+            <li>D-2: el caso GLOBAL debe tocar <b>dos Principales en la misma prueba</b> — lo único que
+            falsaría una regresión que volviera a exigir <code>CompaniaIds.Count > 0</code>.</li>
+            <li>D-4: el caso decisivo es el <code>COMPANY_ADMINISTRATOR</code> que busca el correo
+            <b>exacto</b> de un usuario ajeno y obtiene la misma respuesta que ante uno inexistente.</li>
+          </ul>
+        </div>
+        <div class="evid-card">
+          <span class="evid-tag">Vitest / Playwright</span>
+          <ul>
+            <li>Renovar exige confirmación explícita, igual que finalizar (UX-20).</li>
+            <li>La búsqueda encuentra desde la interfaz a un usuario que no está en la página cargada — justo
+            lo que la implementación anterior no podía hacer.</li>
+            <li>Regresión completa de las cinco suites; el ayudante <code>filaDelUsuario</code> del E2E
+            existente recorre páginas por carecer de búsqueda server-side y podrá simplificarse tras D-4.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CIERRE ===================== -->
+    <section id="cierre">
+      <div class="section-head"><span class="letter">◆</span><h2>Criterios de cierre del Baseline</h2></div>
+
+      <div class="check-list">
+        <div class="check-item"><span class="tick">1</span><span>Las cinco suites en verde, sin regresión en T001–T168 ni T169–T228.</span></div>
+        <div class="check-item"><span class="tick">2</span><span><code>ContractTests</code> confirma que el OpenAPI publicado coincide con <code>users.yaml</code> v2.1.0.</span></div>
+        <div class="check-item"><span class="tick">3</span><span>Los tres escenarios de <code>quickstart.md</code> §8 se reproducen con los resultados esperados.</span></div>
+        <div class="check-item"><span class="tick">4</span><span>CS-037 pasa a tener pruebas reales para los cinco servicios, no solo una mención en un comentario de clase.</span></div>
+        <div class="check-item"><span class="tick">5</span><span><code>UsuariosController.cs</code> ya no contiene la nota de ausencia de renovación, y <code>UsuariosPage.tsx</code> ya no filtra por correo sobre <code>consulta.data?.items</code>.</span></div>
+        <div class="check-item"><span class="tick">6</span><span>Ninguna casilla de T001–T228 se modifica; el gate de cierre se repite y se registra en <code>docs/auditorias/</code>.</span></div>
+      </div>
+    </section>
+
+    <!-- ===================== VERIFICACIÓN ===================== -->
+    <section id="verificacion">
+      <div class="section-head"><span class="letter">✔</span><h2>Verificaciones explícitas</h2></div>
+
+      <div class="verdict">
+        <div class="verdict-head"><span class="status">Confirmado</span></div>
+        <ul>
+          <li><span class="pill ok">D-1</span> permanece en Baseline — RF-075 ya lo establece; este plan solo lo expone.</li>
+          <li><span class="pill ok">D-2</span> solo requiere cobertura de pruebas — verificado leyendo los cinco servicios, sin evidencia contraria.</li>
+          <li><span class="pill ok">D-4</span> requiere búsqueda server-side — parámetro, semántica y orden de composición definidos.</li>
+          <li><span class="pill ok">D-5</span> permanece cerrada — fuera de este plan; RF-078 sin tocar.</li>
+          <li><span class="pill ok">T001–T168 y T169–T228</span> no se reimplementan y sus casillas no se modifican.</li>
+          <li><span class="pill ok">Stage 2</span> permanece separado — RF-067 a RF-069 y CS-032 siguen diferidos, sin tareas.</li>
+          <li><span class="pill ok">Sin ejecución</span> de <code>/speckit-tasks</code> ni <code>/speckit-implement</code>, sin commits ni push.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Informe generado el 20/09/2026 como plan de implementación (<code>/speckit-plan</code>, Fase 0/1) para
+      cerrar las desviaciones D-1, D-2 y D-4 detectadas al finalizar T169–T228. No se generaron tareas
+      (<code>/speckit-tasks</code>) ni se implementó código (<code>/speckit-implement</code>); no hubo
+      commits ni push. D-5 no forma parte de este plan — ya fue cerrada por configuración y documentación.
+      Documento local: los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

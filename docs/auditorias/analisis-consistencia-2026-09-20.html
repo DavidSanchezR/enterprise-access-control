@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análisis de consistencia de especificación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #1F2937;
+    --muted: #667085;
+    --border: #D9DEE7;
+    --rule: #E7EBF1;
+    --band: #172033;
+    --band-ink: #E8EDF6;
+    --band-muted: #A3AEC2;
+    --primary: #2563EB;
+    --danger: #DC2626;
+    --danger-soft: #FDECEC;
+    --warning: #B45F06;
+    --warning-soft: #FDF3E3;
+    --success: #15803D;
+    --success-soft: #E7F6EC;
+    --neutral: #64748B;
+    --neutral-soft: #EEF1F5;
+    --info-soft: #E8EFFD;
+    --code-bg: #EEF2F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1320;
+      --surface: #141C2C;
+      --ink: #E4E9F2;
+      --muted: #97A2B6;
+      --border: #2A3550;
+      --rule: #212B40;
+      --band: #0A0F1A;
+      --band-ink: #E8EDF6;
+      --band-muted: #8F9AB0;
+      --primary: #7AA2FF;
+      --danger: #F37A7A;
+      --danger-soft: #3A1B20;
+      --warning: #F2B35A;
+      --warning-soft: #3A2A14;
+      --success: #5DD389;
+      --success-soft: #16311F;
+      --neutral: #9AA6BA;
+      --neutral-soft: #1E2738;
+      --info-soft: #1A2744;
+      --code-bg: #1C2537;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1320;
+    --surface: #141C2C;
+    --ink: #E4E9F2;
+    --muted: #97A2B6;
+    --border: #2A3550;
+    --rule: #212B40;
+    --band: #0A0F1A;
+    --band-ink: #E8EDF6;
+    --band-muted: #8F9AB0;
+    --primary: #7AA2FF;
+    --danger: #F37A7A;
+    --danger-soft: #3A1B20;
+    --warning: #F2B35A;
+    --warning-soft: #3A2A14;
+    --success: #5DD389;
+    --success-soft: #16311F;
+    --neutral: #9AA6BA;
+    --neutral-soft: #1E2738;
+    --info-soft: #1A2744;
+    --code-bg: #1C2537;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, code {
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code {
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--primary); }
+  a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+
+  /* ---------- Banda superior ---------- */
+  .band {
+    background: var(--band);
+    color: var(--band-ink);
+    padding-inline: 24px;
+    padding-block: 36px 32px;
+  }
+  .band-inner { max-width: 1160px; margin: 0 auto; display: grid; gap: 20px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--band-muted);
+  }
+  .band h1 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.015em; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--band-muted);
+  }
+  .meta b { color: var(--band-ink); font-weight: 500; }
+
+  /* ---------- Estructura ---------- */
+  .page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 32px 72px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.index {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.index p {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  nav.index ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.index a {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav.index a span:first-child { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-weight: 600; }
+  nav.index a:hover { background: var(--neutral-soft); }
+
+  main { display: grid; gap: 56px; min-width: 0; }
+  section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .section-head .letter {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+  .section-head h2 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+  .muted { color: var(--muted); }
+  h3 { font-size: 15px; font-weight: 650; }
+
+  /* ---------- Etiquetas ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.bad { color: var(--danger); background: var(--danger-soft); }
+  .pill.warn { color: var(--warning); background: var(--warning-soft); }
+  .pill.ok { color: var(--success); background: var(--success-soft); }
+  .pill.neutral { color: var(--neutral); background: var(--neutral-soft); }
+
+  /* ---------- Veredicto ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--danger);
+    border-radius: 6px;
+    padding: 24px 26px;
+    display: grid;
+    gap: 16px;
+  }
+  .verdict-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+  .verdict-head .status {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--danger);
+  }
+  .verdict ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 78ch; }
+  .runs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .runs span b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Tablas ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--neutral-soft);
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  td.state { white-space: nowrap; }
+  tr.group td {
+    background: var(--ground);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-block: 7px;
+  }
+  table.coverage { min-width: 760px; }
+  table.stories { min-width: 640px; }
+
+  /* ---------- Hallazgos ---------- */
+  .findings { display: grid; border-top: 1px solid var(--border); }
+  .finding {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-tag { display: grid; gap: 8px; align-content: start; }
+  .finding-tag .code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 18px; font-weight: 600; }
+  .finding-body { display: grid; gap: 10px; max-width: 78ch; }
+  .finding-body h3 { font-size: 16px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+  dl.facts dd { margin: 0; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+
+  .doc-diffs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display: grid;
+    gap: 10px;
+  }
+
+  /* ---------- Riesgos ---------- */
+  .risk-levels { display: grid; gap: 18px; }
+  .risk-level { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .risk-level ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; max-width: 80ch; }
+
+  /* ---------- Recomendaciones ---------- */
+  .recs { display: grid; gap: 22px; }
+  .rec-group { display: grid; gap: 10px; }
+  .rec-group-head { display: flex; align-items: center; gap: 10px; }
+  .rec-group-head .note { font-size: 13px; color: var(--muted); }
+  .rec-group ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+  .rec-group ol li::marker { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Preguntas finales ---------- */
+  .qa { display: grid; border-top: 1px solid var(--border); }
+  .qa-item { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 20px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+  .qa-item .q { font-weight: 600; }
+  .answer-lead { font-weight: 650; }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  footer.foot {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.index { position: static; }
+    nav.index ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .band { padding-inline: 16px; }
+    .page { padding-inline: 16px; }
+    .finding { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .finding-tag { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; }
+    dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    dl.facts dd { margin-bottom: 8px; }
+    .risk-level { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .qa-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .verdict { padding: 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  html { scroll-behavior: smooth; }
+  @page { size: A4; margin: 16mm 14mm; }
+  @media print {
+    html { scroll-behavior: auto; }
+    body { font-size: 11.5px; background: #FFFFFF; }
+    nav.index { display: none; }
+    .page { grid-template-columns: minmax(0, 1fr); padding-block: 18px 0; gap: 0; max-width: none; }
+    .band { padding-block: 22px 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { gap: 30px; }
+    .pill, th, tr.group td, code, .verdict { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .finding, .risk-level, .qa-item, tr, .panel, .verdict { break-inside: avoid; }
+    .section-head { break-after: avoid; }
+    .table-wrap { overflow: visible; }
+    table.coverage, table.stories { min-width: 0; }
+  }
+  /* .prose organiza bloques hermanos; en un parrafo, el grid convertiria cada <code>,
+     <strong> o enlace en una fila propia a todo el ancho. */
+  p.prose { display: block; }
+</style>
+
+
+<style>
+  [hidden] { display: none !important; }
+  .barra-volver {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: 6px; font-size: 13.5px; max-width: calc(100vw - 32px);
+  }
+  .barra-volver-enlace { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .barra-volver-enlace:hover .barra-volver-texto { text-decoration: underline; }
+  .barra-volver-cerrar {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .barra-volver-cerrar:hover { background: var(--neutral-soft); color: var(--ink); }
+  .index-sep { margin-top: 18px; }
+  .lista-num { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 78ch; }
+  ul.tight { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 78ch; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 16px; font-size: 14px; }
+  dl.facts dt { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 3px; }
+  dl.facts dd { margin: 0; max-width: 78ch; }
+  .fichas { display: grid; border-top: 1px solid var(--border); }
+  .ficha { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--rule); scroll-margin-top: 20px; }
+  .ficha:target { background: var(--info-soft); border-radius: 4px; }
+  .ficha-id { font-size: 15px; font-weight: 600; color: var(--primary); }
+  .ficha-texto { font-size: 14px; max-width: 78ch; }
+  @media (max-width: 620px) { dl.facts, .ficha { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+  @media print { .barra-volver { display: none !important; } }
+</style>
+
+<style>
+  td.id:target, tr:target td { background: var(--info-soft); }
+  main a[href] { color: var(--primary); text-underline-offset: 2px; }
+  .table-wrap a { white-space: nowrap; }
+</style>
+</head>
+<body>
+<style>
+  .cat { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+    border-radius: 5px; font-size: 12.5px; font-weight: 700; font-family: inherit; padding: 0 6px; letter-spacing: 0.01em; }
+  .cat-a { background: var(--danger-soft); color: var(--danger); }
+  .cat-b { background: var(--success-soft); color: var(--success); }
+  .cat-c { background: var(--info-soft); color: var(--primary); }
+  .cat-d { background: var(--warning-soft); color: var(--warning); }
+  .cat-e { background: var(--neutral-soft); color: var(--neutral); }
+  .cats { display: inline-flex; gap: 4px; }
+  .cat-def { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px 14px; align-items: start; font-size: 14px; }
+  .cat-def > p { margin: 0; max-width: 78ch; }
+  .sev { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.04em; padding: 2px 7px; border-radius: 4px; white-space: nowrap; text-transform: uppercase; }
+  .sev-crit { background: var(--danger-soft); color: var(--danger); }
+  .sev-high { background: var(--warning-soft); color: var(--warning); }
+  .sev-med { background: var(--info-soft); color: var(--primary); }
+  .sev-info { background: var(--neutral-soft); color: var(--neutral); }
+  .hallazgos td:nth-child(4) { min-width: 210px; }
+  .hallazgos td:nth-child(5) { min-width: 260px; }
+  .hallazgos td:nth-child(6) { min-width: 230px; }
+  .hallazgos { min-width: 1080px; }
+  table.cobertura { min-width: 720px; }
+  .metrica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .metrica { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; }
+  .metrica .valor { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metrica .etiqueta { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .metrica.alerta .valor { color: var(--danger); }
+  .metrica.aviso .valor { color: var(--warning); }
+</style>
+
+<header class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Análisis de consistencia tras la planificación de cierre · Etapa 1</p>
+    <h1>Análisis de consistencia de especificación</h1>
+    <div class="meta">
+      <span>Rama <b class="mono">001-control-acceso-empresarial</b></span>
+      <span>Fecha <b>20/09/2026</b></span>
+      <span>Base <b>spec.md, plan.md y tasks.md tras el <code class="mono">/speckit-plan</code> de cierre (D1–D9)</b></span>
+      <span>Estado <b>Solo lectura: no se modificó ningún archivo</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="index" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#veredicto"><span>✓</span><span>Veredicto</span></a></li>
+      <li><a href="#contexto"><span>CTX</span><span>Qué se analizó</span></a></li>
+      <li><a href="#hallazgos"><span>10</span><span>Hallazgos</span></a></li>
+      <li><a href="#detalle"><span>4</span><span>Los cuatro severos</span></a></li>
+      <li><a href="#cobertura"><span>COB</span><span>Cobertura</span></a></li>
+      <li><a href="#constitucion"><span>§</span><span>Constitución</span></a></li>
+      <li><a href="#metricas"><span>#</span><span>Métricas</span></a></li>
+      <li><a href="#acciones"><span>▶</span><span>Siguientes pasos</span></a></li>
+    </ol>
+    <p class="index-sep">Documentos</p>
+    <ol>
+      <li><a href="clasificacion-hallazgos-2026-09-16.html"><span>→</span><span>Clasificación y matriz</span></a></li>
+      <li><a href="decisiones-etapa1-2026-09-16.html"><span>→</span><span>Decisiones abiertas</span></a></li>
+      <li><a href="gate-cierre-etapa1-2026-09-16.html"><span>→</span><span>Gate de cierre</span></a></li>
+      <li><a href="auditoria-final-cierre-2026-09-16.html"><span>→</span><span>Auditoría 16/09</span></a></li>
+      <li><a href="especificaciones-baseline.html"><span>→</span><span>Especificaciones</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="veredicto">
+      <div class="section-head"><span class="letter">✓</span><h2>Veredicto</h2></div>
+      <div class="verdict">
+        <div class="verdict-head">
+          <span class="status">Resolver antes de generar tareas</span>
+          <span class="muted">1 hallazgo crítico y 3 altos. Ninguna violación de la Constitución.</span>
+        </div>
+        <ol>
+          <li>El modelo <strong>RBAC</strong> que cierra <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23veredicto&desde=Veredicto#f-01">F-01</a> ya está diseñado en <code>plan.md</code>, <code>data-model.md</code> y el contrato de usuarios, pero <strong>ningún requisito de <code>spec.md</code> lo respalda todavía</strong> — cobertura cero sobre la corrección que desbloquea el baseline.</li>
+          <li>El algoritmo de evaluación de acceso está <strong>duplicado</strong> en <code>spec.md</code> Historia 8 y <code>research.md</code> §7, y la planificación de cierre solo actualizó la narrativa nueva: ambas listas siguen enumerando 14 pasos mientras el contrato ya declara 15.</li>
+          <li><code>research.md</code> §14.5 <strong>conserva intacta la afirmación falsa</strong> que originó la decisión <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23veredicto&desde=Veredicto#d4">D4</a>: que la re-validación dinámica «ya» protege contra una compañía inactivada.</li>
+          <li>El resto de decisiones cerradas (<a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23veredicto&desde=Veredicto#d5">D5</a>, <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23veredicto&desde=Veredicto#d6">D6</a>) tampoco tiene requisito propio en <code>spec.md</code>, aunque ya existan en el modelo de datos y en los contratos.</li>
+          <li><strong>Cero tareas</strong> mapean a D1–D9. Es lo esperado: <code>/speckit-tasks</code> no se ha ejecutado y fue excluido explícitamente.</li>
+        </ol>
+        <div class="runs">
+          <span>Requisitos <b>73 RF · 35 CS</b></span>
+          <span>Tareas <b>168</b></span>
+          <span>Hallazgos <b>10</b></span>
+          <span>Críticos <b>1</b></span>
+          <span>Altos <b>3</b></span>
+          <span>Constitución <b>0 conflictos</b></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="contexto">
+      <div class="section-head"><span class="letter">CTX</span><h2>Qué se analizó y por qué estos hallazgos eran previsibles</h2></div>
+      <p class="prose">Este análisis corre inmediatamente después de una ejecución de <code>/speckit-plan</code> acotada al cierre y corrección del baseline, con las nueve decisiones <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20analiz%C3%B3#d1">D1</a> a <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20analiz%C3%B3#d9">D9</a> ya resueltas. Esa planificación escribió en <code>plan.md</code>, <code>research.md</code>, <code>data-model.md</code> y los contratos, y <strong>deliberadamente no tocó <code>spec.md</code> ni <code>tasks.md</code></strong>: el flujo de <code>/speckit-plan</code> solo lee la especificación como contexto, y la generación de tareas estaba excluida por instrucción explícita.</p>
+      <p class="prose">La consecuencia directa es la mayor parte de lo que sigue: el diseño técnico va por delante de la especificación funcional y de la lista de tareas. Los hallazgos no señalan un error de criterio sino una <strong>brecha de sincronización que debe cerrarse antes de generar tareas</strong>, más dos defectos reales dejados por la propia planificación (<a href="#i2">I2</a> y <a href="#u1">U1</a>).</p>
+      <div class="panel">
+        <h3>Nota al leer los documentos del 16/09</h3>
+        <p>Las páginas de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20analiz%C3%B3#matriz">clasificación y matriz</a> y de <a href="decisiones-etapa1-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23contexto&desde=Qu%C3%A9%20se%20analiz%C3%B3#preguntas">decisiones abiertas</a> muestran las 16 preguntas como <em>pendiente</em>, que era su estado al 16/09. Las dieciséis quedaron respondidas en la sesión de decisiones del 20/09 (D1 a D9). Aquellas páginas conservan el estado previo a propósito, como registro histórico; este documento y los artefactos de <code>specs/</code> reflejan el estado vigente.</p>
+      </div>
+    </section>
+
+    <section id="hallazgos">
+      <div class="section-head"><span class="letter">10</span><h2>Hallazgos</h2></div>
+      <p class="prose muted">Identificador prefijado por categoría: <b>G</b> cobertura, <b>I</b> inconsistencia, <b>U</b> subespecificación. Sin duplicaciones de requisitos ni ambigüedades nuevas detectadas; la única duplicación es estructural y está en <a href="#i2">I2</a>.</p>
+      <div class="table-wrap">
+        <table class="hallazgos">
+          <thead><tr><th>ID</th><th>Categoría</th><th>Severidad</th><th>Ubicación</th><th>Resumen</th><th>Recomendación</th></tr></thead>
+          <tbody>
+            <tr id="g1">
+              <td class="id"><a href="#detalle-g1">G1</a></td>
+              <td>Cobertura</td>
+              <td><span class="sev sev-crit">Critical</span></td>
+              <td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-004">RF-004</a>, <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-005">RF-005</a>, <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-050">RF-050</a> · <code>data-model.md</code> · <code>contracts/users.yaml</code></td>
+              <td>El modelo RBAC de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d1">D1</a> (roles <code>GLOBAL_ADMINISTRATOR</code> y <code>COMPANY_ADMINISTRATOR</code>) no tiene ningún requisito que lo respalde: cero menciones de rol administrativo en <code>spec.md</code>. Es la corrección que cierra <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#f-01">F-01</a>.</td>
+              <td>Sesión de clarificación que agregue los requisitos de rol, tipo de alcance y límites del Company Administrator antes de <code>/speckit-tasks</code>.</td>
+            </tr>
+            <tr id="i1">
+              <td class="id"><a href="#detalle-i1">I1</a></td>
+              <td>Inconsistencia</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><code>spec.md</code> L93, L550, <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-050">RF-050</a>, L1122</td>
+              <td><code>AlcanceUsuarioCompañía</code> sigue nombrada en cuatro lugares de <code>spec.md</code>, pero fue reemplazada por <code>AsignaciónRolAdministrativo</code> en modelo de datos, contratos y plan.</td>
+              <td>Renombrar las cuatro referencias en la misma sesión de clarificación de <a href="#g1">G1</a>.</td>
+            </tr>
+            <tr id="i2">
+              <td class="id"><a href="#detalle-i2">I2</a></td>
+              <td>Inconsistencia · Duplicación</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#us-8">Historia 8</a> (<code>spec.md</code> L707–772) · <code>research.md</code> §7 L380 y §30 · <code>contracts/access-evaluation.yaml</code></td>
+              <td>El algoritmo de evaluación está duplicado casi literalmente en dos documentos. La planificación de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d4">D4</a> y <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d5">D5</a> actualizó el contrato a 15 pasos y añadió secciones nuevas, pero ninguna de las dos listas canónicas: ambas siguen en 14 pasos y con <code>América/Lima</code> fijo en el paso 12.</td>
+              <td>Actualizar la lista en <code>research.md</code> §7 y en Historia 8; valorar dejar una sola copia canónica y que la otra remita por referencia.</td>
+            </tr>
+            <tr id="u1">
+              <td class="id"><a href="#detalle-u1">U1</a></td>
+              <td>Subespecificación</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><code>research.md</code> §14.5 L786 frente a §30</td>
+              <td>§14.5 conserva textualmente que la re-validación dinámica «ya cubre» el caso de compañía inactivada y «deniega acceso correctamente» — la misma afirmación falsa que motivó <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d4">D4</a>. La sección nueva la contradice, pero el texto original nunca se editó.</td>
+              <td>Editar §14.5 directamente, no solo referenciarla desde §30.</td>
+            </tr>
+            <tr id="g2">
+              <td class="id">G2</td>
+              <td>Cobertura</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-016">RF-016</a> · <code>data-model.md</code> · <code>contracts/companies.yaml</code></td>
+              <td>Cero menciones de zona horaria, IANA o calendario en todo <code>spec.md</code>. El campo <code>ZonaHorariaIana</code> de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d5">D5</a> ya existe en el modelo y el contrato sin requisito que lo sostenga.</td>
+              <td>Requisito nuevo con la zona por Compañía Principal y la zona de repaldo del sistema.</td>
+            </tr>
+            <tr id="i3">
+              <td class="id">I3</td>
+              <td>Inconsistencia</td>
+              <td><span class="sev sev-med">Medium</span></td>
+              <td><code>contracts/permissions.yaml</code> L126, L130</td>
+              <td><code>BloqueHorarioPermiso</code> sigue documentando sus horas como «hora local <code>America/Lima</code>», una zona fija que D5 sustituye por la de cada Principal. Este contrato no se tocó en la planificación.</td>
+              <td>Reescribir la descripción de <code>horaInicio</code> y <code>horaFin</code> para remitir a la zona de la Compañía Principal.</td>
+            </tr>
+            <tr id="g3">
+              <td class="id">G3</td>
+              <td>Cobertura</td>
+              <td><span class="sev sev-med">Medium</span></td>
+              <td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-059">RF-059</a> · <code>research.md</code> §30</td>
+              <td>Ningún requisito exige que la evaluación compruebe <code>Compañía.Estado = ACTIVO</code>. RF-059 solo habla de contexto operativo y de la relación Contratista–Principal.</td>
+              <td>Ampliar RF-059 o agregar un requisito propio para <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d4">D4</a>.</td>
+            </tr>
+            <tr id="g4">
+              <td class="id">G4</td>
+              <td>Cobertura</td>
+              <td><span class="sev sev-med">Medium</span></td>
+              <td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-045">RF-045</a>, <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#rf-046">RF-046</a> · <code>research.md</code> §32</td>
+              <td>Ningún requisito exige validar dependientes antes de cambiar <code>TipoCompañía</code> (<a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d6">D6</a>), aunque el contrato ya declare el 409 correspondiente.</td>
+              <td>Requisito nuevo que nombre las cinco categorías de dependencia.</td>
+            </tr>
+            <tr id="g5">
+              <td class="id">G5</td>
+              <td>Cobertura</td>
+              <td><span class="sev sev-med">Medium</span></td>
+              <td><code>spec.md</code> (sin sección) · <code>research.md</code> §28</td>
+              <td>El mecanismo de alta del primer administrador (<a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23hallazgos&desde=Hallazgos#d2">D2</a>) no tiene requisito propio. Brecha anterior a esta planificación, no resuelta por ella.</td>
+              <td>Requisito nuevo con el mecanismo y sus claves de configuración.</td>
+            </tr>
+            <tr id="g6">
+              <td class="id">G6</td>
+              <td>Cobertura de tareas</td>
+              <td><span class="sev sev-info">Informativo</span></td>
+              <td><code>tasks.md</code> T001–T168</td>
+              <td>Cero tareas mapean a D1–D9. <strong>Esperado</strong>: <code>/speckit-tasks</code> no se ha ejecutado y estaba excluido por instrucción.</td>
+              <td>Ejecutar <code>/speckit-tasks</code> cuando se autorice, con numeración ≥ T169 y sin renumerar T001–T168.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="detalle">
+      <div class="section-head"><span class="letter">4</span><h2>Los cuatro hallazgos severos, en detalle</h2></div>
+      <div class="findings">
+        <div class="finding" id="detalle-g1">
+          <div class="finding-tag">
+            <span class="code">G1</span>
+            <span class="sev sev-crit">Critical</span>
+            <span class="muted">Cobertura</span>
+          </div>
+          <div class="finding-body">
+            <h3>El RBAC no tiene requisito que lo respalde</h3>
+            <dl class="facts">
+              <dt>Evidencia</dt>
+              <dd>Búsqueda literal en <code>spec.md</code>: cero coincidencias de «rol administrativo», <code>RolAdministrativo</code>, <code>GLOBAL_ADMINISTRATOR</code> y <code>COMPANY_ADMINISTRATOR</code>. <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#rf-004">RF-004</a> y <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#rf-005">RF-005</a> conservan su redacción previa a D1, que habla de un alcance plano de compañías sin ninguna noción de rol.</dd>
+              <dt>Por qué crítico</dt>
+              <dd>La rúbrica reserva ese nivel para un requisito con cobertura cero que bloquea funcionalidad de baseline. D1 es precisamente la corrección de <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#f-01">F-01</a>, el defecto que impidió congelar el baseline, y hoy vive solo en el diseño técnico.</dd>
+              <dt>Riesgo</dt>
+              <dd>Generar tareas ahora produciría trabajo sin requisito que lo justifique ni criterio de aceptación contra el que probarlo.</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="finding" id="detalle-i2">
+          <div class="finding-tag">
+            <span class="code">I2</span>
+            <span class="sev sev-high">High</span>
+            <span class="muted">Inconsistencia</span>
+          </div>
+          <div class="finding-body">
+            <h3>Dos copias del algoritmo, y solo se actualizó el contrato</h3>
+            <dl class="facts">
+              <dt>Evidencia</dt>
+              <dd><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#us-8">Historia 8</a> enumera los 14 pasos en <code>spec.md</code> L732–763 y cierra con una nota que habla del paso «13 a 14»; <code>research.md</code> §7 L380 repite la misma lista casi palabra por palabra, con <code>América/Lima</code> fijo en el paso 12. El contrato de evaluación ya declara 15 pasos y el motivo <code>COMPANIA_INACTIVA</code>.</dd>
+              <dt>Origen</dt>
+              <dd>La planificación de cierre añadió el diseño de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#d4">D4</a> y <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#d5">D5</a> como secciones nuevas (§30 y §31) en lugar de editar las listas existentes. El resultado es que <code>research.md</code> se contradice consigo mismo.</dd>
+              <dt>Causa de fondo</dt>
+              <dd>La duplicación misma: mientras el algoritmo viva completo en dos documentos, cada cambio futuro volverá a abrir esta brecha. Es el mismo patrón que ya produjo <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#f-19">F-19</a>.</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="finding" id="detalle-u1">
+          <div class="finding-tag">
+            <span class="code">U1</span>
+            <span class="sev sev-high">High</span>
+            <span class="muted">Subespecificación</span>
+          </div>
+          <div class="finding-body">
+            <h3>La afirmación falsa que originó D4 sigue en pie</h3>
+            <dl class="facts">
+              <dt>Evidencia</dt>
+              <dd><code>research.md</code> §14.5 (L786) mantiene su título «Fuera de alcance de esta corrección» y su texto original: la re-validación dinámica «cubre ambos casos como red de seguridad mínima (deniega acceso correctamente)». El código nunca consultó <code>Compañía.Estado</code>.</dd>
+              <dt>Relación con D4</dt>
+              <dd>Exactamente esa frase es lo que la auditoría detectó como falso y lo que <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#d4">D4</a> vino a resolver. La sección §30 declara que §14.5 «queda corregida», pero se limita a anunciarlo.</dd>
+              <dt>Nota</dt>
+              <dd>Está registrado como <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#f-20">F-20</a> en la categoría documental ya autorizada; este análisis solo confirma que sigue abierto tras la planificación.</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="finding" id="detalle-i1">
+          <div class="finding-tag">
+            <span class="code">I1</span>
+            <span class="sev sev-high">High</span>
+            <span class="muted">Inconsistencia</span>
+          </div>
+          <div class="finding-body">
+            <h3>Una entidad con dos nombres según el documento</h3>
+            <dl class="facts">
+              <dt>Evidencia</dt>
+              <dd><code>AlcanceUsuarioCompañía</code> aparece en <code>spec.md</code> en la sesión de clarificación (L93), en el criterio 10 de <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#us-2">Historia 2</a> (L550), en <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#rf-050">RF-050</a> (L949) y en la lista de <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23detalle&desde=Los%20cuatro%20severos#entidades">entidades principales</a> (L1122).</dd>
+              <dt>Alcance</dt>
+              <dd>Renombrado ya aplicado en <code>data-model.md</code>, <code>contracts/users.yaml</code>, <code>contracts/auth.yaml</code> y <code>plan.md</code>. La deriva es unidireccional y fácil de cerrar.</dd>
+              <dt>Por qué alto</dt>
+              <dd>Es la entidad que sostiene el aislamiento entre compañías: un nombre ambiguo sobre ella invita a implementar contra el modelo antiguo.</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="doc-diffs">
+        <h3>Los seis restantes</h3>
+        <p><a href="#g2">G2</a>, <a href="#g3">G3</a>, <a href="#g4">G4</a> y <a href="#g5">G5</a> comparten un mismo patrón: la decisión ya está en el modelo de datos y en los contratos, y falta el requisito funcional que la sostenga. <a href="#i3">I3</a> es un contrato que la planificación no alcanzó a revisar. <a href="#g6">G6</a> no es un defecto: es la consecuencia esperada de no haber ejecutado <code>/speckit-tasks</code>.</p>
+      </div>
+    </section>
+
+    <section id="cobertura">
+      <div class="section-head"><span class="letter">COB</span><h2>Cobertura de requisitos</h2></div>
+      <p class="prose muted">Solo las áreas afectadas por el cierre de Etapa 1. El resto de RF y CS mantiene la cobertura del baseline ya implementado y no se revisó de nuevo en este análisis.</p>
+      <div class="table-wrap">
+        <table class="cobertura">
+          <thead><tr><th>Requisito o capacidad</th><th>¿Tiene tarea?</th><th>Tareas</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-004">RF-004</a> · <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-005">RF-005</a> — alcance y RBAC</td><td class="state"><span class="pill bad">No</span></td><td class="muted">—</td><td>Requisito sin actualizar (<a href="#g1">G1</a>) y sin tarea (<a href="#g6">G6</a>)</td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-016">RF-016</a> — calendario y zona horaria</td><td class="state"><span class="pill bad">No</span></td><td class="muted">—</td><td>Sin requisito (<a href="#g2">G2</a>) ni tarea</td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-059">RF-059</a> — estado de compañía en la evaluación</td><td class="state"><span class="pill bad">No</span></td><td class="muted">—</td><td>Sin requisito (<a href="#g3">G3</a>) ni tarea</td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-045">RF-045</a> · <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-046">RF-046</a> — dependientes al cambiar tipo</td><td class="state"><span class="pill bad">No</span></td><td class="muted">—</td><td>Sin requisito (<a href="#g4">G4</a>) ni tarea</td></tr>
+            <tr><td>Alta del primer administrador</td><td class="state"><span class="pill bad">No</span></td><td class="muted">—</td><td>Sin requisito (<a href="#g5">G5</a>) ni tarea</td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#cs-021">CS-021</a> — árbol en la asignación de unidad</td><td class="state"><span class="pill warn">Parcial</span></td><td class="mono">T116</td><td>El criterio exige árbol; la pantalla usa una lista plana. Alcance real de <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#d7">D7</a></td></tr>
+            <tr><td><a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#rf-069">RF-069</a> · <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#cs-032">CS-032</a></td><td class="state"><span class="pill neutral">Fuera de alcance</span></td><td class="muted">—</td><td>Diferidas por <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23cobertura&desde=Cobertura%20de%20requisitos#d8">D8</a>; falta anotarlo en <code>spec.md</code></td></tr>
+            <tr><td>RF-001 a RF-073 restantes · CS del baseline</td><td class="state"><span class="pill ok">Sí</span></td><td class="mono">T001–T168</td><td>Sin cambios; no revisados de nuevo aquí</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose muted">Tareas sin requisito asociado: ninguna. Las 168 existentes siguen mapeadas a sus historias originales y todavía no hay tareas nuevas que pudieran quedar huérfanas.</p>
+    </section>
+
+    <section id="constitucion">
+      <div class="section-head"><span class="letter">§</span><h2>Alineación con la Constitución</h2></div>
+      <div class="verdict" style="border-top-color: var(--success);">
+        <div class="verdict-head">
+          <span class="status" style="color: var(--success);">Sin conflictos</span>
+          <span class="muted">Ningún principio <code>MUST</code> se vulnera ni requiere enmienda.</span>
+        </div>
+        <p class="prose">Las nueve decisiones se verificaron principio por principio durante la planificación, y el resultado quedó registrado en <code>plan.md</code>. <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#d1">D1</a> y <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#d3">D3</a> <strong>refuerzan</strong> el Principio I al cerrar <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#f-01">F-01</a> y <a href="auditoria-final-cierre-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#f-02">F-02</a>; <a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#d4">D4</a> agrega una verificación de denegación por defecto sin escribir estado.</p>
+        <p class="prose">Único punto que exige lectura atenta: la fecha <code class="mono">MAX_VALIDITY_DATE</code> del bootstrap (<a href="clasificacion-hallazgos-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#d2">D2</a>) es una excepción explícita a <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23constitucion&desde=Alineaci%C3%B3n%20con%20la%20Constituci%C3%B3n#rf-071">RF-071</a>, acotada a una sola fila sembrada. Documentada como tal, no debilita el Principio IV en ningún otro registro — pero si esa acotación se pierde al escribir <code>spec.md</code>, pasaría a ser un conflicto real.</p>
+      </div>
+    </section>
+
+    <section id="metricas">
+      <div class="section-head"><span class="letter">#</span><h2>Métricas</h2></div>
+      <div class="metrica-grid">
+        <div class="metrica"><span class="valor">73</span><span class="etiqueta">Requisitos funcionales</span></div>
+        <div class="metrica"><span class="valor">35</span><span class="etiqueta">Criterios de éxito</span></div>
+        <div class="metrica"><span class="valor">168</span><span class="etiqueta">Tareas existentes</span></div>
+        <div class="metrica"><span class="valor">10</span><span class="etiqueta">Hallazgos</span></div>
+        <div class="metrica alerta"><span class="valor">1</span><span class="etiqueta">Críticos</span></div>
+        <div class="metrica aviso"><span class="valor">3</span><span class="etiqueta">Altos</span></div>
+        <div class="metrica"><span class="valor">1</span><span class="etiqueta">Duplicaciones</span></div>
+        <div class="metrica"><span class="valor">0</span><span class="etiqueta">Ambigüedades nuevas</span></div>
+        <div class="metrica"><span class="valor">0</span><span class="etiqueta">Conflictos de constitución</span></div>
+        <div class="metrica aviso"><span class="valor">0 %</span><span class="etiqueta">Cobertura de D1–D9</span></div>
+      </div>
+      <p class="prose muted">La cobertura del baseline original se mantiene completa: los 168 tareas cubren los requisitos ya implementados. El 0 % corresponde exclusivamente a las cinco áreas nuevas que abren D1 a D9, que todavía no tienen ni requisito formal ni tarea.</p>
+    </section>
+
+    <section id="acciones">
+      <div class="section-head"><span class="letter">▶</span><h2>Siguientes pasos</h2></div>
+      <div class="recs">
+        <div class="rec-group">
+          <div class="rec-group-head"><span class="cat cat-a">1</span><h3>Antes de generar tareas</h3><span class="note">bloquea <code>/speckit-tasks</code></span></div>
+          <ol>
+            <li>Sesión de clarificación sobre <code>spec.md</code> que cierre <a href="#g1">G1</a>, <a href="#g2">G2</a>, <a href="#g3">G3</a>, <a href="#g4">G4</a> y <a href="#g5">G5</a> con requisitos nuevos, y renombre las cuatro referencias de <a href="#i1">I1</a>.</li>
+            <li>Anotar en <code>spec.md</code> que <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#rf-067">RF-067</a> a <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#rf-069">RF-069</a> y <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#cs-032">CS-032</a> quedan fuera del alcance de Etapa 1, y cerrar las decisiones heredadas <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#decision-1">#1</a>, <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#decision-3">#3</a> y <a href="especificaciones-baseline.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#decision-7">#7</a>.</li>
+            <li>Corregir las dos brechas dejadas por la planificación: la lista de pasos en <code>research.md</code> §7 y en Historia 8 (<a href="#i2">I2</a>), y el texto de §14.5 (<a href="#u1">U1</a>).</li>
+            <li>Actualizar <code>contracts/permissions.yaml</code> (<a href="#i3">I3</a>).</li>
+          </ol>
+        </div>
+        <div class="rec-group">
+          <div class="rec-group-head"><span class="cat cat-c">2</span><h3>Después</h3></div>
+          <ol>
+            <li>Ejecutar <code>/speckit-tasks</code> para las tareas de corrección, numeración ≥ T169, sin renumerar T001–T168.</li>
+            <li>Implementar y correr las cinco suites en regresión, más las pruebas nuevas por decisión.</li>
+            <li>Repetir el <a href="gate-cierre-etapa1-2026-09-16.html?volver=analisis-consistencia-2026-09-20.html%23acciones&desde=Siguientes%20pasos#fase-14">gate de cierre</a> contra el código corregido y, solo entonces, congelar el baseline.</li>
+          </ol>
+        </div>
+      </div>
+      <p class="prose muted">Los seis escenarios de validación funcional de estas correcciones están en la sección 7 de <code>quickstart.md</code>, escrita durante la planificación.</p>
+    </section>
+
+    <footer class="foot">
+      Análisis generado el 20/09/2026 sobre <code>spec.md</code>, <code>plan.md</code> y <code>tasks.md</code>, con <code>research.md</code> y <code>contracts/</code> como artefactos referenciados, verificado contra la Constitución del proyecto. Estrictamente de solo lectura: no se modificó ningún archivo, no se marcó ni desmarcó ninguna tarea y no se ejecutó <code>/speckit-tasks</code> ni <code>/speckit-implement</code>. Las referencias a líneas corresponden al estado de los archivos en esa fecha. Documento local: los enlaces funcionan mientras los archivos convivan en esta carpeta.
+    </footer>
+  </main>
+</div>
+
+
+<div class="barra-volver" id="barra-volver" hidden>
+  <a class="barra-volver-enlace" href="#"><span aria-hidden="true">←</span> <span class="barra-volver-texto">Volver</span></a>
+  <button type="button" class="barra-volver-cerrar" aria-label="Ocultar el aviso de regreso">×</button>
+</div>
+<script>
+  (() => {
+    const parametros = new URLSearchParams(location.search);
+    const destino = parametros.get('volver');
+    // Solo se acepta un archivo local con ancla: nada de URLs arbitrarias.
+    if (!destino || !/^[\w.-]+\.html#[\w-]+$/.test(destino)) return;
+    const barra = document.getElementById('barra-volver');
+    const enlace = barra.querySelector('.barra-volver-enlace');
+    const texto = barra.querySelector('.barra-volver-texto');
+    const desde = parametros.get('desde');
+    enlace.href = destino;
+    texto.textContent = desde ? 'Volver a ' + desde : 'Volver al documento anterior';
+    barra.hidden = false;
+    barra.querySelector('.barra-volver-cerrar').addEventListener('click', () => { barra.hidden = true; });
+  })();
+</script>
+
+</body>
+</html>

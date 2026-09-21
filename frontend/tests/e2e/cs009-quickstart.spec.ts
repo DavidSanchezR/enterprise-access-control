@@ -14,7 +14,8 @@ test('quickstart §5 — CS-009: jerarquía de 3 niveles y permiso horario de ex
   try {
     await test.step('§5 paso 1 — login con alcance no vacío', async () => {
       const sesion = await api.iniciarSesion()
-      expect(sesion.alcanceCompanias.length).toBeGreaterThan(0)
+      // El alcance GLOBAL no se enumera: lo expresa el rol, no una lista de compañías (RF-074).
+      expect(sesion.rol).toBe('GLOBAL_ADMINISTRATOR')
     })
 
     const reloj = await fijarReloj()
@@ -54,7 +55,8 @@ test('quickstart §5 — CS-009: jerarquía de 3 niveles y permiso horario de ex
 
     await test.step('§5 paso 12 — un usuario sin la compañía en su alcance recibe 404', async () => {
       const sesion = await ajeno.iniciarSesion()
-      expect(sesion.alcanceCompanias).not.toContain(montaje.mineraAbcId)
+      expect(sesion.rol).toBe('COMPANY_ADMINISTRATOR')
+      expect(sesion.companiaIds).not.toContain(montaje.mineraAbcId)
 
       await ajeno.exigir(ajeno.get(`/api/personas/${montaje.personaId}`), 404)
 

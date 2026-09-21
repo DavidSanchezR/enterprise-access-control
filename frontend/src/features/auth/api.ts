@@ -1,18 +1,20 @@
-import { apiClient } from '../../lib/apiClient'
+import { apiClient, type RolAdministrativo } from '../../lib/apiClient'
 
 /** contracts/auth.yaml — LoginResponse. */
 export interface LoginResponse {
   accessToken: string
   expiraEn: string
   requiereCambioPassword: boolean
-  alcanceCompanias: string[]
+  rol: RolAdministrativo | null
+  companiaIds: string[]
 }
 
 /** contracts/auth.yaml — SesionActual. */
 export interface SesionActual {
   usuarioId: string
   correo: string
-  alcanceCompanias: string[]
+  rol: RolAdministrativo | null
+  companiaIds: string[]
 }
 
 export async function login(correo: string, password: string): Promise<LoginResponse> {

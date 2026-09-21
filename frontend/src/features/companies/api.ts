@@ -21,6 +21,11 @@ export interface Compania {
   numeroDocumento: string
   tipoCompania: TipoCompania
   estado: Estado
+  /**
+   * Identificador IANA de la zona horaria propia (RF-080). Obligatoria para PRINCIPAL_MANDANTE;
+   * `null` para una CONTRATISTA, que no posee áreas ni bloques horarios propios.
+   */
+  zonaHorariaIana: string | null
 }
 
 /** contracts/companies.yaml — PaginaCompanias. */
@@ -45,6 +50,8 @@ export interface CompaniaRequest {
   numeroDocumento: string
   tipoCompania: TipoCompania
   estado: Estado
+  /** Obligatoria cuando `tipoCompania` es PRINCIPAL_MANDANTE (RF-080). */
+  zonaHorariaIana: string | null
 }
 
 /** contracts/companies.yaml — RelacionContratistaPrincipal. */

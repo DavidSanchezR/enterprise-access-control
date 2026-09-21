@@ -55,7 +55,8 @@ el sistema, y auditoría automática vía interceptor de EF Core, conforme a la 
 **Primary Dependencies**: ASP.NET Core 10 Web API; Entity Framework Core 10 (proveedor
 `Microsoft.EntityFrameworkCore.SqlServer`) + EF Core Migrations para evolución de esquema; LINQ como
 mecanismo normal de consulta (sin repositorio genérico adicional solo por abstracción — research.md §15);
-FluentValidation; NodaTime (manejo de zona horaria `America/Lima`); ASP.NET Core Identity solo como base de
+FluentValidation; NodaTime (manejo de zonas horarias IANA por Compañía Principal — RF-080, research.md §31;
+`America/Lima` es el valor de respaldo por defecto, no una zona única del sistema); ASP.NET Core Identity solo como base de
 hashing de contraseñas (`PasswordHasher<T>`) sin su modelo de usuario completo; ASP.NET Core Authentication
 (JWT Bearer) + Authorization (Policies/Claims) para el alcance administrativo — distinto del motor de
 evaluación de acceso de dominio (research.md §18); Options Pattern para configuración fuertemente tipada
@@ -126,7 +127,7 @@ credenciales simultáneos, uno por cada Compañía Principal (RF-052, RF-055, RF
 | I. Seguridad Server-Side, Denegación por Defecto y Autorización por Compañías | PASS | Toda autorización y evaluación de permisos se ejecuta en la API (ASP.NET Core); ninguna decisión de acceso depende del cliente. El alcance de compañías del usuario autenticado se aplica mediante un filtro de consulta global de EF Core (`AlcanceUsuarioCompañía`) más verificación explícita en cada caso de uso de Aplicación; ausencia de match válido ⇒ denegado. Extendido en la corrección Compañía Principal/Contratista: `UnidadOrganizativa` (sin FK directa a `Compañía` — RF-044) resuelve su alcance vía `CompañíaPrincipalUnidadOrganizativaRaiz` + recorrido de ancestros hasta la raíz; `ÁreaAcceso` lo resuelve directamente por su `CompañíaPrincipalId` (RF-046, RF-049). Extendido de nuevo en la corrección Contexto Operativo: el algoritmo de evaluación de acceso (research.md §7) determina la Principal propietaria del área ANTES de evaluar cualquier permiso, y exige un `ContextoOperativoPersonaPrincipal` vigente (con `RelaciónContratistaPrincipal` vigente cuando aplica) como precondición de denegación por defecto (RF-059) — el permiso de la Principal B nunca puede satisfacer una evaluación sobre la Principal A. Ver research.md §"Alcance de compañías", §"Jerarquías y prevención de ciclos", §7, §12 y §13. |
 | II. Identificadores Únicos Autogenerados (UID/UUID) | PASS | Toda entidad persistente usa `Guid` como PK generado en la capa de Aplicación/Infraestructura (`Guid.CreateVersion7()`), nunca aceptado del cliente ni derivado de campos de negocio. Ver research.md §"Generación de UUID". |
 | III. Auditoría Automática y Trazabilidad | PASS | Un `SaveChangesInterceptor` de EF Core estampa `CreatedAt/UpdatedAt/CreatedBy/UpdatedById` en cada operación; estos campos no existen en los DTOs de entrada de la API ni son editables desde el frontend. Extendido en la corrección Revocación Automática: la cascada de revocación (RF-061 a RF-065) reutiliza este mismo interceptor para registrar quién y cuándo se disparó cada revocación, sin necesitar una entidad de log adicional — `MotivoFin`/`RevocadoPorPertenenciaId` (nuevos) completan el resto del rastro de auditoría exigido (research.md §14.2). Ver research.md §"Auditoría automática" y §14. |
-| IV. Integridad Temporal e Históricos | PASS | Vigencias con inicio/fin explícitos; un trigger `AFTER INSERT, UPDATE` por tabla (equivalente idiomático de SQL Server a `EXCLUDE USING gist`, que no existe en este motor — contradicción real detectada y resuelta en la Sesión 2026-09-14 "Stack Tecnológico Oficial", research.md §5) impide solapamientos de asignaciones, con clave de partición específica por entidad (p. ej. `AsignaciónPersonaUnidadOrganizativa` por `ContextoOperativoId`, `AsignaciónCredencial` y `RelaciónContratistaPrincipal`/`ContextoOperativoPersonaPrincipal` por par de compañías/persona-Principal — research.md §5, §13) para permitir simultaneidad entre Compañías Principales distintas sin permitir solapamiento dentro de la misma; timestamps persistidos en UTC (`datetime2(3)`), conversión a `America/Lima` solo en evaluación de negocio y presentación vía NodaTime; baja lógica (`Estado`), nunca eliminación física de históricos. Extendido en la corrección Revocación Automática: la revocación en cascada (RF-061 a RF-065) nunca elimina registros ni modifica `FechaHoraInicio`, solo fija `FechaHoraFin`/`Estado`/`MotivoFin` — coherente con "NO DEBE realizarse eliminación física de historial relevante para trazabilidad". `Estado` es explícitamente administrativo/informativo, nunca la fuente de verdad de vigencia (que sigue siendo siempre la comparación de fechas), evitando una segunda fuente de verdad divergente. Ver data-model.md y research.md §"Modelado temporal", §5 y §14. |
+| IV. Integridad Temporal e Históricos | PASS | Vigencias con inicio/fin explícitos; un trigger `AFTER INSERT, UPDATE` por tabla (equivalente idiomático de SQL Server a `EXCLUDE USING gist`, que no existe en este motor — contradicción real detectada y resuelta en la Sesión 2026-09-14 "Stack Tecnológico Oficial", research.md §5) impide solapamientos de asignaciones, con clave de partición específica por entidad (p. ej. `AsignaciónPersonaUnidadOrganizativa` por `ContextoOperativoId`, `AsignaciónCredencial` y `RelaciónContratistaPrincipal`/`ContextoOperativoPersonaPrincipal` por par de compañías/persona-Principal — research.md §5, §13) para permitir simultaneidad entre Compañías Principales distintas sin permitir solapamiento dentro de la misma; timestamps persistidos en UTC (`datetime2(3)`), conversión a hora local solo en evaluación de negocio y presentación vía NodaTime, usando la zona de la Compañía Principal correspondiente (RF-080, Sesión 2026-09-20; antes `America/Lima` fijo); baja lógica (`Estado`), nunca eliminación física de históricos. Extendido en la corrección Revocación Automática: la revocación en cascada (RF-061 a RF-065) nunca elimina registros ni modifica `FechaHoraInicio`, solo fija `FechaHoraFin`/`Estado`/`MotivoFin` — coherente con "NO DEBE realizarse eliminación física de historial relevante para trazabilidad". `Estado` es explícitamente administrativo/informativo, nunca la fuente de verdad de vigencia (que sigue siendo siempre la comparación de fechas), evitando una segunda fuente de verdad divergente. Ver data-model.md y research.md §"Modelado temporal", §5 y §14. |
 | V. Jerarquías sin Ciclos | PASS | Validación server-side de ausencia de ciclos (recorrido de ancestros vía CTE recursivo) antes de confirmar creación/reubicación de nodos en `UnidadOrganizativa` y `ÁreaAcceso`. Ver research.md §"Jerarquías y prevención de ciclos". |
 | VI. Modelado Explícito del Dominio | PASS | Las 22 entidades de data-model.md representan de forma explícita personas, compañías (clasificadas PRINCIPAL_MANDANTE/CONTRATISTA), sus relaciones (`RelaciónContratistaPrincipal`), unidades, áreas, perfiles, permisos, credenciales (tipo/diseño visual, nunca tecnología física — RF-058) y el contexto operativo persona↔Principal (`ContextoOperativoPersonaPrincipal`) con FKs y catálogos versionados; sin campos libres para relaciones de negocio. La relación Contratista↔Principal y la relación operativa persona↔Principal se modelan como entidades explícitas de primera clase (research.md §12, decisión revertida tras corrección de negocio, y §13). |
 | VII. Pruebas Automatizadas Obligatorias (NO NEGOCIABLE) | PASS (compromiso de diseño) | Estrategia definida en Technical Context (xUnit + Testcontainers + pruebas de contrato + Playwright). `tasks.md` (fase posterior) deberá generar pruebas por historia P1/P2 cubriendo denegación por defecto, ciclos, solapamientos y fuga entre compañías, conforme CS-008. |
@@ -236,7 +237,9 @@ afirmaba explícitamente lo contrario ("nunca el mecanismo que por sí solo dete
 Esta contradicción se reportó al usuario en vez de resolverse unilateralmente (conforme a instrucción
 explícita), y una sesión dedicada de `/speckit-clarify` la resolvió: **la credencial SÍ gatilla la
 denegación**. `spec.md` fue modificado: nueva sesión de Clarifications, RF-066 (nuevo), Historia 8
-(algoritmo ahora de 14 pasos — nuevo paso 6, `SIN_CREDENCIAL_VIGENTE`), Historia 9 (la afirmación anterior
+(algoritmo de 14 pasos **en aquel momento** — nuevo paso 6, `SIN_CREDENCIAL_VIGENTE`; el algoritmo vigente
+tiene 15 pasos y ese paso es hoy el 7, ver el re-chequeo de cierre de Etapa 1 más abajo y spec.md Historia 8),
+Historia 9 (la afirmación anterior
 queda `[REEMPLAZADA]`, anotada no eliminada), CS-031 (nuevo). `research.md` §7 se reescribió con el paso
 nuevo; `contracts/access-evaluation.yaml` agregó `SIN_CREDENCIAL_VIGENTE` al enum `MotivoDenegacion`.
 `data-model.md` **no cambió** (ningún campo nuevo — la cascada de RF-061 ya escribía `Estado = REVOCADA`;
@@ -386,6 +389,199 @@ asignación). Ninguna entidad, columna, estado, migración ni endpoint nuevo. `s
 acotada), `data-model.md` y `contracts/credentials.yaml` fueron modificados; `ux-ui.md` no contenía la
 cláusula. Sin decisiones pendientes nuevas.
 
+**Re-chequeo de cierre de Etapa 1 (Sesión 2026-09-20, Decisiones D1 a D9 — planificación de corrección de
+baseline, sin implementar todavía)**: confirmado, sin violaciones nuevas. Este re-chequeo cubre
+**exclusivamente** el plan de cierre y corrección del baseline ya implementado (T001–T168) — no replantea ni
+reabre esas 168 tareas, que permanecen completas y válidas tal como están. Las nueve decisiones que cierran
+las 16 preguntas de la matriz de auditoría de cierre (`docs/auditorias/decisiones-etapa1-2026-09-16.html`):
+
+- **D1** (RBAC de administración de usuarios) y **D3** (aislamiento por alcance, Resource Ownership)
+  **refuerzan el Principio I**: cierran F-01 (`UsuarioService` sin ningún control de alcance) y F-02
+  (`AsignacionUnidadOrganizativaService`, `EstadoEfectivoService`, `RevocacionService`,
+  `UnidadOrganizativaService`, `AreaAccesoService` verificados sin ningún control de alcance) — el defecto
+  crítico que impedía congelar el baseline. `AlcanceUsuarioCompañía` es reemplazada por
+  `AsignaciónRolAdministrativo` (research.md §27, data-model.md). Ninguna entidad de `Persona` ni regla de
+  cardinalidad/aislamiento entre Principales cambia.
+- **D2** (bootstrap del primer administrador) no introduce entidades ni migraciones nuevas — una rutina de
+  arranque idempotente crea la primera `AsignaciónRolAdministrativo` (`GLOBAL_ADMINISTRATOR`) desde
+  configuración/secrets (research.md §28). Único punto de atención: `FechaHoraFin = MAX_VALIDITY_DATE` es
+  una **excepción explícita y acotada** a RF-071, exclusiva de esa fila — no debilita el Principio IV en
+  ningún otro registro.
+- **D4** (inactivación de Compañía) y **D5** (zona horaria por Compañía Principal) modifican
+  `EvaluadorDeAcceso` (research.md §7) en el mismo tramo del algoritmo (pasos 4-5 y 12), que pasa de 14 a 15
+  pasos — coordinados, no en conflicto. El Principio I se refuerza (nueva verificación de denegación por
+  defecto); el Principio IV se mantiene (D4 no cierra ni modifica ningún registro dependiente; D5 nunca
+  reinterpreta instantes UTC ya persistidos).
+- **D6** (validación de dependientes al cambiar `TipoCompañía`) refuerza RF-044/045/046, ya vigentes,
+  cerrando un vacío de validación — sin cascada automática, consistente con el patrón de D4.
+- **D7** (interfaz de Historia 5, Casos A/B) es exclusivamente frontend — cero cambios de dominio, modelo de
+  datos, autorización o contrato; reutiliza entidades, endpoints y el componente `Tree` ya existentes.
+- **D8** (consultas transversales, RF-067 a RF-069) queda explícitamente **fuera del alcance de Etapa 1** —
+  no se planifica ningún cambio de arquitectura, contrato ni dato para esta decisión en este re-chequeo.
+- **D9** (decisiones heredadas #1 política de contraseñas, #3 retención legal, #7 prioridad de Historia 9)
+  no requiere ningún cambio técnico — ratifica comportamiento ya implementado y verificado
+  (`PasswordPolicyValidator`/`AutenticacionService`, ausencia de purga física ya exigida por el Principio
+  IV, `CredencialService`/`CredencialesController` ya completos).
+
+Ningún principio de la Constitución requirió enmienda. `research.md` (§27-§33), `data-model.md` (entidad
+`AsignaciónRolAdministrativo`, campo `Compañía.ZonaHorariaIana`, validación de dependientes en `Compañía`) y
+`contracts/users.yaml`, `contracts/auth.yaml`, `contracts/companies.yaml`, `contracts/access-evaluation.yaml`
+fueron modificados en esta sesión de planificación. `spec.md` y `tasks.md` **no** fueron modificados por este
+plan.
+
+> **Actualización (Sesión 2026-09-20, posterior a este plan)**: la sesión de clarificación pendiente **ya se
+> ejecutó**. `spec.md` incorpora ahora RF-074 a RF-081 y CS-036 a CS-041, la sesión de Clarifications del
+> 2026-09-20, el renombrado de `AlcanceUsuarioCompañía` a `AsignaciónRolAdministrativo`, las anotaciones
+> `[DIFERIDA A ETAPA 2]` de RF-067 a RF-069 y CS-032, la sincronización de Historia 8 a 15 pasos y el cierre de
+> las diez Decisiones Pendientes. Lo único que sigue pendiente de este párrafo es `/speckit-tasks` (tareas de
+> corrección con numeración ≥T169, sin renumerar T001–T168), aún no autorizado. **[CUMPLIDO]**: `/speckit-tasks`
+> generó T169–T228 y `/speckit-implement` las completó; el gate de cierre quedó registrado en
+> `docs/auditorias/gate-cierre-etapa1-2026-09-20.html`.
+
+**Re-chequeo post-desviaciones (Sesión 2026-09-20, cierre de D-1, D-2 y D-4 — `/speckit-plan`)**: confirmado,
+sin violaciones nuevas. Alcance **exclusivo**: las tres desviaciones que quedaron abiertas tras implementar
+T169–T228. No replantea T001–T168 ni T169–T228, que permanecen completas y válidas.
+
+> **Nomenclatura**: `D-1`/`D-2`/`D-4` (con guion) son **desviaciones de implementación** auditadas con
+> `/speckit-analyze`, no las decisiones de negocio `D1`–`D9` (sin guion) del re-chequeo anterior. La letra
+> coincide por accidente y el contenido no se corresponde. `D-3` se cerró como implementación válida sin
+> cambios; **`D-5` se cerró por configuración y documentación y no forma parte de este plan** (RF-078 no se
+> modifica; `docker-compose.yml` ya exige `BOOTSTRAP_ADMIN_PASSWORD` sin valor por defecto).
+
+- **D-1** (renovación de `AsignaciónRolAdministrativo` expuesta como operación HTTP) **refuerza el Principio
+  I**: la operación no estaba accesible, pero su ausencia no era una protección — la regla que la gobierna ya
+  vive en el dominio y lo que faltaba era exponerla bajo los mismos controles de RF-076/RF-077 que el resto.
+  El Principio IV se mantiene íntegro: la renovación es aditiva hacia adelante, nunca reescribe
+  `FechaHoraInicio`, no crea un registro nuevo y no puede puentear un intervalo ya transcurrido. Cero
+  entidades, columnas y migraciones nuevas. Dos correcciones puntuales de consistencia acompañan la
+  exposición (nombre del campo del cuerpo y estado HTTP de `RENOVACION_NO_POSTERIOR`), detalladas en
+  research.md §34.1.
+- **D-2** (cobertura de alcance GLOBAL vs COMPANY) **no modifica código de producción**: el control exigido
+  por RF-077 ya está aplicado en los cinco servicios auditados. Lo que faltaba es la red de regresión que el
+  **Principio VII** exige de forma explícita para las fugas de datos entre compañías — hoy una regresión en
+  el alcance de esos servicios no rompería ninguna prueba. Es, por tanto, el único de los tres puntos que
+  cierra una violación real de la Constitución, y lo hace sin tocar la lógica que verifica.
+- **D-4** (búsqueda server-side de usuarios) **refuerza el Principio I** y la regla de ingeniería de
+  consistencia API/interfaz: el filtrado por correo vivía solo en el cliente, que la Constitución prohíbe
+  tratar como frontera de seguridad. Moverlo al servidor lo somete al mismo alcance que el listado
+  (`Scope → Search → Pagination`) y elimina el riesgo de que la interfaz y la API discrepen sobre qué
+  conjunto se está filtrando. Cero cambios de modelo de datos: es una cláusula `Where` adicional sobre una
+  consulta ya acotada.
+
+Ningún principio requirió enmienda. En esta sesión de planificación se modificaron `research.md` (§34 nueva),
+`contracts/users.yaml` (v2.0.0 → v2.1.0), `data-model.md` (`AsignaciónRolAdministrativo`, párrafo de
+renovación) y `quickstart.md` (§8 nueva, escenarios 1-3). `spec.md` y `ux-ui.md` **no** se modificaron: ya
+incorporan D-1 (RF-075) y D-4 (RF-077, UX-22) desde la sesión de `/speckit-clarify` previa. `tasks.md`
+**no** se modificó: las tareas las genera `/speckit-tasks`, aún no ejecutado.
+
+### Plan de cierre de D-1, D-2 y D-4
+
+#### Archivos afectados, por capa
+
+| Capa | D-1 — renovación | D-2 — cobertura de alcance | D-4 — búsqueda server-side |
+|---|---|---|---|
+| Especificación | RF-075 ya enmendado (sin cambios) | RF-077 ya vigente (sin cambios) | RF-077 y UX-22 ya enmendados (sin cambios) |
+| Contrato | `contracts/users.yaml` — ruta `/renovar` **(hecho en este plan)** | — | `contracts/users.yaml` — parámetro `texto` **(hecho en este plan)** |
+| Backend | `UsuariosController.cs` (acción nueva); `AuthDtos.cs` (`RenovarAsignacionRolRequest.FechaHoraFin`); `AsignacionRolAdministrativoService.cs` (excepción de `RENOVACION_NO_POSTERIOR`) | **ninguno** | `UsuarioService.cs` (`ListarAsync` + registro `FiltroUsuarios`); `UsuariosController.cs` (parámetro `texto`) |
+| Frontend | `features/users/api.ts`, `hooks.ts`, `UsuarioDetalle.tsx`, `mensajesRol.ts` | — | `features/users/api.ts` (`FiltroUsuarios.texto`), `UsuariosPage.tsx` (deja de filtrar por correo en cliente) |
+| Pruebas | contrato, integración, Vitest, Playwright | **integración únicamente** | contrato, integración, Vitest, Playwright |
+| Documentación | `quickstart.md` §8.1 **(hecho)** | `quickstart.md` §8.2 **(hecho)** | `quickstart.md` §8.3 **(hecho)** |
+
+`UsuariosController.cs` aparece en D-1 y D-4: son cambios independientes en el mismo archivo, así que sus
+tareas no deben marcarse `[P]` entre sí.
+
+#### Tareas: ampliación vs. tareas nuevas
+
+**Recomendación: tareas nuevas con numeración ≥T229, sin reabrir ninguna tarea T169–T228.** Razón: las
+T169–T228 están cerradas y su cierre fue verificado por el gate de T228; reabrirlas haría que `[X]`
+significara dos cosas distintas y volvería falso un registro de auditoría ya emitido. Es además el criterio
+que este proyecto ya aplicó ante el caso idéntico de D7/T116 ("el trabajo debe reflejarse en tareas nuevas,
+nunca reescribir ni renumerar T115/T116 retroactivamente"). La trazabilidad se preserva citando la tarea
+antecesora en el texto de cada tarea nueva, no modificándola.
+
+Matiz honesto sobre dos de ellas: **T199** ("…listar, crear, asignar, finalizar, **renovar**") y **T204**
+("Implementar finalizar **y renovar** una asignación") sí nombraban la renovación y se cerraron sin ella,
+porque `contracts/users.yaml` v2.0.0 no declaraba la ruta y publicarla habría roto las pruebas de contrato —
+limitación registrada en su momento como nota explícita en `UsuariosController.cs`. Se completaron hasta
+donde el contrato permitía; el resto queda desbloqueado solo ahora, con v2.1.0.
+
+| # (indicativo) | Trabajo | Antecesora | Capa |
+|---|---|---|---|
+| T229 | Unificar `RENOVACION_NO_POSTERIOR` en `ConflictoEstadoException` (409) y renombrar `RenovarAsignacionRolRequest.NuevaFechaHoraFin` → `FechaHoraFin` | — (corrección, research.md §34.1) | backend |
+| T230 | Exponer `POST .../roles/{asignacionId}/renovar` (204) reutilizando `UsuarioService.RenovarRolAsync`, y retirar la nota que documenta su ausencia | completa T194 | backend |
+| T231 | `renovarRol` en `api.ts` y `useRenovarRol` en `hooks.ts` | completa T199 | frontend |
+| T232 | Acción **Renovar** en `UsuarioDetalle.tsx` con confirmación (UX-20) y sus mensajes en `mensajesRol.ts` | completa T204/T205 | frontend |
+| T233 | Filtro `texto` server-side en `UsuarioService.ListarAsync` (registro `FiltroUsuarios`) y parámetro en `UsuariosController` | amplía T185/T194 | backend |
+| T234 | `UsuariosPage.tsx` deja de filtrar por correo en cliente y pasa `texto` al hook | amplía T200 | frontend |
+| T235 | Pruebas de contrato de v2.1.0: ruta `/renovar` y parámetro `texto` (incl. snapshot OpenAPI) | amplía T220 | pruebas |
+| T236 | Integración de renovación: caso feliz, `409` ×3, `404` fuera de alcance, `403` sin autorización | amplía T213/T214 | pruebas |
+| T237 | Integración de alcance GLOBAL/COMPANY en `UnidadOrganizativaService` y `AreaAccesoService` | cubre T186, cierra CS-037 | pruebas |
+| T238 | Integración de alcance GLOBAL/COMPANY en `AsignacionUnidadOrganizativaService`, `EstadoEfectivoService` y `RevocacionService` (vía `/historial-companias/{id}/finalizar`) | cubre T187, cierra CS-037 | pruebas |
+| T239 | Integración de búsqueda: hallazgo entre páginas, AND con `estado`, resultado vacío, aislamiento con correo exacto conocido | amplía T215 | pruebas |
+| T240 | Vitest del módulo de usuarios: renovar y búsqueda server-side | amplía T221 | pruebas |
+| T241 | E2E: renovar desde UX-20 y encontrar por búsqueda un usuario que no está en la página 1 | amplía T223 | pruebas |
+
+La numeración final la fija `/speckit-tasks`; aquí solo se fija el alcance y el orden.
+
+#### Dependencias reales
+
+- **D-1**: T229 → T230 → T231 → T232. T229 precede a T230 porque el contrato publicado ya declara
+  `fechaHoraFin` y `409`; exponer la ruta antes de corregir el DTO y la excepción publicaría un endpoint que
+  contradice su propio contrato. T235/T236 dependen de T230; T240/T241 de T232.
+- **D-2**: T237 y T238 **no dependen de nada** dentro de este plan — el código que verifican ya existe. Pueden
+  ejecutarse en paralelo entre sí y con todo lo demás, y son el trabajo que puede empezar primero.
+- **D-4**: T233 → T234. T235 y T239 dependen de T233; T240/T241 de T234.
+- **Entre decisiones**: D-1, D-2 y D-4 son independientes. Las únicas coincidencias son de archivo
+  (`UsuariosController.cs` en T230 y T233; `api.ts` en T231 y T234; y las suites compartidas de T235, T240 y
+  T241), que obligan a secuencia dentro del archivo, no dependencia lógica entre decisiones.
+
+#### Trazabilidad
+
+| Decisión | Requisito / UX | Artefacto de diseño | Tareas | Evidencia de prueba |
+|---|---|---|---|---|
+| D-1 | RF-075 (vigencia y renovación), RF-076 (autorización), RF-077 (alcance y `404`) | research.md §34.1; `contracts/users.yaml` `/renovar`; data-model.md (`AsignaciónRolAdministrativo`, renovación); quickstart.md §8.1 | T229–T232 | T235 (contrato), T236 (integración), T240 (Vitest), T241 (E2E UX-20) |
+| D-2 | RF-077 | research.md §34.2; quickstart.md §8.2 | T237, T238 | T237, T238 (son la evidencia; cierran CS-037) |
+| D-4 | RF-077 (alcance antes de buscar y paginar), UX-22 (`ux-ui.md` §35) | research.md §34.3; `contracts/users.yaml` parámetro `texto`; quickstart.md §8.3 | T233, T234 | T235 (contrato), T239 (integración), T240 (Vitest), T241 (E2E) |
+
+#### Estrategia de pruebas
+
+Cada prueba debe fallar si se revierte la capacidad que verifica; no basta con ejercitar el camino feliz.
+
+- **Contrato** (T235): el documento OpenAPI publicado vuelve a coincidir con `users.yaml` v2.1.0 — ruta
+  `/renovar` presente con sus cinco respuestas, parámetro `texto` declarado en el listado. **Desde este plan
+  y hasta que T230 esté implementada, `OpenApiSnapshotTests` está en rojo** con
+  `POST /api/usuarios/{id}/roles/{asignacionId}/renovar: no existe en la API`: recorre cada operación
+  declarada en `contracts/*.yaml` y exige que exista. Es el estado esperado —el contrato se actualiza como
+  artefacto de diseño y el código lo alcanza después, igual que ocurrió con T194–T198— pero conviene saberlo
+  antes de ejecutar la suite. El parámetro `texto` **no** rompe nada mientras tanto: ese snapshot compara
+  rutas, códigos de estado y forma del cuerpo, no parámetros de consulta, de modo que su verificación exige
+  una aserción dedicada en `UsersContractTests` (parte de T235).
+- **Integración** (T236–T239, Testcontainers contra SQL Server real): los tres `409` de la renovación se
+  distinguen por `codigo`, no por el estado HTTP. El aislamiento se prueba siempre con identificadores
+  **conocidos y válidos** de otra Principal —no inventados— porque lo que se verifica es que conocer el
+  identificador no concede acceso (RF-077). En D-2, el caso GLOBAL debe tocar **dos Principales distintas en
+  la misma prueba**: es lo único que falsaría una regresión que volviera a exigir `CompaniaIds.Count > 0`. En
+  D-4, el caso decisivo es el `COMPANY_ADMINISTRATOR` que busca el correo **exacto** de un usuario fuera de su
+  alcance y obtiene la misma respuesta que ante un correo inexistente.
+- **Vitest** (T240) y **Playwright** (T241): la renovación exige confirmación explícita como finalizar
+  (UX-20); la búsqueda encuentra desde la interfaz a un usuario que no está en la página cargada, que es
+  precisamente lo que la implementación anterior no podía hacer.
+- **Regresión**: las cinco suites completas deben quedar en verde, incluida la prueba E2E existente de UX-17 a
+  UX-22, cuyo ayudante `filaDelUsuario` recorre páginas por carecer de búsqueda server-side y podrá
+  simplificarse una vez D-4 esté implementada.
+
+#### Criterios de cierre del Baseline para estas tres desviaciones
+
+1. Las cinco suites en verde, sin regresión en T001–T168 ni en T169–T228.
+2. `ContractTests` confirma que el OpenAPI publicado coincide con `users.yaml` v2.1.0.
+3. Los tres escenarios de `quickstart.md` §8 se reproducen con los resultados esperados.
+4. CS-037 pasa a tener pruebas reales que lo cubran para los cinco servicios auditados, y no solo una
+   mención en un comentario de clase.
+5. `UsuariosController.cs` ya no contiene la nota que documenta la ausencia de la renovación, y
+   `UsuariosPage.tsx` ya no filtra por correo sobre `consulta.data?.items`.
+6. Ninguna casilla de T001–T228 se modifica, y el gate de cierre se repite registrando el resultado en
+   `docs/auditorias/`.
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -424,7 +620,10 @@ backend/
 │   │   ├── Persistence/                           # no-solapamiento vía SQL crudo), interceptor de auditoría,
 │   │   ├── Auditing/                              # value conversions de enums, configuraciones IEntityTypeConfiguration<T>
 │   │   └── Security/                              # hashing de contraseñas, filtros globales de alcance de compañías,
-│   │                                               # CompaniaScopeAuthorizationHandler (Policy de ASP.NET Core)
+│   │                                               # CompaniaScopeAuthorizationHandler (Policy de ASP.NET Core;
+│   │                                               # redefinido para RBAC — D1, research.md §27),
+│   │                                               # RelojEmpresarial (resuelve zona por Compañía Principal — D5,
+│   │                                               # research.md §31, en vez de un único DateTimeZone global)
 │   └── EnterpriseAccessControl.Api/               # Composición DI, Controllers, ProblemDetails, Options Pattern,
 │       ├── Controllers/                           # HealthChecks (/health/live, /health/ready), OpenAPI nativo,
 │       └── Program.cs                             # autenticación JWT

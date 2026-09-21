@@ -9,7 +9,7 @@ namespace EnterpriseAccessControl.UnitTests.Permissions;
 /// Construye el estado de una evaluación que concede, para que cada prueba rompa exactamente un paso.
 /// </summary>
 /// <remarks>
-/// El evaluador tiene 14 cortes y casi todos comparten los mismos datos de partida. Definir una vez
+/// El evaluador tiene 15 cortes y casi todos comparten los mismos datos de partida. Definir una vez
 /// el caso que concede y derivar cada denegación de él hace que la prueba diga qué paso está
 /// ejercitando en lugar de enterrarlo en veinte líneas de montaje repetido.
 /// </remarks>
@@ -23,14 +23,31 @@ internal static class EscenarioEvaluacion
     public static readonly Guid UnidadId = Guid.CreateVersion7();
     public static readonly Guid TipoPersonaId = Guid.CreateVersion7();
 
-    /// <summary>Reloj fijo en America/Lima, sin NodaTime ni configuración: el corte es determinista.</summary>
+    /// <summary>Zona IANA de la Principal del escenario (RF-080).</summary>
+    public const string ZonaLima = "America/Lima";
+
+    /// <summary>
+    /// Reloj de desplazamiento fijo, sin NodaTime ni configuración: el corte es determinista.
+    /// </summary>
+    /// <remarks>
+    /// Aplica −5 h para <see cref="ZonaLima"/> y 0 h (UTC) para cualquier otra zona o para
+    /// <c>null</c>. No pretende ser una base de datos de husos: basta para verificar que el evaluador
+    /// **pasa** la zona de la Principal al reloj, que es la regla que introduce RF-080.
+    /// </remarks>
     public sealed class RelojLima : IRelojEmpresarial
     {
-        public DayOfWeek DiaSemanaLocal(DateTime instanteUtc) =>
-            instanteUtc.AddHours(-5).DayOfWeek;
+        public DayOfWeek DiaSemanaLocal(DateTime instanteUtc, string? zonaIana) =>
+            Local(instanteUtc, zonaIana).DayOfWeek;
 
-        public TimeOnly HoraLocal(DateTime instanteUtc) =>
-            TimeOnly.FromDateTime(instanteUtc.AddHours(-5));
+        public TimeOnly HoraLocal(DateTime instanteUtc, string? zonaIana) =>
+            TimeOnly.FromDateTime(Local(instanteUtc, zonaIana));
+
+        public string ZonaEfectiva(string? zonaIana) => zonaIana ?? "UTC";
+
+        public bool EsZonaValida(string? zonaIana) => zonaIana is ZonaLima or "UTC";
+
+        private static DateTime Local(DateTime instanteUtc, string? zonaIana) =>
+            zonaIana == ZonaLima ? instanteUtc.AddHours(-5) : instanteUtc;
     }
 
     public static EvaluadorDeAcceso Evaluador() => new(new RelojLima());
@@ -42,20 +59,23 @@ internal static class EscenarioEvaluacion
         Estado = estado,
     };
 
-    public static Compania Principal() => new()
+    public static Compania Principal(Estado estado = Estado.ACTIVO) => new()
     {
         Nombre = "Minera Principal",
         TipoDocumentoId = Guid.CreateVersion7(),
         NumeroDocumento = "20100000001",
         TipoCompania = TipoCompania.PRINCIPAL_MANDANTE,
+        Estado = estado,
+        ZonaHorariaIana = ZonaLima,
     };
 
-    public static Compania Contratista() => new()
+    public static Compania Contratista(Estado estado = Estado.ACTIVO) => new()
     {
         Nombre = "Servicios Contratista",
         TipoDocumentoId = Guid.CreateVersion7(),
         NumeroDocumento = "20100000002",
         TipoCompania = TipoCompania.CONTRATISTA,
+        Estado = estado,
     };
 
     public static ContextoOperativoPersonaPrincipal Contexto(
@@ -116,11 +136,14 @@ internal static class EscenarioEvaluacion
     }
 
     /// <summary>Estado de partida que concede; cada prueba altera solo lo que quiere romper.</summary>
-    public static DatosDeEvaluacion Concede(Compania? pertenencia = null) => new()
+    public static DatosDeEvaluacion Concede(
+        Compania? pertenencia = null,
+        Compania? principal = null) => new()
     {
         FechaHoraUtc = Instante,
         PersonaId = PersonaId,
         Area = Area(),
+        CompaniaPrincipal = principal ?? PrincipalComoPertenencia(),
         UsuarioTieneAlcanceSobrePrincipal = true,
         ContextoOperativo = Contexto(),
         CompaniaPertenencia = pertenencia ?? PrincipalComoPertenencia(),
@@ -136,12 +159,12 @@ internal static class EscenarioEvaluacion
     /// La Principal evaluada, usada como compañía de pertenencia de la persona.
     /// </summary>
     /// <remarks>
-    /// El identificador debe ser exactamente <see cref="PrincipalId"/>: el paso 5 concede legitimidad
+    /// El identificador debe ser exactamente <see cref="PrincipalId"/>: el paso 6 concede legitimidad
     /// automática solo cuando la persona pertenece a la propia Principal evaluada (RF-053).
     /// </remarks>
-    public static Compania PrincipalComoPertenencia()
+    public static Compania PrincipalComoPertenencia(Estado estado = Estado.ACTIVO)
     {
-        var compania = Principal();
+        var compania = Principal(estado);
         ForzarId(compania, PrincipalId);
         return compania;
     }
