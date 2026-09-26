@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../../src/features/companies/api'
 import type { Compania, PaginaCompanias } from '../../src/features/companies/api'
 import { CompaniasPage } from '../../src/features/companies/CompaniasPage'
+import * as maestrosApi from '../../src/features/masters/api'
+
+/** Tipos de documento activos del maestro (VF-001: se eligen por nombre, viaja el id). */
+const TIPO_RUC = '0199b0d0-0000-7000-8000-0000000000dd'
+const TIPO_DNI = '0199b0d0-0000-7000-8000-0000000000de'
 
 function compania(overrides: Partial<Compania> = {}): Compania {
   return {
@@ -38,6 +43,10 @@ function renderizar(): void {
 describe('CompaniasPage', () => {
   beforeEach(() => {
     localStorage.clear()
+    vi.spyOn(maestrosApi, 'listarMaestro').mockResolvedValue([
+      { id: TIPO_RUC, nombre: 'RUC', estado: 'ACTIVO' },
+      { id: TIPO_DNI, nombre: 'DNI', estado: 'ACTIVO' },
+    ])
   })
 
   afterEach(() => {
@@ -114,10 +123,8 @@ describe('CompaniasPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Nueva compañía' }))
 
     await userEvent.type(screen.getByLabelText('Nombre'), 'Constructora Boreal')
-    await userEvent.type(
-      screen.getByLabelText('Tipo de documento'),
-      '0199b0d0-0000-7000-8000-0000000000dd',
-    )
+    await screen.findByRole('option', { name: 'RUC' })
+    await userEvent.selectOptions(screen.getByLabelText('Tipo de documento'), 'RUC')
     await userEvent.type(screen.getByLabelText('Número de documento'), '77777777-7')
     await userEvent.selectOptions(screen.getByLabelText('Clasificación'), 'CONTRATISTA')
 
@@ -147,10 +154,8 @@ describe('CompaniasPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Nueva compañía' }))
     await userEvent.type(screen.getByLabelText('Nombre'), 'Duplicada')
-    await userEvent.type(
-      screen.getByLabelText('Tipo de documento'),
-      '0199b0d0-0000-7000-8000-0000000000dd',
-    )
+    await screen.findByRole('option', { name: 'RUC' })
+    await userEvent.selectOptions(screen.getByLabelText('Tipo de documento'), 'RUC')
     await userEvent.type(screen.getByLabelText('Número de documento'), '77777777-7')
     await userEvent.click(screen.getByRole('button', { name: 'Crear compañía' }))
 
@@ -171,5 +176,90 @@ describe('CompaniasPage', () => {
 
     expect(await screen.findByText('Indique el nombre.')).toBeInTheDocument()
     expect(crear).not.toHaveBeenCalled()
+  })
+
+  // --- VF-001 (post-Baseline): tipo de documento elegido del maestro, nunca por su identificador ---
+
+  it('el tipo de documento se elige por nombre y nunca se muestra su identificador', async () => {
+    vi.spyOn(api, 'listarCompanias').mockResolvedValue(pagina([]))
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva compañía' }))
+
+    const campo = screen.getByLabelText('Tipo de documento')
+
+    // RF-013: es un selector del maestro, no un campo donde escribir el UUID.
+    expect(campo.tagName).toBe('SELECT')
+    await screen.findByRole('option', { name: 'RUC' })
+
+    const textos = within(campo).getAllByRole('option').map((o) => o.textContent)
+    expect(textos).toEqual(['Seleccione…', 'RUC', 'DNI'])
+    expect(screen.queryByText(TIPO_RUC)).toBeNull()
+    expect(screen.queryByText('Identificador del maestro de tipos de documento.')).toBeNull()
+  })
+
+  it('exige elegir un tipo de documento para crear', async () => {
+    vi.spyOn(api, 'listarCompanias').mockResolvedValue(pagina([]))
+    const crear = vi.spyOn(api, 'crearCompania')
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva compañía' }))
+
+    await userEvent.type(screen.getByLabelText('Nombre'), 'Sin tipo')
+    await userEvent.type(screen.getByLabelText('Número de documento'), '77777777-7')
+    await userEvent.click(screen.getByRole('button', { name: 'Crear compañía' }))
+
+    expect(await screen.findByText('Seleccione el tipo de documento.')).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
+  })
+
+  it('al editar muestra el tipo de documento actual por su nombre y conserva su identificador', async () => {
+    vi.spyOn(api, 'listarCompanias').mockResolvedValue(pagina([compania()]))
+    const actualizar = vi.spyOn(api, 'actualizarCompania').mockResolvedValue(compania())
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    const campo = screen.getByLabelText('Tipo de documento')
+    await screen.findByRole('option', { name: 'RUC' })
+
+    // El valor guardado (el id de RUC) se presenta por su nombre.
+    expect(campo).toHaveDisplayValue('RUC')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(actualizar).toHaveBeenCalledTimes(1)
+    expect(actualizar.mock.calls[0][0]).toBe(compania().id)
+    expect(actualizar.mock.calls[0][1].tipoDocumentoId).toBe(TIPO_RUC)
+  })
+
+  it('al editar, un tipo de documento actual no disponible exige elegir uno activo para guardar', async () => {
+    // Inactivo o no resoluble: no figura entre los tipos ACTIVOS (RF-032). No se ofrece una opción
+    // especial y nunca se muestra su identificador.
+    const RETIRADO = '0199b0d0-0000-7000-8000-0000000000ff'
+    vi.spyOn(api, 'listarCompanias').mockResolvedValue(
+      pagina([compania({ tipoDocumentoId: RETIRADO })]),
+    )
+    const actualizar = vi.spyOn(api, 'actualizarCompania').mockResolvedValue(compania())
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    const campo = screen.getByLabelText('Tipo de documento')
+    await screen.findByRole('option', { name: 'RUC' })
+
+    expect(campo).toHaveDisplayValue('Seleccione…')
+    expect(screen.queryByText(RETIRADO)).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText('Seleccione el tipo de documento.')).toBeInTheDocument()
+    expect(actualizar).not.toHaveBeenCalled()
+
+    await userEvent.selectOptions(campo, 'DNI')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(actualizar).toHaveBeenCalledTimes(1)
+    expect(actualizar.mock.calls[0][1].tipoDocumentoId).toBe(TIPO_DNI)
   })
 })

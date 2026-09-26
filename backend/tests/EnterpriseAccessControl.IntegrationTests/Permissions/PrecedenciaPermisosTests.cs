@@ -93,10 +93,12 @@ public sealed class PrecedenciaPermisosTests(SqlServerFixture fixture)
     {
         var escenario = await new EscenarioPermisos(fixture).MontarAsync();
 
+        // El permiso vence antes del instante evaluado. Su inicio queda dentro de la pertenencia del
+        // escenario (desde hace un mes): desde RF-082 (VF-007) no puede empezar antes que ella.
         await escenario.CrearPermisoAsync(escenario.Peticion(
             AlcancePermiso.PERSONA,
-            inicio: EscenarioPermisos.Instante.AddMonths(-2),
-            fin: EscenarioPermisos.Instante.AddDays(-1)));
+            inicio: escenario.FechaCivil(EscenarioPermisos.Instante.AddMonths(-1)),
+            fin: escenario.FechaCivil(EscenarioPermisos.Instante.AddDays(-1))));
 
         var compania = await escenario.CrearPermisoAsync(
             AlcancePermiso.COMPANIA, sujetoId: escenario.PrincipalA.Id);

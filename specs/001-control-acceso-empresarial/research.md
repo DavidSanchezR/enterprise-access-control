@@ -1182,7 +1182,9 @@ de consistencia RF-066; corregida en la Sesión "vigencia temporal jerárquica")
   crudo); extender la contención también a `AsignaciónTipoPersona`/`PermisoAcceso` "por consistencia"
   (descartado explícitamente por negocio: la obligatoriedad de `FechaHoraFin`, RF-071, y la contención,
   RF-072, son conceptos distintos — ninguna regla de negocio establece que estas dos entidades dependan
-  temporalmente de la pertenencia, y no se inventa esa dependencia).
+  temporalmente de la pertenencia, y no se inventa esa dependencia). **[Decisión del Baseline, ampliada
+  post-Baseline por VF-007: RF-082 aplica la contención a `AsignaciónTipoPersona` y a `PermisoAcceso` con
+  alcance PERSONA, sin incorporarlas a la cascada. Ver §35.]**
 
 ## 26. Renovación de `AsignaciónPersonaCompañía` (Sesión 2026-09-14, "renovación de
 AsignaciónPersonaCompañía")
@@ -1676,3 +1678,353 @@ AsignaciónPersonaCompañía")
   (descartado: alcance mayor que la desviación, no respaldado por la decisión tomada); usar búsqueda de
   texto completo de SQL Server (descartado: exige infraestructura de catálogo adicional que la Constitución
   obliga a justificar con un requisito explícito, inexistente aquí).
+
+## 35. Cambio post-Baseline VF-007 — contención de perfiles y permisos de alcance PERSONA (RF-082)
+
+> Cambio de requisito posterior al cierre del Baseline de Etapa 1 (T001–T242), formalizado en spec.md
+> (Sesión 2026-09-25, RF-082, CS-042, CS-043) a partir del hallazgo VF-007
+> (`docs/functional-validation/post-baseline-validation.md` §9). §25 conserva la decisión histórica. Esta
+> sección registra solo las decisiones **técnicas** necesarias para implementar RF-082; la regla funcional
+> vive en spec.md y no se repite aquí.
+
+### 35.1 Punto de integración
+
+- **Decision**: Reutilizar `ContencionTemporalValidator.ValidarAsync(personaId, inicio, fin)` sin cambiar su
+  lógica. Se inyecta en `EstadoEfectivoService` (alta de perfil) y en `PermisoAccesoService` (alta y
+  actualización de permisos de alcance PERSONA). En el alta de perfil se invoca justo después de
+  `Vigencia.NormalizarRango` y antes de verificar el `TipoPersona`, el mismo orden que usa
+  `ContextoOperativoService` (normalizar → contener → reglas propias). En `CrearAsync` se invoca después de
+  `ValidarSujetoAsync`, porque sin una persona existente no hay pertenencia que consultar. En `ActualizarAsync`
+  se invoca después de la comprobación de alcance inmutable y antes de mutar la entidad, usando el
+  `PersonaId` almacenado. En los permisos PERSONA, **antes** del validador se exige el alcance histórico del
+  actor sobre la persona (§35.6), de modo que el orden completo es: sujeto existente → alcance del actor
+  sobre la persona → contención.
+- **Rationale**: RF-082 exige la misma forma de contención que RF-072 (D1). El validador ya implementa
+  exactamente esa forma, ya resuelve la pertenencia de referencia "vigente por fechas en el instante de la
+  operación" y ya emite `400 SIN_PERTENENCIA_VIGENTE` y `409 FUERA_DE_CONTENCION_TEMPORAL`. T107 y T165
+  exigen un único punto de validación, y la prueba estructural `El_validador_es_el_unico_punto...` lo
+  verifica. Validar el sujeto antes de la contención conserva el `400` actual ante una persona inexistente,
+  en vez de sustituirlo por `SIN_PERTENENCIA_VIGENTE`.
+- **Alternatives considered**: Una variante del validador para estas dos entidades (descartada: D1 confirma
+  la misma regla, y una segunda implementación rompería el criterio de punto único). Un `CHECK` o trigger
+  de base de datos (descartado por las mismas razones que en §25: cruza tablas y además no puede distinguir
+  las operaciones de D4).
+
+### 35.2 Predicado de D4 como función pura
+
+- **Decision**: Aislar en una función estática pura de `Application/Permissions` la decisión de si una
+  escritura de `PermisoAcceso` requiere contención. La función recibe el alcance, el estado previo (o
+  "nuevo"), el estado resultante y si cambiaron las fechas, y devuelve `true` solo si el alcance es `PERSONA`,
+  el estado resultante es `ACTIVO` y además (a) el registro es nuevo, (b) cambiaron las fechas o (c) el
+  estado pasa de `INACTIVO` a `ACTIVO`. En perfiles el predicado es trivial, porque hoy solo existe el alta
+  (caso a) y no necesita función.
+- **Rationale**: La tabla de D4 tiene más combinaciones que casos de prueba de integración razonables. Una
+  función pura permite probarla de forma exhaustiva con una prueba unitaria parametrizada, y dejar la
+  integración para los casos representativos de CS-042 y CS-043.
+- **Alternatives considered**: Condicionales en línea dentro de `ActualizarAsync` (descartado: la matriz
+  solo se podría verificar mediante integración, más lenta y menos exhaustiva).
+
+### 35.3 Detección de "cambio de fechas"
+
+> **[Superada para `PermisoAcceso` por VF-004 — ver §36.3]** Con fechas civiles (RF-083), un extremo "cambia"
+> cuando cambia su fecha civil, y la tolerancia de 1 ms deja de aplicarse al permiso
+> (`ReglaContencionPermiso.FechasCambian` se retira en T292). El texto siguiente se conserva como registro
+> histórico de VF-007.
+
+- **Decision**: Las fechas se consideran cambiadas si alguno de los dos instantes recibidos (tras
+  `InstanteUtc.Desde`) difiere del almacenado en 1 ms o más.
+- **Rationale**: La columna es `datetime2(3)`, que redondea a milisegundos. Una comparación exacta en ticks
+  trataría como "cambiada" una fecha reenviada sin modificar con precisión submilisegundo, y bloquearía un
+  cambio de solo bloques sobre un registro histórico (CS-043 b). El formulario ya reenvía los valores
+  originales sin tocarlos (`conservarSiNoCambio`), pero el servidor no debe depender de eso.
+- **Alternatives considered**: Pedir al cliente que omita las fechas no modificadas (descartado: cambia el
+  esquema de la petición, que RF-082 no requiere).
+
+### 35.4 Contratos y snapshot OpenAPI
+
+- **Decision**: `contracts/people.yaml` y `contracts/permissions.yaml` pasan de `1.0.0` a `1.1.0` (MINOR,
+  aditivo). Se declaran las respuestas `400` y `409` en `POST /api/personas/{id}/perfiles`, y `409` en
+  `POST` y `PUT /api/permisos`, además de las descripciones de `400` ya existentes, sin cambiar ningún
+  esquema. Los controladores deben declarar esos códigos con `ProducesResponseType`.
+- **Rationale**: `OpenApiSnapshotTests` exige que cada código declarado en el contrato exista en la API
+  publicada. Entre este plan y la implementación, esa prueba estará en rojo para las tres operaciones. Es
+  el mismo estado transitorio que el proyecto ya aceptó con D-1 (§34): el contrato es el artefacto de
+  diseño y el código lo alcanza después.
+- **Alternatives considered**: Actualizar el contrato en la misma tarea que el código (descartado: rompe el
+  flujo del proyecto, donde `/speckit-plan` actualiza los contratos).
+
+### 35.5 Frontend: ayuda al usuario, nunca regla de negocio
+
+> **[Superada en parte para `PermisoAcceso` por VF-004 — ver §36.7]** El principio se mantiene (el cliente
+> orienta y el servidor decide), pero en el formulario de permisos el límite deja de calcularse sobre el
+> instante UTC de la pertenencia con `datetime-local`. Pasa a usar las fechas declaradas de la pertenencia
+> con controles de fecha (RF-083 (c)). La parte de perfiles no cambia.
+
+- **Decision**: El frontend refleja la regla sin sustituirla. En los perfiles se calcula `min`/`max` a partir
+  de la pertenencia vigente, que el historial de la persona ya obtiene con `useHistorialCompanias`. En los
+  permisos se intenta obtener esa pertenencia al elegir la persona. Si la consulta falla, por ejemplo con
+  `404` porque el usuario administra el área pero no tiene alcance sobre la persona (RF-049 frente a
+  RF-077), el formulario funciona sin límites y el backend decide. En ambos casos se muestran mensajes
+  específicos para `SIN_PERTENENCIA_VIGENTE` y `FUERA_DE_CONTENCION_TEMPORAL`. El límite del permiso se
+  calcula sobre el instante UTC de la pertenencia (23:59:59.999 UTC), convertido a la hora local del control
+  `datetime-local`.
+- **Rationale**: La Constitución (Principio I) sitúa la validación en el servidor. El límite en el cliente
+  evita el error más común, pero no puede ser obligatorio porque el cliente no siempre ve la pertenencia.
+  Calcular el máximo en UTC evita que un fin "31/07 23:59" en hora local, que en UTC es posterior, parezca
+  válido en el control y se rechace en el servidor. La normalización a día completo de los permisos
+  (VF-004) queda fuera de alcance.
+- **Alternatives considered**: Exponer la vigencia de la pertenencia dentro del DTO de la persona o del
+  permiso (descartado: cambia esquemas que RF-082 no requiere cambiar).
+
+### 35.6 Frontera de alcance antes de consultar la pertenencia (corregida tras `/speckit-analyze`, hallazgo C1)
+
+> La versión anterior de esta sección aceptaba que `SIN_PERTENENCIA_VIGENTE` revelara a un administrador de
+> área el estado de pertenencia de la persona. `/speckit-analyze` lo clasificó como CRITICAL (C1): con
+> `400`/`409` se podía inferir, probando fechas, la vigencia exacta de la pertenencia de una persona cuya
+> compañía está fuera del alcance del actor. Eso viola el Principio I ("un usuario NUNCA DEBE poder leer …
+> datos de una compañía fuera de su alcance autorizado, incluso si conoce el identificador"). Esa
+> aceptación queda **retirada** y sustituida por la decisión siguiente.
+
+- **Decision**: En toda escritura de un `PermisoAcceso` con `Alcance = PERSONA` que, según D4, requiera
+  contención, el orden es obligatorio:
+  1. Primero se evalúa el alcance del actor sobre la persona, reutilizando exactamente
+     `PersonaService.ExigirAlcanceHistoricoAsync(personaId)`: el mismo control que ya protege el alta de
+     perfil (`EstadoEfectivoService`), sin una lógica paralela de autorización.
+  2. Si la persona está fuera del alcance del actor, la operación termina con `404 RECURSO_NO_ENCONTRADO`,
+     indistinguible de un recurso inexistente.
+  3. Solo después de superar el alcance se consulta la pertenencia vigente (`ContencionTemporalValidator`).
+  4. Por tanto, `400 SIN_PERTENENCIA_VIGENTE` y `409 FUERA_DE_CONTENCION_TEMPORAL` nunca pueden usarse para
+     inferir datos temporales de una persona fuera del alcance del actor.
+
+  El alcance se evalúa en el `PersonaId` de la petición (alta) o en el almacenado (actualización). Las
+  escrituras que D4 no somete a contención (solo bloques, desactivar, registro resultante `INACTIVO`) y los
+  alcances `UNIDAD_ORGANIZATIVA`/`COMPANIA` no consultan la pertenencia, así que no exponen nada y no cambian:
+  VF-007 no añade autorización fuera de su propio punto de exposición.
+- **Rationale**: El riesgo solo aparece cuando el servidor consulta la pertenencia, así que la protección se
+  coloca justo antes de esa consulta. `ExigirAlcanceHistoricoAsync` ya resuelve el alcance histórico
+  (pertenencias y contextos operativos, RF-077 con la unión de D3). Una persona sin ningún histórico sigue
+  siendo administrable por cualquiera, como en el alta de perfil. Así, el contratista con contexto en la
+  Principal del área, que es el caso legítimo de RF-049, conserva el acceso.
+- **Fuera de alcance, deuda preexistente**: `ValidarSujetoAsync` ya respondía, antes de VF-007, `400` si la
+  persona no existe, lo que revela su existencia a un administrador de área. VF-007 no la corrige ni la
+  convierte en tarea: queda registrada como observación independiente en
+  `docs/functional-validation/post-baseline-validation.md` §9.9.
+- **Alternatives considered**: Mantener la aceptación del riesgo (descartado: viola el Principio I y la
+  constitución no se relaja desde research). Crear una comprobación de alcance propia de permisos
+  (descartado: duplicaría la autorización que `PersonaService` ya centraliza). Exigir el alcance de la
+  persona en todas las escrituras PERSONA, incluidas las que no consultan la pertenencia (descartado: cambia
+  comportamiento del Baseline sin que VF-007 lo requiera).
+
+### 35.7 Numeración de tareas
+
+- **Decision**: Las tareas de VF-007 se generan en `/speckit-tasks` como un bloque nuevo y separado, marcado
+  como post-Baseline, a continuación de T242 y sin tocar ninguna tarea anterior. El número exacto lo fija
+  `/speckit-tasks`.
+- **Rationale**: Es el precedente del proyecto para bloques delta (T169–T228 y T229–T242). La trazabilidad se
+  mantiene citando RF-082 y VF-007 en cada tarea, sin modificar las tareas históricas.
+
+## 36. Cambio post-Baseline VF-004 — vigencia diaria del permiso de acceso (RF-083)
+
+> Cambio de requisito posterior al cierre del Baseline de Etapa 1, formalizado en spec.md (Sesión 2026-09-25
+> VF-004, RF-083, CS-044 a CS-047; decisiones F-1 a F-7) a partir del hallazgo VF-004
+> (`docs/functional-validation/post-baseline-validation.md` §19). Esta sección registra solo las decisiones
+> **técnicas**; la regla funcional vive en spec.md y no se repite aquí.
+
+### 36.1 Conversión de una fecha civil a instantes UTC (F-1, cambios de horario)
+
+- **Decision**: Una clase estática pura nueva, `VigenciaDiariaPermiso` (capa `Application`, carpeta
+  `Permissions`), que recibe una `DateOnly` y una `NodaTime.DateTimeZone`:
+  - inicio = `zona.AtStartOfDay(LocalDate.FromDateOnly(fecha))`, convertido a `DateTime` UTC;
+  - fin = `zona.AtStartOfDay(LocalDate.FromDateOnly(fecha).PlusDays(1))` − 1 ms, convertido a `DateTime` UTC;
+  - fecha civil de un instante = `Instant.FromDateTimeUtc(instante).InZone(zona).Date`, como `DateOnly`.
+
+  `AtStartOfDay` devuelve el **primer instante válido** del día. Si las 00:00 no existen porque el reloj salta
+  de 00:00 a 01:00 (p. ej. `America/Santiago` al empezar el horario de verano), devuelve las 01:00. Si las
+  00:00 ocurren dos veces, devuelve la primera. Como el fin se calcula a partir del inicio del día siguiente,
+  el día dura 23, 24 o 25 horas según corresponda, sin suponer que 23:59:59.999 local existe o es único.
+  `Application` ya referencia NodaTime 3.3.4, que expone `LocalDate.FromDateOnly`.
+- **Caso extremo técnico**: `AtStartOfDay` lanza `SkippedTimeException` si la zona omite un día **entero**.
+  En tzdb solo ocurre en fechas históricas (p. ej. `Pacific/Apia`, 30/12/2011). Se traduce a `400`
+  `VALIDACION_ENTRADA` ("la fecha no existe en la zona horaria de la Compañía Principal"), sin inventar una
+  regla de negocio. Es inalcanzable con fechas actuales.
+- **Rationale**: Es la única forma de cumplir F-1 cuando hay cambio de horario. Una función pura con la zona
+  como parámetro se prueba en `EnterpriseAccessControl.UnitTests`, que solo referencia `Application`, con
+  zonas tzdb reales y sin base de datos.
+- **Alternatives considered**: Reutilizar `Vigencia.NormalizarInicio/NormalizarFin` (descartado: normalizan el
+  día **UTC**, no el de la zona; ver registro §19.6). Construir 00:00 y 23:59:59.999 locales con
+  `LocalDateTime` e `InZoneLeniently` (descartado: 00:00 puede no existir y 23:59:59.999 no es "el primer
+  instante del día siguiente − 1 ms" si el día siguiente empieza a las 01:00). `TimeZoneInfo` (descartado por
+  research.md §5 y §31: no expone con claridad los huecos y ambigüedades, y los identificadores IANA dependen
+  de la plataforma).
+
+### 36.2 Zona que define el día: Área → Compañía Principal → zona efectiva
+
+- **Decision**: La zona es la de la Compañía Principal propietaria del área
+  (`ÁreaAcceso.CompañíaPrincipalId` → `Compañía.ZonaHorariaIana`). Se resuelve con el mismo criterio que el
+  paso 13: `IRelojEmpresarial.ZonaEfectiva(zonaIana)` devuelve un identificador utilizable (el propio, o el
+  global de respaldo si falta o no es válido) y `DateTimeZoneProviders.Tzdb[id]` lo convierte en
+  `DateTimeZone`. `IRelojEmpresarial` no cambia.
+  - Alta: la consulta que hoy verifica que el área esté en el alcance del actor (`ExigirAreaEnAlcanceAsync`)
+    devuelve además la zona de su Principal. Así la zona solo se lee **después** de confirmar el alcance, y un
+    área fuera de alcance sigue produciendo `404`.
+  - Actualización: la zona se lee a partir del `AreaAccesoId` almacenado, después de `ObtenerEnAlcanceAsync`.
+    El área de un permiso no es editable.
+  - Lectura (listado y detalle): una consulta por lote obtiene la zona de las Principales de los permisos de
+    la página, igual que `BloquesDeAsync` obtiene los bloques.
+- **Rationale**: RF-083 exige que la vigencia y los bloques se interpreten en la **misma** zona. Reutilizar
+  `ZonaEfectiva` garantiza que la conversión y el paso 13 usan siempre la misma, incluido el respaldo, sin
+  duplicar la resolución.
+- **Alternatives considered**: Añadir a `IRelojEmpresarial` métodos de inicio de día (descartado: obligaría a
+  cambiar el reloj falso `EscenarioEvaluacion.RelojLima` sin beneficio, porque la conversión no depende del
+  reloj sino solo de la zona). Fallar si la Principal no tiene zona (descartado: el paso 13 cae en el respaldo,
+  y un criterio distinto rompería la coherencia que exige RF-083).
+
+### 36.3 Edición por extremo (F-6) y supuestos de D4
+
+- **Decision**: En `ActualizarAsync` cada extremo se resuelve por separado con una función pura de
+  `VigenciaDiariaPermiso`. Si la fecha solicitada es igual a la fecha civil del instante almacenado (calculada
+  en la zona efectiva **actual**), se conserva exactamente ese instante. Si difiere, se normaliza según §36.1.
+  "Cambian las fechas", a efectos de `ReglaContencionPermiso.RequiereContencion` (D4, sin cambios), significa
+  que **algún** extremo cambió de fecha civil.
+  `ReglaContencionPermiso.FechasCambian` (comparación de instantes con tolerancia de 1 ms, §35.3) deja de
+  usarse para los permisos y se elimina junto con sus casos de prueba. La matriz de `RequiereContencion` no
+  cambia.
+  **Tras resolver ambos extremos** se exige `FinUtc > InicioUtc` (RF-039), o `400 PERIODO_INVALIDO`, antes de
+  la contención y de persistir. Con un extremo antiguo conservado, dos fechas civiles válidas pueden producir
+  instantes vacíos o invertidos (p. ej. un fin antiguo a las 00:00 locales del día Dx y un inicio nuevo en Dx),
+  y no existe CHECK en base de datos que lo impida. *(Añadido tras `/speckit-analyze`, hallazgo U1.)*
+- **Rationale**: Con fechas civiles, "reenviar sin cambios" significa reenviar la misma fecha, y la
+  tolerancia de milisegundos pierde su sentido. Decidirlo en el servidor cumple F-6 aunque el cliente no
+  conserve los instantes originales.
+- **Alternatives considered**: Mantener `conservarSiNoCambio` en el cliente (descartado: F-6 exige que decida
+  el servidor, y con un contrato `date` el cliente ya no puede reenviar instantes). Normalizar ambos extremos
+  si cambia uno (descartado por F-6).
+
+### 36.4 Contención de RF-082 por fecha civil (F-2)
+
+- **Decision**: `ContencionTemporalValidator` gana una variante para permisos,
+  `ValidarFechasCivilesAsync(personaId, DateOnly inicio, DateOnly fin)`, con su comprobación pura
+  `ValidarFechasCiviles(pertenencia, inicio, fin)`. Obtiene la pertenencia vigente con el método actual
+  (`ObtenerPertenenciaVigenteAsync`, sin cambios) y compara: `inicio >= fechaDeclaradaInicio` **y**
+  `fin <= fechaDeclaradaFin`, con igualdad válida. Usa los mismos códigos (`SIN_PERTENENCIA_VIGENTE` `400`,
+  `FUERA_DE_CONTENCION_TEMPORAL` `409`) y los mismos mensajes. `ValidarAsync` (por instantes) no cambia y
+  sigue siendo el de RF-072 y de los perfiles.
+  - **Fecha declarada de la pertenencia** = `DateOnly.FromDateTime(pertenencia.FechaHoraInicio)` y
+    `DateOnly.FromDateTime(pertenencia.FechaHoraFin)`. Toda `AsignaciónPersonaCompañía` se crea o renueva por
+    `HistorialPersonaService`, que aplica `Vigencia.NormalizarRango` o `Vigencia.NormalizarFin`. Ambos guardan
+    el día declarado en sus límites UTC (00:00:00.000 y 23:59:59.999 UTC), así que los componentes de fecha UTC
+    son exactamente el día declarado. No es una reconversión a la zona del permiso (RF-083 (c)).
+  - **Fechas civiles del permiso** = las fechas de la petición. Para un extremo conservado (§36.3), la fecha
+    solicitada coincide por definición con la fecha civil de su instante almacenado.
+  - **Orden de autorización (sin cambios, §35.6)**: primero el alcance del actor sobre el área (`404`),
+    después el sujeto, después el alcance histórico del actor sobre la persona (`404`) y solo entonces la
+    pertenencia y la contención. Por último, la escritura.
+- **Rationale**: Es la única forma de que dos rangos con las mismas fechas civiles no se rechacen por la
+  diferencia de representación UTC (en Lima, el fin del permiso es 04:59:59.999 UTC del día siguiente y el de
+  la pertenencia, 23:59:59.999 UTC). No depende de corregir las pertenencias (§19.6, fuera de alcance): si
+  algún día se corrigen, la fecha declarada se seguirá obteniendo del mismo registro.
+- **Alternatives considered**: Convertir el instante de la pertenencia a la zona del permiso (descartado: en
+  Lima, 00:00 UTC del 01/08 es el 31/07 local y rechazaría el primer día). Comparar instantes (descartado por
+  F-2).
+
+### 36.5 Contrato `permissions.yaml` v2.0.0 (F-3)
+
+- **Decision**:
+  - **Petición** (`PermisoAccesoRequest`, `POST` y `PUT /api/permisos`): `fechaInicioVigencia` y
+    `fechaFinVigencia`, `type: string, format: date`, obligatorias. Sustituyen a `fechaHoraInicioVigencia` y
+    `fechaHoraFinVigencia`, que desaparecen de la petición.
+  - **Respuesta** (`PermisoAcceso`, en `GET`, `POST` y `PUT`):
+    - se conservan `fechaHoraInicioVigencia` y `fechaHoraFinVigencia` (`date-time`), ahora documentadas como
+      los **instantes UTC efectivos** que evalúa el paso 12;
+    - se añaden `fechaInicioVigencia` y `fechaFinVigencia` (`date`, fecha civil en la zona efectiva actual);
+    - se añade `vigenciaEnDiasCompletos` (`boolean`, §36.6);
+    - se añade `zonaHorariaIana` (`string`, zona efectiva con la que se calcularon las fechas civiles).
+  - **Nombres**: siguen la convención ya existente, en la que `fecha*` es una `date` (`fechaNacimiento` en
+    `people.yaml`) y `fechaHora*` es un `date-time` (`fechaHoraInicio` en todos los contratos). `zonaHorariaIana`
+    es el nombre que ya usa `Compañía`.
+  - **Versión**: 1.1.0 → **2.0.0**. Renombrar y cambiar el tipo de campos obligatorios de la petición es
+    incompatible. Los añadidos de la respuesta son compatibles.
+  - **Compatibilidad**: sin doble versión ni aceptación de los campos antiguos. Los únicos consumidores son la
+    SPA del proyecto y los helpers E2E, que se despliegan con el mismo commit. Un cliente antiguo que envíe
+    `fechaHora*` recibe `400` con `fechaInicioVigencia`/`fechaFinVigencia` entre los errores de validación: la
+    API falla cerrada y nunca interpreta mal un instante.
+  - **OpenAPI**: en C#, `DateOnly` se publica como `type: string, format: date` (precedente: `fechaNacimiento`).
+    `OpenApiSnapshotTests` compara nombres de propiedades por operación, así que queda en rojo desde que se
+    actualiza el contrato hasta que se implementa el DTO. Es el estado esperado, igual que en VF-007.
+- **Rationale**: F-3 exige `date` en la petición. Mantener los instantes en la respuesta conserva la
+  trazabilidad de lo que realmente se evalúa y hace posible la presentación con hora de F-5.
+- **Alternatives considered**: Reutilizar `fechaHora*` con `format: date` (descartado: nombre engañoso y rompe
+  la convención). Aceptar ambos formatos durante una transición (descartado: sin consumidores externos no hay
+  nada que proteger, y duplicaría la lógica). Quitar los instantes de la respuesta (descartado: F-5 los
+  necesita para los permisos históricos).
+
+### 36.6 Presentación (F-5)
+
+- **Decision**: El servidor calcula `vigenciaEnDiasCompletos = (inicio == InicioUtc(FechaCivil(inicio))) &&
+  (fin == FinUtc(FechaCivil(fin)))` en la zona efectiva actual. En el listado de la SPA:
+  - si es `true`, se muestran solo `fechaInicioVigencia` – `fechaFinVigencia`, formateadas como fechas sin
+    conversión de zona;
+  - si es `false`, se muestran `fechaHoraInicioVigencia` – `fechaHoraFinVigencia` con fecha y hora en
+    `zonaHorariaIana`, mediante `formatearFechaHora`.
+
+  Esto sustituye el `toLocaleString()` actual, que usa la zona del navegador y no la de la Principal (RF-080).
+  Tras un cambio de zona, un permiso cuyos instantes dejan de coincidir con los límites de día pasa a mostrarse
+  con hora (RF-083 (h)).
+- **Rationale**: Una sola implementación de tzdb (NodaTime) decide qué es "un día completo". `Intl` del
+  navegador no ofrece "primer instante del día", y duplicarlo en TypeScript arriesga divergencias en los días
+  con cambio de horario.
+- **Alternatives considered**: Calcularlo en el cliente (descartado por lo anterior).
+
+### 36.7 Formulario de permisos
+
+- **Decision**:
+  - Controles `type="date"` para inicio y fin.
+  - Validación zod: ambas obligatorias y fin ≥ inicio. La comparación léxica de `AAAA-MM-DD` es cronológica, y
+    la igualdad es válida (CS-045).
+  - En edición, los valores iniciales son `fechaInicioVigencia` y `fechaFinVigencia` de la respuesta, y se
+    envían tal cual. Se elimina `conservarSiNoCambio`: el servidor decide (§36.3).
+  - Si `vigenciaEnDiasCompletos = false`, una nota informativa muestra los instantes actuales con fecha y hora
+    en la zona de la Principal y avisa de que conservar una fecha conserva su hora (F-5, F-6).
+  - Límite de RF-082: `min`/`max` = fecha declarada de la pertenencia (`fechaHoraInicio.slice(0, 10)` y
+    `fechaHoraFin.slice(0, 10)`), el mismo criterio que `PerfilesPersona`. Sustituye, solo para permisos, el
+    límite por instante UTC de §35.5. La ayuda muestra la pertenencia como fechas.
+  - `lib/fechas.ts` gana dos helpers sin conversión de zona: `fechaDeclarada(iso)` y `formatearFecha(fecha)`.
+    `aValorLocal` y `aIsoUtc` se conservan, porque las usan `EvaluacionAccesoPage` y `UsuarioDetalle`.
+- **Rationale**: Mantiene el principio de §35.5: el cliente orienta y el servidor decide. Así el límite ya no
+  depende de la zona del navegador.
+
+### 36.8 Datos existentes (F-4, F-7)
+
+- **Decision**: Sin migración de base de datos, sin migración de EF Core y sin proceso de corrección.
+  Columnas, tipos, índices y restricciones de `PermisoAcceso` no cambian.
+  - **A. Permisos existentes con instantes históricos**: se leen, se evalúan (paso 12 sin cambios) y se
+    devuelven con sus instantes exactos. Se muestran con hora si no coinciden con límites de día.
+  - **B. Permisos nuevos (RF-083)**: se guardan con los instantes de §36.1.
+  - **C. Permisos existentes editados (F-6)**: por extremo, según §36.3. Cambiar solo bloques o estado reenvía
+    las fechas civiles actuales y conserva ambos instantes.
+  - **Cambio de zona (F-7)**: no se toca ninguna fila. Las fechas civiles y `vigenciaEnDiasCompletos` se
+    recalculan en cada lectura.
+- **Rationale**: F-4 y F-7. Es el mismo criterio no retroactivo de RF-082 (CS-043).
+
+### 36.9 Evaluación de acceso
+
+- **Decision**: Sin cambios en `PermisoAcceso.EstaVigenteEn`, `EvaluadorDeAcceso`, `EvaluacionAccesoService`,
+  `BloqueHorarioPermiso`, los bloques ni la cascada. El paso 12 sigue comparando instantes; la novedad está
+  solo en cómo se calculan al escribir.
+- **Rationale**: RF-083 (b) y RF-080. Minimiza el riesgo de regresión en la evaluación.
+
+### 36.10 Pruebas E2E: reloj del escenario
+
+- **Decision**: `soporte/tiempo.ts` adelanta `inicio` a `referencia − 2 días` y añade `fechaInicioPermiso` y
+  `fechaFinPermiso`, que son las fechas declaradas de la pertenencia del escenario (`inicio.slice(0, 10)` y
+  `fin.slice(0, 10)`). Así el permiso queda contenido por fecha civil y su primer instante en Lima
+  (00:00 = 05:00 UTC de esa fecha) es siempre anterior a `referencia` y a `fueraDelBloque`, a cualquier hora del
+  día. `seccion5.ts` y `multi-principal-quickstart.spec.ts` envían los campos `date`.
+- **Rationale**: Con el `inicio` actual (`referencia − 3 h`), entre las 22:00 y las 23:59 de Lima la fecha UTC
+  de `inicio` sería la de `referencia`, y el permiso diario empezaría después de ella: el E2E fallaría según la
+  hora de ejecución.
+
+### 36.11 Numeración de tareas
+
+- **Decision**: `/speckit-tasks` genera un bloque separado "POST-BASELINE — VF-004" a partir de T287, sin tocar
+  T001–T286.

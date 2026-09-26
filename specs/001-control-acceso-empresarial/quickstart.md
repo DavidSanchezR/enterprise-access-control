@@ -118,7 +118,9 @@ configurar un permiso horario") usando la API documentada en `contracts/`:
    vigente (`POST /api/personas/{id}/historial-companias`) apuntando a la Compañía Principal del paso 2, con
    `fechaHoraInicio`/`fechaHoraFin` reales y obligatorias (p. ej. `fechaHoraInicio` = ahora,
    `fechaHoraFin` = ahora + 1 año — RF-071; ya no admite `null` ni fecha centinela). Esta ventana es la
-   referencia de contención para los pasos 7 y 9 (RF-072).
+   referencia de contención para los pasos 7 y 9 (RF-072). **[Post-Baseline VF-007, RF-082]**: registrar
+   primero la compañía y después el perfil. El perfil también queda contenido en esta ventana, así que sin
+   pertenencia vigente su alta responde `400 SIN_PERTENENCIA_VIGENTE`.
 6. **Autorizar el tipo de persona en el área de nivel 3** —
    `PUT /api/areas-acceso/{nivel3Id}/tipos-persona` incluyendo el `TipoPersona` creado.
 7. **Contexto operativo** — `POST /api/personas/{id}/contextos-operativos` con `companiaPrincipalId` = la
@@ -130,9 +132,10 @@ configurar un permiso horario") usando la API documentada en `contracts/`:
    del área, y una credencial vigente con esa misma Principal (paso 9), antes de evaluar cualquier permiso
    (RF-059, RF-066, research.md §7).
 8. **Permiso con bloque horario** — `POST /api/permisos` con `alcance = PERSONA`, `personaId` de la
-   persona creada, `areaAccesoId` del nivel 3, `fechaHoraInicioVigencia`/`fechaHoraFinVigencia` reales y
-   obligatorias que cubran "ahora" (RF-021, RF-071), y un `bloqueHorario` que cubra el día de semana y hora
-   actuales en `America/Lima`.
+   persona creada, `areaAccesoId` del nivel 3, `fechaInicioVigencia`/`fechaFinVigencia` reales y
+   obligatorias (fechas civiles `AAAA-MM-DD` desde `permissions.yaml` v2.0.0, RF-083) que cubran el día de hoy
+   en `America/Lima` y queden dentro de las fechas de la pertenencia (RF-021, RF-071, RF-082), y un
+   `bloqueHorario` que cubra el día de semana y hora actuales en `America/Lima`.
 9. **Tipo de credencial y asignación** — crear un `TipoCredencial` (`POST /api/maestros/tipos-credencial`)
    con `estado = ACTIVO`, y asignarlo a la persona para la Compañía Principal del paso 2
    (`POST /api/personas/{id}/credenciales`) con `fechaHoraInicio`/`fechaHoraFin` reales, contenidas dentro
@@ -181,7 +184,8 @@ Usa la Compañía Principal ("Minera ABC") y la jerarquía de áreas creadas en 
    reales y obligatorias (p. ej. `fechaHoraInicio` = ahora, `fechaHoraFin` = ahora + 1 año — RF-071; ya no
    admite `null`). Esta ventana es la referencia de contención (RF-072) para los pasos 6, 8, 9 y 10.
    Asignarle además el perfil de ese mismo `TipoPersona` (`POST /api/personas/{id}/perfiles`, con
-   `fechaHoraFin` obligatoria — RF-071; el perfil no está sujeto a contención, RF-072): el paso 8 del
+   `fechaHoraFin` obligatoria — RF-071; ~~el perfil no está sujeto a contención, RF-072~~ **[Post-Baseline
+   VF-007: desde RF-082 el perfil sí queda contenido en la pertenencia]**): el paso 8 del
    algoritmo de evaluación exige un perfil vigente autorizado en el área antes de evaluar permisos (RF-024,
    research.md §7).
 6. **Contexto operativo sin relación vigente — debe rechazarse** — intentar
@@ -354,11 +358,126 @@ verificación de confirmación y no la única evidencia:
    inexistente: conocer el correo no revela su existencia ni concede acceso. Desde la interfaz, escribir en
    el filtro **Correo** debe encontrar al usuario de la página 3 sin navegar hasta ella.
 
-## 9. Próximos pasos
+## 9. Escenarios de validación del cambio post-Baseline VF-007 (RF-082, Sesión 2026-09-25)
+
+> Cambio de requisito posterior al cierre del Baseline (research.md §35). **Implementado** en las tareas
+> T243–T266 (bloque POST-BASELINE — VF-007) y cubierto por pruebas automatizadas que ejercitan cada
+> escenario por HTTP contra la API y SQL Server reales, así que ejecutarlos a mano es una confirmación y
+> no la única evidencia. `OpenApiSnapshotTests`, que estuvo en rojo entre el plan y la implementación
+> (research.md §35.4), vuelve a verde desde T247/T248.
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Alta de perfil (CS-042) | `ContencionPerfilesTests` (7 pruebas), `ContencionTemporalTests.El_perfil_esta_sujeto_a_contencion_temporal_desde_RF_082` |
+| 2 — Alta de permiso y aislamiento (CS-042, C1) | `ContencionPermisosPersonaTests` (13 pruebas, incluidas las dos de aislamiento `404`) |
+| 3 — Registros anteriores a RF-082 (CS-043) | `RegistrosAnterioresRf082Tests` (11 pruebas), `ReglaContencionPermisoTests` (matriz D4) |
+| 4 — Renovación (RF-073) | `Rf082RenovacionYCascadaTests.Renovar_la_pertenencia_amplia_el_limite_...` |
+| 5 — Sin cambio en la cascada (D3) | `Rf082RenovacionYCascadaTests.Finalizar_la_pertenencia_no_revoca_...`, `PerfilesPersonaTests.Los_perfiles_no_se_revocan_al_cerrar_la_pertenencia` |
+| 6 — Interfaz | `PerfilesPersona.test.tsx`, `PermisosPage.test.tsx` (casos RF-082); E2E `cs009-quickstart` y `multi-principal-quickstart` |
+
+Preparación: una persona con una pertenencia vigente de `01/08/2026` a `31/07/2027` (fechas del ejemplo de
+CS-042; en la prueba real se usan fechas relativas al día actual), una segunda persona sin pertenencia, y un
+área de acceso de la Principal.
+
+1. **Alta de perfil (CS-042)**: `POST /api/personas/{id}/perfiles` con fin `31/03/2027` → `201`; con fin
+   `31/07/2027` → `201`; con fin `01/08/2027` → `409`, `codigo = FUERA_DE_CONTENCION_TEMPORAL`; con inicio
+   `01/07/2026` → `409`, mismo código. Sobre la persona sin pertenencia → `400`,
+   `codigo = SIN_PERTENENCIA_VIGENTE`.
+2. **Alta de permiso (CS-042)**: `POST /api/permisos` con `alcance = PERSONA` y las mismas combinaciones →
+   mismos resultados. Con `alcance = UNIDAD_ORGANIZATIVA` o `COMPANIA` y fechas fuera de la pertenencia →
+   `201`: la regla no les aplica. **Aislamiento**: un `COMPANY_ADMINISTRATOR` de la compañía A que administra
+   el área, sobre una persona cuyo único histórico es con la compañía B → `404`,
+   `codigo = RECURSO_NO_ENCONTRADO`, nunca `400`/`409`, sean cuales sean las fechas (research.md §35.6).
+3. **Registros anteriores a RF-082 (CS-043)**: insertar directamente en base de datos un perfil y un permiso
+   de alcance PERSONA que excedan la pertenencia, simulando datos creados bajo la regla anterior.
+   - `GET` los devuelve con sus fechas originales.
+   - `PUT` del permiso cambiando solo los bloques → `200`, fechas intactas.
+   - `PUT` a `INACTIVO` → `200`, también sobre la persona sin pertenencia.
+   - `PUT` de nuevo a `ACTIVO` → `409` (fuera de contención) o `400` (sin pertenencia).
+   - `PUT` que cambia las fechas a un rango que sigue fuera → `409`; a un rango contenido → `200`.
+4. **Renovación (RF-073)**: renovar la pertenencia hasta `31/01/2028`. Los perfiles y permisos existentes no
+   cambian. Un perfil nuevo con fin `31/01/2028` → `201`.
+5. **Sin cambio en la cascada**: finalizar la pertenencia. Los perfiles y permisos siguen `ACTIVO` con sus
+   fechas (RF-061 sin cambios). Solo se revocan el contexto, la unidad organizativa y la credencial.
+6. **Interfaz**: en el historial de la persona, el formulario de perfiles limita las fechas a la pertenencia
+   vigente y muestra un mensaje específico ante cada código. En el formulario de permisos, un rechazo por
+   contención muestra un mensaje específico y no un error genérico.
+
+> **Nota VF-004**: desde `permissions.yaml` v2.0.0, las peticiones de permisos de este apartado envían
+> `fechaInicioVigencia`/`fechaFinVigencia` (fechas civiles). Las fechas de CS-042 se comparan como fechas
+> civiles para el permiso (RF-083), así que los resultados esperados no cambian.
+
+## 10. Escenarios de validación del cambio post-Baseline VF-004 (RF-083, Sesión 2026-09-25)
+
+Vigencia del permiso en días civiles completos (spec.md RF-083, CS-044 a CS-047; research.md §36;
+`contracts/permissions.yaml` v2.0.0). Los mismos escenarios se cubren con pruebas automatizadas (ver
+plan.md, "Plan post-Baseline VF-004").
+
+> **Implementado** en las tareas T287–T312 (bloque POST-BASELINE — VF-004). Cada escenario tiene pruebas
+> automatizadas que lo ejercitan por HTTP contra la API y SQL Server reales, con fechas relativas al día de
+> ejecución. Las fechas de este apartado son ejemplos documentales, así que reproducirlos a mano es una
+> confirmación y no la única evidencia. `OpenApiSnapshotTests`, en rojo entre el plan y la implementación
+> (research.md §36.5), vuelve a verde con los DTO de T289/T293, y así lo verifica T302. La regresión dirigida de T310 demuestra que las pruebas
+> detectan por separado el día UTC en lugar del local, la contención por instantes y la pérdida de la
+> conservación por extremo.
+
+| Escenario | Cobertura automatizada |
+|---|---|
+| 1 — Alta diaria (CS-044) | `VigenciaDiariaPermisosTests` (persistencia exacta en Lima, lectura como fechas, último día concedido, día siguiente `PERMISO_FUERA_DE_VIGENCIA`, hora sin bloque `FUERA_DE_BLOQUE_HORARIO`); `VigenciaDiariaPermisoTests` (Lima) |
+| 2 — Un solo día y periodo inválido (CS-045) | `VigenciaDiariaPermisosTests` (un día; fin anterior → `400 PERIODO_INVALIDO`; contrato antiguo → `400` que nombra los campos nuevos; fecha con hora o mal formada → `400`); `PermisosTests` |
+| 3 — Mismo último día que la pertenencia (RF-082 por fecha civil) | `ContencionPermisoFechaCivilTests` (fin = último día en Lima e inicio = primer día en `Asia/Tokyo` → `201`; día siguiente o anterior → `409`; sin pertenencia → `400`; aislamiento `404`); `ContencionFechaCivilPermisoTests` |
+| 4 — Permiso anterior con hora (CS-046) e instantes invertidos | `PermisosHistoricosVigenciaDiariaTests` (lectura; solo bloques o estado; un solo extremo; `FinUtc <= InicioUtc` → `400 PERIODO_INVALIDO` sin modificar el permiso); `RegistrosAnterioresRf082Tests` |
+| 5 — Cambio de zona (CS-047) | `PermisosHistoricosVigenciaDiariaTests` (`POST` normalizado, cambio de zona por la API de compañías, filas sin cambios, lectura recalculada) |
+| 6 — Cambio de horario | `VigenciaDiariaPermisoTests` (Santiago: día sin 00:00 de 23 h y día de 25 h, localizados con tzdb; día omitido en `Pacific/Apia`); `VigenciaDiariaPermisosTests` (alta en Santiago el día sin 00:00) |
+| 7 — Interfaz | `PermisosPage.test.tsx` (controles `date`, listado con fechas o con fecha y hora en la zona de la Principal, nota del permiso con hora, reenvío de fechas, un día, fin anterior, límites por fecha declarada); `fechas.test.ts`; E2E `cs009-quickstart` y `multi-principal-quickstart` | Precondición común: una Compañía Principal con zona `America/Lima`, un
+área de nivel 3 de esa Principal y una persona con pertenencia vigente del 01/08/2026 al 31/07/2027, con
+contexto operativo, perfil autorizado y credencial vigentes.
+
+1. **Alta diaria (CS-044)**: `POST /api/permisos` con `alcance = PERSONA`, `fechaInicioVigencia = 2026-09-25`,
+   `fechaFinVigencia = 2026-09-30` y bloques que cubren todo el día → `201`. La respuesta trae
+   `fechaHoraInicioVigencia = 2026-09-25T05:00:00.000Z`, `fechaHoraFinVigencia = 2026-10-01T04:59:59.999Z`,
+   `fechaInicioVigencia = 2026-09-25`, `fechaFinVigencia = 2026-09-30`, `vigenciaEnDiasCompletos = true` y
+   `zonaHorariaIana = America/Lima`. La evaluación a las 23:00 de Lima del 30/09 da `CONCEDIDO`, y a las 00:30
+   del 01/10, `DENEGADO` con `PERMISO_FUERA_DE_VIGENCIA`. Dentro de la vigencia, una hora sin bloque da
+   `FUERA_DE_BLOQUE_HORARIO`.
+2. **Un solo día y periodo inválido (CS-045)**: inicio = fin → `201`; fin anterior al inicio → `400`. Una
+   petición con los campos antiguos `fechaHoraInicioVigencia`/`fechaHoraFinVigencia` → `400`, que nombra
+   `fechaInicioVigencia` y `fechaFinVigencia`.
+3. **Mismo último día que la pertenencia (RF-082 por fecha civil)**: `fechaFinVigencia = 2027-07-31` → `201`,
+   aunque su instante UTC (`2027-08-01T04:59:59.999Z`) sea posterior al de la pertenencia
+   (`2027-07-31T23:59:59.999Z`). `2027-08-01` → `409` `FUERA_DE_CONTENCION_TEMPORAL`.
+4. **Permiso anterior con hora (CS-046)**: insertar directamente en base de datos un permiso
+   `2026-09-25T08:00:00.000Z – 2026-09-30T17:00:00.000Z`.
+   - `GET` → mismos instantes, `fechaInicioVigencia = 2026-09-25`, `fechaFinVigencia = 2026-09-30`,
+     `vigenciaEnDiasCompletos = false`. La interfaz muestra 25/09/2026 03:00 – 30/09/2026 12:00.
+   - `PUT` que reenvía las mismas fechas y cambia solo bloques o estado → `200`, ambos instantes intactos.
+   - `PUT` con `fechaFinVigencia = 2026-10-05` → inicio intacto y fin `2026-10-06T04:59:59.999Z`.
+   - **Instantes invertidos (`FinUtc <= InicioUtc`)**: insertar otro permiso antiguo con fin exactamente
+     `2026-09-30T05:00:00.000Z` (00:00 de Lima del 30/09, así que su fecha civil de fin es 30/09) e inicio
+     anterior. Un `PUT` con `fechaInicioVigencia = 2026-09-30` y `fechaFinVigencia = 2026-09-30` pasa la
+     validación de fechas, pero al conservar el fin y normalizar el inicio (`2026-09-30T05:00:00.000Z`) resulta
+     `FinUtc <= InicioUtc` → `400`, `codigo = PERIODO_INVALIDO`. Un `GET` posterior devuelve el permiso con sus
+     instantes y su estado originales, sin ninguna modificación (RF-039, RF-083 (d)).
+5. **Cambio de zona (CS-047)**: cambiar la zona de la Principal a `America/Santiago`. Ningún instante cambia.
+   Las fechas civiles se recalculan y un permiso que deja de coincidir con los límites de día se devuelve con
+   `vigenciaEnDiasCompletos = false`.
+6. **Cambio de horario**: con una Principal en `America/Santiago`, un permiso que empieza el día en que el
+   reloj salta de 00:00 a 01:00 empieza en ese primer instante válido (01:00 local), y el día anterior termina
+   1 ms antes.
+7. **Interfaz**: el formulario de permisos usa controles de fecha. Al editar un permiso con hora se muestran
+   sus instantes actuales y se avisa de que se conservan si no cambia la fecha. El listado muestra solo fechas
+   cuando `vigenciaEnDiasCompletos = true`, y fecha y hora en la zona de la Principal cuando es `false`.
+
+## 11. Próximos pasos
 
 Este quickstart valida el comportamiento end-to-end una vez implementado. La secuencia de construcción
 (entidades → migraciones → casos de uso → endpoints → UI) se define en `tasks.md`, generado por el comando
 `/speckit-tasks` a partir de este plan. Las tareas de corrección del cierre de Etapa 1 (D1-D9) ya se
 generaron y completaron como T169–T228, sin renumerar T001–T168. Los escenarios de la sección 8 (cierre de
-las desviaciones D-1, D-2 y D-4) son los únicos pendientes: sus tareas se generarán en la próxima ejecución
-de `/speckit-tasks`, continuando la numeración a partir de T228.
+las desviaciones D-1, D-2 y D-4) se implementaron como T229–T242. ~~Los escenarios de la sección 9 (VF-007,
+post-Baseline) son los únicos pendientes: sus tareas se generarán en la próxima ejecución de
+`/speckit-tasks` como un bloque post-Baseline separado, sin modificar T001–T242.~~ **[Actualizado — VF-004]**
+Los escenarios de la sección 9 (VF-007) se implementaron como T243–T266. ~~Los de la sección 10 (VF-004) son
+los únicos pendientes: sus tareas se generarán con `/speckit-tasks` como un bloque post-Baseline separado a
+partir de T287, sin modificar T001–T286.~~ Los de la sección 10 (VF-004) se implementaron como T287–T312, en
+un bloque post-Baseline separado y sin modificar T001–T286.

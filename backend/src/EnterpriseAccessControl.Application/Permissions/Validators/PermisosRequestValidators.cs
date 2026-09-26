@@ -6,10 +6,14 @@ namespace EnterpriseAccessControl.Application.Permissions.Validators;
 /// Validación de borde de un permiso de acceso (RF-021, RF-071, contracts/permissions.yaml).
 /// </summary>
 /// <remarks>
-/// Mismo motivo que los validadores de la Historia 5: omitir <c>fechaHoraFinVigencia</c> en el JSON
-/// la enlaza a <c>default(DateTime)</c> y el error aflora después como un período inválido. El
+/// Mismo motivo que los validadores de la Historia 5: omitir <c>fechaFinVigencia</c> en el JSON
+/// la enlaza a <c>default(DateOnly)</c> y el error aflora después como un período inválido. El
 /// problema real es un campo obligatorio ausente, así que se rechaza aquí con 400 y un mensaje que
 /// lo dice.
+///
+/// Desde v2.0.0 (VF-004) es también lo que rechaza a un cliente del contrato anterior: un cuerpo con
+/// <c>fechaHoraInicioVigencia</c>/<c>fechaHoraFinVigencia</c> deja las fechas civiles sin informar, y el 400
+/// nombra los campos nuevos en lugar de interpretar un instante.
 ///
 /// Solo se comprueba presencia. Orden de fechas, bloques horarios y exclusividad del sujeto son
 /// reglas de negocio y viven en <see cref="PermisoAccesoService"/>.
@@ -21,14 +25,14 @@ public sealed class PermisoAccesoRequestValidator : AbstractValidator<PermisoAcc
         RuleFor(r => r.AreaAccesoId)
             .NotEqual(Guid.Empty).WithMessage("El área de acceso es obligatoria.");
 
-        RuleFor(r => r.FechaHoraInicioVigencia)
-            .NotEqual(default(DateTime))
-            .WithName("fechaHoraInicioVigencia")
+        RuleFor(r => r.FechaInicioVigencia)
+            .NotEqual(default(DateOnly))
+            .WithName("fechaInicioVigencia")
             .WithMessage("La fecha de inicio de vigencia es obligatoria.");
 
-        RuleFor(r => r.FechaHoraFinVigencia)
-            .NotEqual(default(DateTime))
-            .WithName("fechaHoraFinVigencia")
+        RuleFor(r => r.FechaFinVigencia)
+            .NotEqual(default(DateOnly))
+            .WithName("fechaFinVigencia")
             .WithMessage(
                 "La fecha de fin de vigencia es obligatoria para los tres alcances: no existe vigencia indefinida (RF-021, RF-071).");
 

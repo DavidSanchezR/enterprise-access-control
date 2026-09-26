@@ -171,6 +171,8 @@ public sealed class PersonasController(
 
     [HttpPost("{id:guid}/perfiles")]
     [ProducesResponseType<AsignacionTipoPersonaDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AsignacionTipoPersonaDto>> AsignarPerfil(
         Guid id,
         [FromBody] AsignacionTipoPersonaRequest request,

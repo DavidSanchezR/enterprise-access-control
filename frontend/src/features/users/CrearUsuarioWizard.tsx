@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { Dialogo } from '../../components/Dialogo'
 import { useSesion } from '../auth/useSesion'
+import { useCompanias } from '../companies/hooks'
 import {
   aInstanteUtc,
   CamposAsignacion,
@@ -28,6 +29,10 @@ export function CrearUsuarioWizard({ alCerrar }: { alCerrar: () => void }): Reac
 
   const rolPropio = sesion?.rol ?? null
   const companiasPropias = sesion?.companiaIds ?? []
+
+  // Mismo filtro que el selector de compañía: comparte caché con él y no añade llamadas. El resumen
+  // muestra el nombre, nunca el identificador (RF-013, ux-ui.md §35 paso 5).
+  const companias = useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })
 
   const [paso, setPaso] = useState(0)
   const [correo, setCorreo] = useState('')
@@ -187,7 +192,11 @@ export function CrearUsuarioWizard({ alCerrar }: { alCerrar: () => void }): Reac
           {asignacion.rol === 'COMPANY_ADMINISTRATOR' && (
             <>
               <dt>Compañía</dt>
-              <dd>{asignacion.companiaId}</dd>
+              <dd>
+                {companias.data?.items.find((c) => c.id === asignacion.companiaId)?.nombre ?? (
+                  <span className="sin-resolver">Compañía no disponible</span>
+                )}
+              </dd>
             </>
           )}
 

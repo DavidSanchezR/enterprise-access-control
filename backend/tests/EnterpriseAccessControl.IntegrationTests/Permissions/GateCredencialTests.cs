@@ -28,8 +28,8 @@ public sealed class GateCredencialTests(SqlServerFixture fixture)
 
         await escenario.CrearPermisoAsync(escenario.Peticion(
             AlcancePermiso.PERSONA,
-            inicio: EscenarioPermisos.Instante.AddMonths(-1),
-            fin: EscenarioPermisos.Instante.AddMonths(6),
+            inicio: escenario.FechaCivil(EscenarioPermisos.Instante.AddMonths(-1)),
+            fin: escenario.FechaCivil(EscenarioPermisos.Instante.AddMonths(6)),
             bloques: EscenarioPermisos.BloquesTodaLaSemana()));
 
         return escenario;

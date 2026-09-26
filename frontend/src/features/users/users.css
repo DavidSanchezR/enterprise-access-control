@@ -104,6 +104,12 @@
   padding: 0.2rem 0;
 }
 
+/* La regla global `input { width: 100% }` estiraba el radio a lo ancho de la etiqueta y desplazaba su
+   texto (VF-010). Se anula solo aquí para no alterar otros formularios. */
+.opcion-radio input {
+  width: auto;
+}
+
 .tabs {
   display: flex;
   gap: 0.25rem;

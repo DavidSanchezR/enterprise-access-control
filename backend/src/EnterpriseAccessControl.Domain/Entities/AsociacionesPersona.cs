@@ -144,9 +144,10 @@ public class AsignacionCredencial : EntidadBase
 /// A diferencia de compañía y unidad organizativa, **admite varios perfiles simultáneos** sin
 /// exclusividad mutua (RF-011).
 ///
-/// Tampoco está sujeta a la contención temporal de RF-072: el modelo de dominio no la declara
-/// dependiente de la pertenencia, y asumirlo sería inventar una dependencia que nadie estableció.
-/// Sí le aplica RF-071: su fecha de fin es obligatoria.
+/// Desde el cambio post-Baseline VF-007 está sujeta a la contención temporal de RF-072 al crearse
+/// (RF-082): no puede empezar antes ni terminar después de la pertenencia vigente. Sigue **fuera** de
+/// la cascada de RF-061: el modelo de dominio no la declara dependiente de la pertenencia, así que
+/// cerrar la pertenencia no la revoca. Sí le aplica RF-071: su fecha de fin es obligatoria.
 /// </remarks>
 public class AsignacionTipoPersona : EntidadBase
 {

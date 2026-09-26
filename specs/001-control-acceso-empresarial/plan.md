@@ -582,6 +582,273 @@ Cada prueba debe fallar si se revierte la capacidad que verifica; no basta con e
 6. Ninguna casilla de T001–T228 se modifica, y el gate de cierre se repite registrando el resultado en
    `docs/auditorias/`.
 
+### Plan post-Baseline VF-007 — contención de perfiles y permisos PERSONA (RF-082)
+
+> **Contexto**: cambio de requisito posterior al cierre del Baseline de Etapa 1 (T001–T242), no una
+> corrección. La implementación del Baseline cumplía RF-072 tal como estaba escrito. Fuente funcional:
+> spec.md, Sesión 2026-09-25, RF-082, CS-042, CS-043. Registro del hallazgo:
+> `docs/functional-validation/post-baseline-validation.md` §9. Decisiones técnicas: research.md §35.
+
+#### Constitution Check (VF-007)
+
+| Principio | Estado | Justificación |
+|---|---|---|
+| I. Seguridad server-side, denegación por defecto | PASS (tras corregir C1) | La regla se aplica en `Application`. El frontend solo orienta (research.md §35.5). Desactivar nunca se bloquea: reducir acceso siempre está permitido. En los permisos PERSONA se exige el alcance histórico del actor sobre la persona **antes** de consultar su pertenencia (`404`), así que los errores de contención no revelan datos de compañías fuera de alcance (research.md §35.6, hallazgo C1 de `/speckit-analyze`). |
+| II. UUID | PASS | Sin identificadores nuevos. |
+| III. Auditoría | PASS | Sin campos nuevos. Las actualizaciones siguen estampando `UpdatedAt`/`UpdatedById`. |
+| IV. Integridad temporal e históricos | PASS | Contención por fechas, nunca por `Estado`. Regla no retroactiva: ningún registro histórico se reescribe (CS-043). |
+| V. Jerarquías sin ciclos | N/A | — |
+| VI. Modelado explícito | PASS | Sin cambio estructural (data-model.md, undécima revisión). |
+| VII. Pruebas obligatorias | PASS | Cobertura unitaria, de integración, de contrato y de frontend definida abajo. |
+
+Ninguna violación. No requiere Complexity Tracking.
+
+#### Artefactos de diseño actualizados en este plan
+
+- research.md: §35 nueva y marca en §25.
+- data-model.md: undécima revisión y reglas de `AsignaciónTipoPersona` y `PermisoAcceso`.
+- `contracts/people.yaml` y `contracts/permissions.yaml`: v1.0.0 → v1.1.0.
+- quickstart.md: §9 nueva y §10 renumerada.
+- spec.md ya estaba actualizado desde `/speckit-clarify`. `tasks.md` no se toca.
+
+Estado verificado tras actualizar los contratos: `OpenApiSnapshotTests` falla con 2 de 42 casos por
+**exactamente** las tres operaciones previstas (`POST .../perfiles` 400/409; `POST`/`PUT /api/permisos` 409).
+Es el estado esperado hasta implementar WP-1 y WP-2.
+
+#### Paquetes de trabajo (sin numerar; `/speckit-tasks` fija la numeración)
+
+| WP | Trabajo | Capa | Depende de |
+|---|---|---|---|
+| WP-1 | `EstadoEfectivoService`: inyectar `ContencionTemporalValidator` y validar en `AsignarPerfilAsync` después de `NormalizarRango` y antes de verificar `TipoPersona`. `PersonasController`: `ProducesResponseType` 400/409 en `POST /perfiles`. Actualizar el comentario "sin contención" del servicio y de la entidad `AsignacionTipoPersona`. | backend | — |
+| WP-2 | `PermisoAccesoService`: inyectar el validador y crear el predicado puro de D4 (research.md §35.2) con la comparación de fechas con tolerancia de 1 ms (§35.3). `CrearAsync` valida después de `ValidarSujetoAsync` si `Alcance = PERSONA`. `ActualizarAsync` valida con el `PersonaId` almacenado, antes de mutar, solo si el predicado lo exige. En ambos casos, antes de la contención se exige el alcance histórico del actor sobre la persona con `PersonaService.ExigirAlcanceHistoricoAsync` (`404`; research.md §35.6, C1). `PermisosController`: `ProducesResponseType` 409 en `POST` y `PUT`, conservando `404`. Actualizar el comentario de la entidad `PermisoAcceso`. | backend | — |
+| WP-3 | Prueba unitaria parametrizada del predicado de D4 (alcance × estado previo × estado resultante × cambio de fechas). | pruebas | WP-2 |
+| WP-4 | Integración CS-042 para perfiles: casos (a)–(e). | pruebas | WP-1 |
+| WP-5 | Integración CS-042 para permisos: casos (a)–(e) en PERSONA; UO y COMPANIA aceptados fuera de contención; aislamiento entre compañías (persona fuera de alcance → `404 RECURSO_NO_ENCONTRADO`, nunca `400`/`409`; C1). | pruebas | WP-2 |
+| WP-6 | Integración CS-043: registros sembrados directamente en BD fuera de contención. Consultar, cambiar solo bloques, desactivar (también sin pertenencia), reactivar → 409/400, cambiar fechas fuera → 409 y dentro → 200, y la entrada en vigor no modifica filas. | pruebas | WP-1, WP-2 |
+| WP-7 | Integración RF-073 y frontera de la cascada: la renovación no altera perfiles ni permisos y amplía el límite para operaciones nuevas; al finalizar la pertenencia, perfiles y permisos no cambian. | pruebas | WP-1, WP-2 |
+| WP-8 | Ajuste de pruebas existentes que verificaban la regla anterior (ver Regresión). | pruebas | WP-1, WP-2 |
+| WP-9 | Contrato: aserciones de 400/409 en `HistorialPersonaContractTests` y `PermisosContractTests`; `OpenApiSnapshotTests` vuelve a verde. | pruebas | WP-1, WP-2 |
+| WP-10 | Frontend de perfiles: `PerfilesPersona.tsx` con `min`/`max` desde la pertenencia vigente (`useHistorialCompanias`), aviso sin pertenencia y mensajes de `SIN_PERTENENCIA_VIGENTE`/`FUERA_DE_CONTENCION_TEMPORAL`. Añadir `SIN_PERTENENCIA_VIGENTE` a `lib/problemDetails.ts`. | frontend | WP-1 |
+| WP-11 | Frontend de permisos: `PermisoFormulario.tsx` con mensajes específicos para ambos códigos cuando el alcance es PERSONA, y límite opcional calculado en UTC que funciona sin límite si la pertenencia no es visible (research.md §35.5). | frontend | WP-2 |
+| WP-12 | Vitest: `PerfilesPersona.test.tsx` (nuevo) y ampliación de `PermisosPage.test.tsx`. | pruebas | WP-10, WP-11 |
+| WP-13 | Cierre: las cinco suites en verde, escenarios de quickstart.md §9 y actualización del registro VF-007 (estado y evidencias) en `post-baseline-validation.md`. | cierre | todos |
+
+WP-1 y WP-2 son independientes y pueden ejecutarse en paralelo, porque tocan archivos distintos. WP-10 y
+WP-11 también.
+
+#### Regresión
+
+- **RF-072, las tres entidades originales**: `ContencionTemporalTests` (T088), `ContencionTemporalValidatorTests`
+  (T101) y las suites de contexto, unidad organizativa y credencial deben seguir en verde **sin modificación**.
+  El validador no cambia.
+- **Pruebas que verificaban la exclusión y deben invertirse**:
+  `ContencionTemporalTests.El_perfil_NO_esta_sujeto_a_contencion_temporal` pasa a esperar `409`.
+  `VigenciaObligatoriaYContencionTests`: `EstadoEfectivoService` y `PermisoAccesoService` pasan de
+  `NoSujetosAContencion` a los servicios que dependen del validador.
+- **Pruebas con fechas fuera de la pertenencia del escenario** (hoy − 1 mes, hoy + 1 año), que deben
+  ajustarse para que queden contenidas:
+  - `PerfilesPersonaTests.El_mismo_perfil_puede_repetirse_en_periodos_distintos`;
+  - `PerfilesPersonaTests.Los_perfiles_se_normalizan_a_dias_completos`: sus fechas fijas fallarían desde el
+    2026-10-01 y deben pasar a ser relativas;
+  - `PrecedenciaPermisosTests.La_precedencia_no_rescata_un_permiso_de_persona_vencido`;
+  - `PermisosTests.Actualizar_cambia_vigencia_estado_y_reemplaza_los_bloques`.
+- **Sin cambios, porque protegen la frontera de D3**: `PerfilesPersonaTests.Los_perfiles_no_se_revocan_al_cerrar_la_pertenencia`
+  y `HistorialPersonaContractTests.El_perfil_no_expone_campos_de_revocacion_en_cascada`.
+- **Evaluación de acceso**: sin cambios de código ni de pruebas. Sin pertenencia vigente, el paso 6 deniega
+  antes de los pasos 9 y 11–12, así que RF-082 no altera ninguna decisión de acceso.
+
+#### Datos históricos, RF-073 y cascada
+
+- **Históricos**: sin migración ni proceso de corrección. Las filas anteriores a RF-082 se prueban
+  sembrándolas directamente en BD (WP-6), igual que `RevalidacionDinamicaTests` siembra estados sin pasar por
+  el servicio.
+- **RF-073**: `HistorialPersonaService.RenovarAsync` no cambia. Como el validador consulta la pertenencia en
+  cada operación, la renovación amplía el límite de forma automática (WP-7).
+- **Cascada**: `RevocacionService` y `ReglasRevocacion` no se tocan. Cualquier cambio en esos archivos queda
+  fuera del alcance de VF-007.
+
+#### Riesgos
+
+| Riesgo | Mitigación |
+|---|---|
+| El límite de zona horaria en permisos (`datetime-local` frente a pertenencia en UTC) rechaza un fin "31/07 23:59" local | El límite del cliente se calcula en UTC (§35.5) y hay una prueba dedicada. La normalización a días queda fuera (VF-004). |
+| Los errores de contención revelan la pertenencia de una persona fuera del alcance del actor (hallazgo C1, Principio I) | **No se acepta.** Se exige el alcance histórico antes de consultar la pertenencia (`404`), en T245 y T246, y se prueba el aislamiento en T252 (research.md §35.6). La fuga preexistente de `ValidarSujetoAsync` queda fuera de VF-007 (registro §9.9). |
+| Un cambio de solo bloques se interpreta como cambio de fechas por diferencias de precisión | Tolerancia de 1 ms (§35.3) y caso en WP-6. |
+| Snapshot OpenAPI en rojo entre plan e implementación | Estado esperado y verificado. WP-9 lo devuelve a verde. |
+| Pruebas con fechas fijas que caducan | Pasan a fechas relativas en WP-8. |
+
+#### Validación y cierre de VF-007
+
+1. Las cinco suites (unitarias, integración, contrato, Vitest, Playwright) en verde, sin regresión en
+   T001–T242.
+2. `OpenApiSnapshotTests` en verde contra `people.yaml` y `permissions.yaml` v1.1.0.
+3. CS-042 y CS-043 cubiertos por pruebas automatizadas que fallarían si se revirtiera RF-082.
+4. Escenarios de quickstart.md §9 reproducidos.
+5. `RevocacionService`, `ReglasRevocacion`, `EvaluadorDeAcceso` y T001–T242 sin cambios (comprobable con
+   `git diff`).
+6. VF-007 en `post-baseline-validation.md` pasa a FIXED y después a VALIDATED, con referencia a las pruebas.
+
+#### Trazabilidad
+
+| Requisito | Diseño | WP | Evidencia |
+|---|---|---|---|
+| RF-082 (perfil) | research.md §35.1; people.yaml v1.1.0 | WP-1, WP-10 | WP-4, WP-6, WP-9, WP-12 |
+| RF-082 (permiso PERSONA, D4) | research.md §35.2–35.3; permissions.yaml v1.1.0 | WP-2, WP-11 | WP-3, WP-5, WP-6, WP-9, WP-12 |
+| CS-042 | quickstart.md §9.1–9.2 | WP-1, WP-2 | WP-4, WP-5 |
+| CS-043 | quickstart.md §9.3 | WP-2 | WP-6 |
+| RF-072 (sin cambios) | research.md §25 | — | Regresión T088/T101 |
+| RF-073 / RF-061 (frontera) | research.md §35 | — | WP-7 y pruebas de D3 sin cambios |
+
+### Plan post-Baseline VF-004 — vigencia diaria del permiso de acceso (RF-083)
+
+> **Contexto**: cambio de requisito posterior al cierre del Baseline, no una corrección: Historia 8 y RF-029
+> exigían fecha y hora, y la implementación los cumplía. Fuente funcional: spec.md, Sesión 2026-09-25 (VF-004),
+> RF-083, CS-044 a CS-047 y decisiones F-1 a F-7. Registro del hallazgo:
+> `docs/functional-validation/post-baseline-validation.md` §19. Decisiones técnicas: research.md §36. Los
+> paquetes de trabajo de esta sección (WP-1 a WP-12) son propios de VF-004 y no se corresponden con los de
+> VF-007.
+
+#### Contexto técnico (delta)
+
+- Sin dependencias nuevas. NodaTime 3.3.4 ya está referenciado en `Application` e `Infrastructure`
+  (`DateTimeZone.AtStartOfDay`, `LocalDate.FromDateOnly`). En el frontend, `Intl.DateTimeFormat` y los helpers
+  de `lib/fechas.ts`.
+- Sin cambios de esquema ni migraciones. `PermisoAcceso.FechaHoraInicioVigencia` y `FechaHoraFinVigencia`
+  siguen siendo `datetime2(3)` UTC. La conversión desde fechas civiles ocurre al escribir (research.md §36.1).
+- Contrato `permissions.yaml` 1.1.0 → 2.0.0, incompatible en la petición (§36.5).
+- No quedan puntos NEEDS CLARIFICATION: F-1 a F-7 están cerrados en spec.md, y las cuestiones técnicas
+  (cambio de horario, zona, fecha declarada de la pertenencia, contrato, E2E) se resuelven en research.md §36.
+
+#### Constitution Check (VF-004)
+
+| Principio | Estado | Justificación |
+|---|---|---|
+| I. Seguridad server-side, denegación por defecto | PASS | La conversión, la conservación por extremo (F-6) y la contención se deciden en `Application`; el frontend solo orienta. El orden de autorización no cambia: alcance del área (`404`), sujeto, alcance histórico sobre la persona (`404`), pertenencia y contención, y después la escritura. La zona de la Principal solo se lee tras confirmar el alcance sobre el área (§36.2). Un cliente con el contrato antiguo recibe `400`: nunca se interpreta mal un instante. |
+| II. UUID | PASS | Sin identificadores nuevos. |
+| III. Auditoría | PASS | Sin campos nuevos. Las escrituras siguen estampando `CreatedAt`/`UpdatedAt` por el interceptor. |
+| IV. Integridad temporal e históricos | PASS | Persistencia en UTC. La conversión usa la zona de la Principal (RF-080). La evaluación sigue comparando instantes. No es retroactiva: sin migración ni reinterpretación, y los extremos no modificados conservan su instante (F-4, F-6). |
+| V. Jerarquías sin ciclos | N/A | — |
+| VI. Modelado explícito | PASS | Sin cambio estructural (data-model.md, duodécima revisión). La regla temporal vive en una clase pura con nombre propio (`VigenciaDiariaPermiso`). |
+| VII. Pruebas obligatorias | PASS | Cobertura unitaria (incluidos los cambios de horario), de integración, de contrato, Vitest y E2E, definida abajo. |
+
+Ninguna violación. No requiere Complexity Tracking.
+
+#### Artefactos de diseño actualizados en este plan
+
+- research.md: §36 nueva.
+- data-model.md: duodécima revisión y reglas de `PermisoAcceso`.
+- `contracts/permissions.yaml`: v1.1.0 → **v2.0.0**.
+- quickstart.md: nota VF-004 en §5 paso 8 y §9, §10 nueva y "Próximos pasos" renumerado como §11.
+- ux-ui.md §18: vigencia del permiso (controles de fecha y presentación).
+- spec.md ya estaba actualizado desde `/speckit-clarify`. `tasks.md` no se toca.
+
+Estado esperado tras actualizar el contrato: `OpenApiSnapshotTests` y `PermisosContractTests` fallan en
+`PermisoAccesoRequest` y `PermisoAcceso` hasta implementar WP-3. Es el mismo estado transitorio que en
+VF-007.
+
+#### Paquetes de trabajo (sin numerar; `/speckit-tasks` fija la numeración a partir de T287)
+
+| WP | Trabajo | Capa | Depende de |
+|---|---|---|---|
+| WP-1 | `VigenciaDiariaPermiso` (nueva, `Application/Permissions`, estática y pura): `InicioUtc(DateOnly, DateTimeZone)`, `FinUtc(DateOnly, DateTimeZone)`, `FechaCivil(DateTime, DateTimeZone)`, `EsDiaCompleto(inicio, fin, zona)` y la resolución de un extremo (conservar o normalizar, F-6). `SkippedTimeException` de día completo → `400 VALIDACION_ENTRADA` (§36.1). | backend | — |
+| WP-2 | `ContencionTemporalValidator`: añadir `ValidarFechasCivilesAsync(personaId, DateOnly, DateOnly)` y su comprobación pura `ValidarFechasCiviles`, con fecha declarada de la pertenencia = componentes de fecha UTC (§36.4), mismos códigos y mensajes. `ValidarAsync` y `ObtenerPertenenciaVigenteAsync` no cambian. | backend | — |
+| WP-3 | DTOs y validadores: `PermisoAccesoRequest` con `DateOnly FechaInicioVigencia`/`FechaFinVigencia` en lugar de los `DateTime`; `PermisoAccesoDto` con los instantes, más `FechaInicioVigencia`, `FechaFinVigencia`, `VigenciaEnDiasCompletos` y `ZonaHorariaIana`; `PermisosRequestValidators` con los nombres nuevos (campo ausente → `400` que lo nombra). | backend | — |
+| WP-4 | `PermisoAccesoService`:<br>• `ValidarVigencia` por fechas (fin ≥ inicio, `PERIODO_INVALIDO`), pura y antes del alcance, como hoy.<br>• `CrearAsync`: `ExigirAreaEnAlcanceAsync` devuelve la zona efectiva; tras `ValidarSujetoAsync`, convierte con WP-1 y, si `RequiereContencion`, llama a `ContenerEnPertenenciaAsync` con fechas civiles (alcance histórico → WP-2).<br>• `ActualizarAsync`: tras `ObtenerEnAlcanceAsync` y la comprobación de alcance, zona por el área almacenada, resolución por extremo (WP-1); después de resolver los extremos, se exige `FinUtc > InicioUtc` o `400 PERIODO_INVALIDO`, **antes** de la contención y de persistir (un extremo antiguo conservado puede dar instantes vacíos o invertidos; research.md §36.3); `fechasCambian` = algún extremo cambió; D4 sin cambios; contención antes de mutar.<br>• `ListarAsync`/`ObtenerAsync`: zonas por lote para `AMapa`.<br>• Eliminar `ReglaContencionPermiso.FechasCambian` (queda sin uso) y actualizar los comentarios de `PermisoAccesoService`, `ReglaContencionPermiso` y la entidad `PermisoAcceso`. | backend | WP-1, WP-2, WP-3 |
+| WP-5 | Unitarias: `VigenciaDiariaPermisoTests` (Lima; `America/Santiago` en el día sin 00:00 y en el día con 25 h; fin = inicio del día siguiente − 1 ms; fecha civil de instantes antiguos; `EsDiaCompleto`; conservación y normalización por extremo; día omitido en `Pacific/Apia` 2011-12-30), `ValidarFechasCiviles` (igualdad válida en ambos extremos, fuera por un día), y `ReglaContencionPermisoTests` sin los casos de `FechasCambian` (la matriz de `RequiereContencion` se mantiene). | pruebas | WP-1, WP-2, WP-4 |
+| WP-6 | Integración, nueva `VigenciaDiariaPermisosTests`: CS-044 (instantes persistidos y evaluación 23:00/00:30/fuera de bloque), CS-045 (un día; fin < inicio; campos antiguos → `400`), RF-082 por fecha civil (mismo último día que la pertenencia → `201`; día siguiente → `409`; aislamiento `404` antes de la contención), CS-046 (permiso con hora sembrado en BD: `GET`, `PUT` solo bloques o estado, `PUT` cambiando un extremo), CS-047 (cambio de zona sin modificar filas; `vigenciaEnDiasCompletos` se recalcula), y permisos UO/COMPANIA sin contención. | pruebas | WP-4 |
+| WP-7 | Adaptación de pruebas existentes (ver Regresión) y del helper `EscenarioPermisos.Peticion` a `DateOnly`, con conversión explícita en cada llamada. | pruebas | WP-3, WP-4 |
+| WP-8 | Contrato: `PermisosContractTests` con `fechaInicioVigencia`/`fechaFinVigencia` obligatorias y `format: date` en la petición, y los cuatro campos nuevos de la respuesta. `OpenApiSnapshotTests` vuelve a verde. | pruebas | WP-3 |
+| WP-9 | Frontend:<br>• `lib/fechas.ts`: `fechaDeclarada(iso)` y `formatearFecha(AAAA-MM-DD)`, sin conversión de zona.<br>• `permissions/api.ts`: tipos de la v2.0.0.<br>• `PermisoFormulario.tsx`: `type="date"`; zod con fin ≥ inicio; valores iniciales desde las fechas civiles de la respuesta; sin `conservarSiNoCambio`; nota de instantes actuales si `vigenciaEnDiasCompletos = false`; `min`/`max` y ayuda de RF-082 con las fechas declaradas de la pertenencia.<br>• `PermisosPage.tsx`: vigencia con solo fechas o con fecha y hora en `zonaHorariaIana` según `vigenciaEnDiasCompletos` (sustituye `toLocaleString()`). | frontend | WP-3 (contrato) |
+| WP-10 | Vitest: adaptar `PermisosPage.test.tsx` (valores `AAAA-MM-DD`, petición con los campos nuevos, límites RF-082 por fecha declarada) y añadir casos: listado solo con fechas, permiso con hora en la zona de la Principal, nota en la edición de un permiso con hora, mismo día válido, fin < inicio con error, y una edición sin cambios que reenvía las mismas fechas. Pruebas de los helpers nuevos. | pruebas | WP-9 |
+| WP-11 | E2E: `soporte/tiempo.ts` (`inicio = referencia − 2 días`; `fechaInicioPermiso`/`fechaFinPermiso`, §36.10), `soporte/seccion5.ts` y `multi-principal-quickstart.spec.ts` con los campos `date`. Reconstruir el contenedor `eac-api` para ejecutar Playwright contra la API nueva, sin exponer secretos. | pruebas | WP-4, WP-9 |
+| WP-12 | Cierre: las cinco suites en verde, tabla de cobertura en quickstart.md §10 y registro VF-004 (§19) pasado a FIXED y después a VALIDATED con sus evidencias. | cierre | todos |
+
+WP-1, WP-2 y WP-3 son independientes entre sí. WP-9 puede empezar en paralelo a WP-4 una vez fijado el
+contrato.
+
+#### Regresión
+
+- **Sin cambios de código ni de pruebas**: `PermisoAcceso.EstaVigenteEn`, `EvaluadorDeAcceso`,
+  `EvaluacionAccesoService`, `BloqueHorarioPermiso`, `RevocacionService`, `ReglasRevocacion`,
+  `Vigencia`, `ContencionTemporalValidator.ValidarAsync` y los servicios de las entidades de RF-072 y de los
+  perfiles. Las suites de RF-072 (`ContencionTemporalTests`, `ContencionTemporalValidatorTests`) y de perfiles
+  deben seguir en verde sin modificación. Tampoco cambian las pruebas que siembran `PermisoAcceso` directamente
+  (`EscenarioEvaluacion`, `EvaluacionAccesoPerformanceTests`).
+- **Pruebas cuya expectativa cambia por RF-083**:
+  - `PermisosTests`: la petición con inicio = fin (hoy `PERIODO_INVALIDO`) pasa a ser válida. Se sustituye por
+    fin < inicio y se añade el caso de un solo día. El caso de campo ausente usa los nombres nuevos.
+  - `EvaluacionAccesoTests`: el permiso "vencido" con fin `Instante − 1 h` cae el mismo día civil en Lima y
+    pasaría a estar vigente; se usa el día anterior.
+  - `RegistrosAnterioresRf082Tests`: el caso de tolerancia submilisegundo (`AddTicks(±5000)`) se sustituye por
+    "reenviar las mismas fechas civiles conserva los instantes". Los demás casos pasan a enviar fechas
+    civiles.
+- **Pruebas que solo cambian la forma de la petición** (`DateTime` → `DateOnly`, a través de
+  `EscenarioPermisos.Peticion`): `ContencionPermisosPersonaTests` y `Rf082RenovacionYCascadaTests` (con la
+  fecha **declarada** de la pertenencia, `DateOnly.FromDateTime(...)`, nunca su conversión a Lima), y
+  `PrecedenciaPermisosTests`, `GateCredencialTests`, `RevalidacionDinamicaTests`,
+  `EvaluacionAccesoContratistaTests`, `EvaluacionAccesoTests` y el resto de llamadas a `Peticion`.
+- **Contrato**: `PermisosContractTests` (nombres y formato de la vigencia) y `OpenApiSnapshotTests`.
+- **Frontend**: `PermisosPage.test.tsx`. `administracion-usuarios.spec.ts` rellena la vigencia de un rol
+  administrativo, no la de un permiso, y no cambia.
+
+#### Datos existentes
+
+| Caso | Tratamiento |
+|---|---|
+| A. Permisos existentes con instantes históricos | Sin migración ni reinterpretación. Se evalúan con sus instantes y se devuelven con ellos. Se muestran con fecha y hora si no coinciden con límites de día (`vigenciaEnDiasCompletos = false`). |
+| B. Permisos nuevos (RF-083) | Instantes calculados con §36.1 en la zona efectiva de la Principal del área. |
+| C. Permisos existentes editados (F-6) | Por extremo: fecha civil sin cambios → instante conservado; fecha cambiada → normalizado. Cambiar solo bloques o estado conserva ambos. La contención solo se valida en los supuestos de D4. |
+
+No hay migración de EF Core, script SQL ni proceso por lotes. Los casos A y C se prueban sembrando filas
+directamente en BD (WP-6), igual que en VF-007.
+
+#### Riesgos
+
+| Riesgo | Mitigación |
+|---|---|
+| Suponer que 00:00 o 23:59:59.999 locales existen en días con cambio de horario | `AtStartOfDay` (primer instante válido) y fin = inicio del día siguiente − 1 ms; pruebas unitarias con `America/Santiago` (WP-5). |
+| Rechazo del último día de la pertenencia por la diferencia UTC (Lima) | Contención por fecha civil con la fecha declarada de la pertenencia (§36.4); caso dedicado en WP-6. |
+| Convertir el instante de la pertenencia a Lima en pruebas o en código (desplaza un día) | La fecha declarada se toma de los componentes UTC y está documentada en §36.4; el helper de pruebas exige `DateOnly` explícito (WP-7). |
+| Cambiar en silencio un extremo no editado | Resolución por extremo en el servidor (WP-1, WP-4) y casos CS-046 en WP-6. |
+| La zona leída antes del alcance revela datos | La zona sale de la misma consulta que confirma el alcance (§36.2) y se prueba el `404`. |
+| Un cliente antiguo con `fechaHora*` | `400` que nombra los campos nuevos; caso en WP-6. SPA y E2E se actualizan en el mismo cambio. |
+| El E2E falla según la hora de ejecución (22:00–23:59 en Lima) | Nuevo reloj de §36.10 (WP-11). |
+| `OpenApiSnapshotTests` en rojo entre el plan y la implementación | Estado esperado. WP-8 lo devuelve a verde. |
+| Divergencia entre cliente y servidor sobre qué es "día completo" | Lo calcula solo el servidor (`vigenciaEnDiasCompletos`, §36.6). |
+
+#### Validación y cierre de VF-004
+
+1. Las cinco suites (unitarias, integración, contrato, Vitest, Playwright) en verde, sin regresión en
+   T001–T286.
+2. `OpenApiSnapshotTests` en verde contra `permissions.yaml` v2.0.0.
+3. CS-044 a CS-047 y el caso RF-082 por fecha civil cubiertos por pruebas que fallarían si se revirtiera
+   RF-083. Se demuestra con **regresiones dirigidas sobre la implementación nueva de VF-004** (T310), no
+   restaurando el servicio anterior, que no compila con los DTO `DateOnly`. Cada alteración se introduce por
+   separado y se deshace antes de la siguiente: (a) día UTC en `InicioUtc`/`FinUtc`; (b) en el punto de llamada
+   de `PermisoAccesoService.ContenerEnPertenenciaAsync`, `ValidarAsync` por instantes en lugar de
+   `ValidarFechasCivilesAsync`; (c) `ResolverExtremo` que siempre normaliza. Después se restaura exactamente,
+   verificado por hash y `git diff`, y las suites vuelven a verde.
+4. Escenarios de quickstart.md §10 cubiertos.
+5. Sin cambios en `EstaVigenteEn`, `EvaluadorDeAcceso`, `EvaluacionAccesoService`, `BloqueHorarioPermiso`,
+   `Vigencia`, `ContencionTemporalValidator.ValidarAsync`, `RevocacionService`, `ReglasRevocacion`,
+   migraciones ni T001–T286 (comprobable con `git diff`).
+6. VF-004 pasa a FIXED y después a VALIDATED en `post-baseline-validation.md` §19, con referencia a las
+   pruebas.
+
+#### Trazabilidad
+
+| Requisito / decisión | Diseño | WP | Evidencia |
+|---|---|---|---|
+| RF-083 (a), F-1 | research.md §36.1–36.2 | WP-1, WP-4 | WP-5, WP-6 (CS-044, CS-045) |
+| RF-083 (b), paso 12 | research.md §36.9 | — | WP-6 (CS-044) y regresión de evaluación |
+| RF-083 (c), RF-082, F-2 | research.md §36.4 | WP-2, WP-4, WP-9 | WP-5, WP-6, WP-10 |
+| RF-083 (d), F-6, D4 | research.md §36.3 | WP-1, WP-4 | WP-5, WP-6 (CS-046) |
+| RF-083 (e), F-3 | research.md §36.5; permissions.yaml v2.0.0 | WP-3, WP-9, WP-11 | WP-6, WP-8, WP-11 |
+| RF-083 (f), F-5 | research.md §36.6–36.7 | WP-3, WP-9 | WP-6, WP-10 |
+| RF-083 (g), F-4 | research.md §36.8 | — | WP-6 (CS-046) |
+| RF-083 (h), F-7, RF-080 | research.md §36.2, §36.8 | WP-4 | WP-6 (CS-047) |
+| RF-022, RF-072, D1–D4, cascada (sin cambios) | research.md §36.9 | — | Regresión |
+
 ## Project Structure
 
 ### Documentation (this feature)

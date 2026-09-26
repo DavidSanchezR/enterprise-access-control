@@ -48,6 +48,13 @@ export interface Reloj {
   inicio: string
   /** Fin de la pertenencia; las asociaciones dependientes lo reutilizan (contención, RF-072). */
   fin: string
+  /**
+   * Fecha civil de inicio de los permisos (`AAAA-MM-DD`, `permissions.yaml` v2.0.0; VF-004, RF-083): la que
+   * declara la pertenencia del escenario, que el servidor normaliza al día UTC de {@link Reloj.inicio}.
+   */
+  fechaInicioPermiso: string
+  /** Fecha civil de fin de los permisos: la que declara la pertenencia, igual a la fecha UTC de {@link Reloj.fin}. */
+  fechaFinPermiso: string
   /** Bloque del día de la referencia en Lima que la cubre: [hh:00, hh+1:00). */
   bloque: { diaSemana: DiaSemana; horaInicio: string; horaFin: string }
   /** Instante del mismo día en Lima fuera del bloque y dentro de todas las demás vigencias. */
@@ -69,14 +76,23 @@ export async function fijarReloj(): Promise<Reloj> {
   const { dia, hora } = horaEnLima(referencia)
 
   // Dos horas después, o antes si ya es tarde: sigue siendo el mismo día en Lima y queda fuera de
-  // [hh:00, hh+1:00). Las vigencias empiezan tres horas antes para cubrirlo en ambos sentidos, de modo
-  // que el único motivo de denegación posible sea el horario.
+  // [hh:00, hh+1:00). Las vigencias empiezan antes para cubrirlo en ambos sentidos, de modo que el único
+  // motivo de denegación posible sea el horario.
   const fueraDelBloque = new Date(referencia.getTime() + (hora <= 21 ? 2 : -2) * HORA_MS)
+
+  // VF-004 (research.md §36.10): el permiso empieza a las 00:00 de Lima (05:00 UTC) del día que declara la
+  // pertenencia, y ese día es la fecha UTC de `inicio`. Con `referencia − 3 h`, entre las 22:00 y las 23:59
+  // de Lima esa fecha UTC ya es la de la referencia, y el permiso empezaría después de ella. Dos días antes,
+  // el primer instante del permiso es siempre anterior a `referencia` y a `fueraDelBloque`.
+  const inicio = new Date(referencia.getTime() - 48 * HORA_MS).toISOString()
+  const fin = new Date(referencia.getTime() + 365 * 24 * HORA_MS).toISOString()
 
   return {
     referencia,
-    inicio: new Date(referencia.getTime() - 3 * HORA_MS).toISOString(),
-    fin: new Date(referencia.getTime() + 365 * 24 * HORA_MS).toISOString(),
+    inicio,
+    fin,
+    fechaInicioPermiso: inicio.slice(0, 10),
+    fechaFinPermiso: fin.slice(0, 10),
     bloque: {
       diaSemana: dia,
       horaInicio: `${dosDigitos(hora)}:00`,

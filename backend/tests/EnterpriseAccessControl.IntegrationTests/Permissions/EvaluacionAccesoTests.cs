@@ -198,8 +198,13 @@ public sealed class EvaluacionAccesoTests(SqlServerFixture fixture)
     {
         var escenario = await MontarAsync();
 
-        // Existe un permiso en el área, pero para otra persona.
-        var otra = await fixture.Api.SembrarPersonaAsync();
+        // Existe un permiso en el área, pero para otra persona. Esa persona necesita una pertenencia que
+        // contenga la vigencia del permiso: desde RF-082 (VF-007) un permiso PERSONA activo no puede
+        // otorgarse a quien no tiene pertenencia vigente.
+        var otra = await fixture.Api.SembrarPersonaAsync(
+            companiaId: escenario.PrincipalA.Id,
+            inicioVigencia: DateTime.UtcNow.AddMonths(-2),
+            finVigencia: DateTime.UtcNow.AddYears(1));
         await escenario.CrearPermisoAsync(AlcancePermiso.PERSONA, sujetoId: otra.Id);
 
         var resultado = await escenario.EvaluarAsync();
@@ -212,10 +217,12 @@ public sealed class EvaluacionAccesoTests(SqlServerFixture fixture)
     {
         var escenario = await MontarAsync();
 
+        // Desde VF-004 (RF-083) la vigencia es de días completos: un fin una hora antes caería el mismo día
+        // civil y el permiso seguiría vigente. Vence al terminar el día anterior al evaluado (hora de Lima).
         await escenario.CrearPermisoAsync(escenario.Peticion(
             AlcancePermiso.PERSONA,
-            inicio: EscenarioPermisos.Instante.AddMonths(-1),
-            fin: EscenarioPermisos.Instante.AddHours(-1)));
+            inicio: escenario.FechaCivil(EscenarioPermisos.Instante.AddMonths(-1)),
+            fin: escenario.FechaCivil(EscenarioPermisos.Instante).AddDays(-1)));
 
         var resultado = await escenario.EvaluarAsync();
 

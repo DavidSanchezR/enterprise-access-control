@@ -206,9 +206,22 @@ export function Tree({ nodos, etiqueta, seleccionadoId, onSeleccionar }: TreePro
               outlineOffset: '2px',
             }}
           >
-            <span aria-hidden="true">
-              {item.tieneHijos ? (item.expandido ? '▾ ' : '▸ ') : '• '}
-            </span>
+            {/* El indicador expande y contrae con el ratón (RF-036); el clic en el nombre sigue siendo
+                selección. Queda fuera del nombre accesible y del orden de tabulación porque el teclado
+                ya lo cubre con las flechas (patrón ARIA treeview). */}
+            {item.tieneHijos ? (
+              <span
+                aria-hidden="true"
+                onClick={(evento) => {
+                  evento.stopPropagation()
+                  alternar(item.nodo.id)
+                }}
+              >
+                {item.expandido ? '▾ ' : '▸ '}
+              </span>
+            ) : (
+              <span aria-hidden="true">• </span>
+            )}
             <span>{item.nodo.nombre}</span>
 
             {/* El estado seleccionado se anuncia con texto, no solo con color (ux-ui.md §26). */}

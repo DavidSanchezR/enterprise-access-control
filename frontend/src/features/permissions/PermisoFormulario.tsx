@@ -1,13 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
 import { useState, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Dialogo } from '../../components/Dialogo'
 import { ApiError } from '../../lib/apiClient'
-import { aIsoUtc, aValorLocal } from '../../lib/fechas'
+import { fechaDeclarada, formatearFecha, formatearFechaHora } from '../../lib/fechas'
+import { CodigosError } from '../../lib/problemDetails'
 import { ESTADOS } from '../companies/api'
 import { useCompanias } from '../companies/hooks'
 import { useUnidades } from '../org-units/hooks'
+import { listarHistorialCompanias } from '../people/history/api'
+import { clavesHistorial } from '../people/history/hooks'
+import { pertenenciaVigente } from '../people/history/pertenenciaVigente'
 import { usePersonas } from '../people/hooks'
 import {
   ALCANCES,
@@ -26,34 +31,38 @@ const esquema = z
     alcance: z.enum(ALCANCES),
     sujetoId: z.string().min(1, 'Indique a quién se otorga el permiso.'),
     // RF-021, RF-071: inicio y fin obligatorios para los tres alcances; no hay vigencia indefinida.
-    fechaHoraInicioVigencia: z.string().min(1, 'Indique el inicio de vigencia.'),
-    fechaHoraFinVigencia: z.string().min(1, 'Indique el fin de vigencia: es obligatorio.'),
+    // VF-004 (RF-083): son fechas civiles `AAAA-MM-DD`, cada una un día completo en la zona de la Principal.
+    fechaInicioVigencia: z.string().min(1, 'Indique el inicio de vigencia.'),
+    fechaFinVigencia: z.string().min(1, 'Indique el fin de vigencia: es obligatorio.'),
     estado: z.enum(ESTADOS),
   })
   .refine(
+    // `AAAA-MM-DD` se ordena igual como texto que como fecha. La igualdad es válida: un permiso de un día.
     (valores) =>
-      valores.fechaHoraInicioVigencia === '' ||
-      valores.fechaHoraFinVigencia === '' ||
-      new Date(valores.fechaHoraFinVigencia) > new Date(valores.fechaHoraInicioVigencia),
+      valores.fechaInicioVigencia === '' ||
+      valores.fechaFinVigencia === '' ||
+      valores.fechaFinVigencia >= valores.fechaInicioVigencia,
     {
-      path: ['fechaHoraFinVigencia'],
-      message: 'El fin de vigencia debe ser posterior al inicio.',
+      path: ['fechaFinVigencia'],
+      message: 'El fin de vigencia no puede ser anterior al inicio.',
     },
   )
 
 type Formulario = z.infer<typeof esquema>
 
 /**
- * Devuelve el instante original si el usuario no tocó el campo.
- *
- * `datetime-local` solo tiene precisión de minutos: reenviar un fin de vigencia `23:59:59.999` tal
- * como lo muestra el control lo convertiría en `23:59:00.000` y acortaría el permiso en silencio al
- * editar cualquier otro dato.
+ * Mensaje para los rechazos de contención de RF-082 (cambio post-Baseline VF-007), que solo se dan en
+ * permisos por persona. El resto de errores conserva el texto del servidor.
  */
-function conservarSiNoCambio(valorLocal: string, original: string | undefined): string {
-  return original !== undefined && valorLocal === aValorLocal(original)
-    ? original
-    : aIsoUtc(valorLocal)
+function mensajeDeError(error: ApiError): string {
+  switch (error.codigo) {
+    case CodigosError.FUERA_DE_CONTENCION_TEMPORAL:
+      return 'La vigencia de un permiso por persona debe quedar dentro de la pertenencia vigente de esa persona.'
+    case CodigosError.SIN_PERTENENCIA_VIGENTE:
+      return 'La persona no tiene una pertenencia vigente: no se le puede otorgar, ampliar ni reactivar un permiso por persona.'
+    default:
+      return error.message
+  }
 }
 
 /**
@@ -97,18 +106,38 @@ export function PermisoFormulario(
     defaultValues: {
       alcance: edicion?.alcance ?? 'PERSONA',
       sujetoId: edicion ? (sujetoDe(edicion) ?? '') : '',
-      fechaHoraInicioVigencia: edicion ? aValorLocal(edicion.fechaHoraInicioVigencia) : '',
-      fechaHoraFinVigencia: edicion ? aValorLocal(edicion.fechaHoraFinVigencia) : '',
+      // Fechas civiles calculadas por el servidor en la zona de la Principal (RF-083): se reenvían tal cual y,
+      // si no cambian, el servidor conserva el instante almacenado (F-6).
+      fechaInicioVigencia: edicion?.fechaInicioVigencia ?? '',
+      fechaFinVigencia: edicion?.fechaFinVigencia ?? '',
       estado: edicion?.estado ?? 'ACTIVO',
     },
   })
 
   const alcance = useWatch({ control, name: 'alcance' })
+  const sujetoId = useWatch({ control, name: 'sujetoId' })
 
   const personas = usePersonas({ texto: textoPersona, tamañoPagina: 20 })
   const unidades = useUnidades(props.companiaPrincipalId)
   // research.md §12: el alcance COMPAÑÍA admite Principales y Contratistas por igual.
   const companias = useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })
+
+  // RF-082 (VF-007): orientación, nunca regla. Solo el alcance PERSONA tiene una pertenencia que sirva
+  // de límite. Si el historial no puede leerse —p. ej. 404, porque se administra el área pero no la
+  // persona—, el formulario sigue funcionando sin límite y decide el servidor (research.md §35.5).
+  const personaId = alcance === 'PERSONA' ? sujetoId : ''
+  const historial = useQuery({
+    queryKey: clavesHistorial.companias(personaId),
+    queryFn: () => listarHistorialCompanias(personaId),
+    enabled: personaId !== '',
+    retry: false,
+  })
+  const vigente = personaId === '' ? undefined : pertenenciaVigente(historial.data)
+
+  // VF-004: la contención del permiso se compara por fecha civil (RF-083 (c)), así que el límite son las
+  // fechas que declara la pertenencia, sin convertirlas a ninguna zona (research.md §36.7).
+  const minimo = vigente ? fechaDeclarada(vigente.fechaHoraInicio) : undefined
+  const maximo = vigente ? fechaDeclarada(vigente.fechaHoraFin) : undefined
 
   const error = mutacion.error instanceof ApiError ? mutacion.error : undefined
 
@@ -125,14 +154,8 @@ export function PermisoFormulario(
       personaId: valores.alcance === 'PERSONA' ? valores.sujetoId : null,
       unidadOrganizativaId: valores.alcance === 'UNIDAD_ORGANIZATIVA' ? valores.sujetoId : null,
       companiaId: valores.alcance === 'COMPANIA' ? valores.sujetoId : null,
-      fechaHoraInicioVigencia: conservarSiNoCambio(
-        valores.fechaHoraInicioVigencia,
-        edicion?.fechaHoraInicioVigencia,
-      ),
-      fechaHoraFinVigencia: conservarSiNoCambio(
-        valores.fechaHoraFinVigencia,
-        edicion?.fechaHoraFinVigencia,
-      ),
+      fechaInicioVigencia: valores.fechaInicioVigencia,
+      fechaFinVigencia: valores.fechaFinVigencia,
       estado: valores.estado,
       bloquesHorarios: bloques,
     }
@@ -160,7 +183,7 @@ export function PermisoFormulario(
       >
         {error && (
           <p className="aviso error" role="alert">
-            {error.message}
+            {mensajeDeError(error)}
           </p>
         )}
 
@@ -190,6 +213,7 @@ export function PermisoFormulario(
                 <input
                   id="permiso-buscar-persona"
                   type="search"
+                  placeholder="Ingrese su nro. de documento"
                   value={textoPersona}
                   onChange={(evento) => setTextoPersona(evento.target.value)}
                 />
@@ -232,19 +256,31 @@ export function PermisoFormulario(
           </>
         )}
 
+        {edicion && !edicion.vigenciaEnDiasCompletos && (
+          // F-5/F-6: un permiso anterior con hora no se presenta como si fuera de días completos.
+          <p className="aviso" role="note">
+            Este permiso tiene una vigencia con hora:{' '}
+            {formatearFechaHora(edicion.fechaHoraInicioVigencia, edicion.zonaHorariaIana)} –{' '}
+            {formatearFechaHora(edicion.fechaHoraFinVigencia, edicion.zonaHorariaIana)}. Si conserva
+            una fecha, se conserva también su hora; solo cambia el extremo cuya fecha modifique.
+          </p>
+        )}
+
         <div className="permiso-vigencia">
           <div className="campo">
             <label htmlFor="permiso-inicio">Inicio de vigencia</label>
             <input
               id="permiso-inicio"
-              type="datetime-local"
+              type="date"
               required
-              aria-invalid={errors.fechaHoraInicioVigencia ? 'true' : undefined}
-              {...register('fechaHoraInicioVigencia')}
+              min={minimo}
+              max={maximo}
+              aria-invalid={errors.fechaInicioVigencia ? 'true' : undefined}
+              {...register('fechaInicioVigencia')}
             />
-            {errors.fechaHoraInicioVigencia && (
+            {errors.fechaInicioVigencia && (
               <span className="error-campo" role="alert">
-                {errors.fechaHoraInicioVigencia.message}
+                {errors.fechaInicioVigencia.message}
               </span>
             )}
           </div>
@@ -253,18 +289,25 @@ export function PermisoFormulario(
             <label htmlFor="permiso-fin">Fin de vigencia</label>
             <input
               id="permiso-fin"
-              type="datetime-local"
+              type="date"
               required
-              aria-invalid={errors.fechaHoraFinVigencia ? 'true' : undefined}
+              min={minimo}
+              max={maximo}
+              aria-invalid={errors.fechaFinVigencia ? 'true' : undefined}
               aria-describedby="permiso-fin-ayuda"
-              {...register('fechaHoraFinVigencia')}
+              {...register('fechaFinVigencia')}
             />
             <span className="campo-ayuda" id="permiso-fin-ayuda">
-              Obligatorio: un permiso de acceso siempre tiene fecha de término.
+              Obligatorio: un permiso de acceso siempre tiene fecha de término. Cada fecha es un día
+              completo; los horarios dentro del día se definen con los bloques horarios.
+              {vigente &&
+                ` Por persona, debe quedar dentro de su pertenencia vigente (${formatearFecha(
+                  fechaDeclarada(vigente.fechaHoraInicio),
+                )} – ${formatearFecha(fechaDeclarada(vigente.fechaHoraFin))}).`}
             </span>
-            {errors.fechaHoraFinVigencia && (
+            {errors.fechaFinVigencia && (
               <span className="error-campo" role="alert">
-                {errors.fechaHoraFinVigencia.message}
+                {errors.fechaFinVigencia.message}
               </span>
             )}
           </div>

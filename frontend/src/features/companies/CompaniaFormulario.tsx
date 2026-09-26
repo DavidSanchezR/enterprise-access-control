@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Dialogo } from '../../components/Dialogo'
 import { ApiError } from '../../lib/apiClient'
+import { useMaestro } from '../masters/hooks'
 import {
   ESTADOS,
   ETIQUETA_TIPO_COMPANIA,
@@ -16,7 +17,7 @@ import { useActualizarCompania, useCrearCompania } from './hooks'
 
 const esquema = z.object({
   nombre: z.string().min(1, 'Indique el nombre.').max(200, 'Máximo 200 caracteres.'),
-  tipoDocumentoId: z.string().uuid('Indique un identificador de tipo de documento válido.'),
+  tipoDocumentoId: z.string().min(1, 'Seleccione el tipo de documento.'),
   numeroDocumento: z
     .string()
     .min(1, 'Indique el número de documento.')
@@ -48,9 +49,15 @@ export function CompaniaFormulario(
 
   const edicion = props.modo === 'editar' ? props.compania : null
 
+  // Se elige por nombre y viaja el id, que nunca se muestra (RF-013). Solo se ofrecen valores ACTIVOS:
+  // uno INACTIVO no puede usarse en asignaciones nuevas (RF-032), igual que en el formulario de persona.
+  const tiposDocumento = useMaestro('tipos-documento', 'ACTIVO')
+
   const {
     register,
     handleSubmit,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<Formulario>({
     resolver: zodResolver(esquema),
@@ -63,6 +70,18 @@ export function CompaniaFormulario(
       zonaHorariaIana: edicion?.zonaHorariaIana ?? 'America/Lima',
     },
   })
+
+  // Las opciones llegan después del primer render, cuando el <select> ya no puede mostrar el valor
+  // inicial. Al cargarlas se reaplica el tipo actual si está entre los ACTIVOS; si no lo está (inactivo o
+  // no resoluble), se deja vacío para que haya que elegir uno activo y nunca se envíe un id oculto.
+  useEffect(() => {
+    if (!tiposDocumento.data) {
+      return
+    }
+
+    const actual = getValues('tipoDocumentoId')
+    setValue('tipoDocumentoId', tiposDocumento.data.some((t) => t.id === actual) ? actual : '')
+  }, [tiposDocumento.data, getValues, setValue])
 
   const mutacion = edicion ? actualizar : crear
   const error = mutacion.error instanceof ApiError ? mutacion.error : undefined
@@ -123,16 +142,18 @@ export function CompaniaFormulario(
 
         <div className="campo">
           <label htmlFor="compania-tipo-documento">Tipo de documento</label>
-          <input
+          <select
             id="compania-tipo-documento"
-            type="text"
             aria-invalid={errors.tipoDocumentoId ? 'true' : undefined}
-            aria-describedby="compania-tipo-documento-ayuda"
             {...register('tipoDocumentoId')}
-          />
-          <span className="campo-ayuda" id="compania-tipo-documento-ayuda">
-            Identificador del maestro de tipos de documento.
-          </span>
+          >
+            <option value="">Seleccione…</option>
+            {tiposDocumento.data?.map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>
+                {tipo.nombre}
+              </option>
+            ))}
+          </select>
           {errors.tipoDocumentoId && (
             <span className="error-campo" role="alert">
               {errors.tipoDocumentoId.message}

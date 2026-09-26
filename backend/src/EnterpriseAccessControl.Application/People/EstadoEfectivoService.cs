@@ -18,7 +18,10 @@ namespace EnterpriseAccessControl.Application.People;
 /// Devuelve **todos** los contextos vigentes, no uno: una persona puede operar con varias Compañías
 /// Principales a la vez (RF-052, CS-013).
 /// </remarks>
-public sealed class EstadoEfectivoService(IAppDbContext db, PersonaService personas)
+public sealed class EstadoEfectivoService(
+    IAppDbContext db,
+    PersonaService personas,
+    ContencionTemporalValidator contencion)
 {
     public async Task<EstadoEfectivoPersonaDto> ObtenerAsync(
         Guid personaId,
@@ -95,8 +98,14 @@ public sealed class EstadoEfectivoService(IAppDbContext db, PersonaService perso
     }
 
     /// <summary>
-    /// Asigna un perfil. Sin exclusividad (RF-011) y sin contención temporal (RF-072 no le aplica).
+    /// Asigna un perfil. Sin exclusividad (RF-011), pero contenido en la pertenencia vigente (RF-082).
     /// </summary>
+    /// <remarks>
+    /// Cambio post-Baseline VF-007: el perfil pasa a estar sujeto a la contención de RF-072, pero no a la
+    /// cascada de RF-061. Cerrar la pertenencia no lo revoca; solo impide registrar perfiles que la
+    /// excedan. El alcance se exige antes de consultar la pertenencia, así que una persona fuera de
+    /// alcance produce 404 y nunca un error que revele su pertenencia (Principio I).
+    /// </remarks>
     public async Task<AsignacionTipoPersonaDto> AsignarPerfilAsync(
         Guid personaId,
         AsignacionTipoPersonaRequest request,
@@ -107,6 +116,9 @@ public sealed class EstadoEfectivoService(IAppDbContext db, PersonaService perso
         await personas.ExigirAlcanceHistoricoAsync(personaId, ct).ConfigureAwait(false);
 
         var (inicio, fin) = Vigencia.NormalizarRango(request.FechaHoraInicio, request.FechaHoraFin);
+
+        // Mismo orden que el contexto operativo: normalizar → contener → reglas propias.
+        await contencion.ValidarAsync(personaId, inicio, fin, ct).ConfigureAwait(false);
 
         var activo = await db.Maestro<TipoPersona>()
             .AnyAsync(t => t.Id == request.TipoPersonaId && t.Estado == Estado.ACTIVO, ct)

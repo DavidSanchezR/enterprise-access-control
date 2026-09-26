@@ -73,9 +73,11 @@ export async function montarSeccion5(api: ClienteApi, reloj: Reloj): Promise<Mon
       const tipo = await api.crearMaestro('tipos-persona', 'Supervisor E2E')
       const persona = await api.crearPersona('Ana', 'Quispe E2E')
 
+      // La pertenencia va primero: desde RF-082 (cambio post-Baseline VF-007) el perfil debe quedar
+      // contenido en una pertenencia vigente, y sin ella el alta responde 400 SIN_PERTENENCIA_VIGENTE.
       await api.exigir(
-        api.post(`/api/personas/${persona}/perfiles`, {
-          tipoPersonaId: tipo,
+        api.post(`/api/personas/${persona}/historial-companias`, {
+          companiaId: mineraAbcId,
           fechaHoraInicio: reloj.inicio,
           fechaHoraFin: reloj.fin,
         }),
@@ -83,8 +85,8 @@ export async function montarSeccion5(api: ClienteApi, reloj: Reloj): Promise<Mon
       )
 
       await api.exigir(
-        api.post(`/api/personas/${persona}/historial-companias`, {
-          companiaId: mineraAbcId,
+        api.post(`/api/personas/${persona}/perfiles`, {
+          tipoPersonaId: tipo,
           fechaHoraInicio: reloj.inicio,
           fechaHoraFin: reloj.fin,
         }),
@@ -121,8 +123,8 @@ export async function montarSeccion5(api: ClienteApi, reloj: Reloj): Promise<Mon
         areaAccesoId: nivel3Id,
         alcance: 'PERSONA',
         personaId,
-        fechaHoraInicioVigencia: reloj.inicio,
-        fechaHoraFinVigencia: reloj.fin,
+        fechaInicioVigencia: reloj.fechaInicioPermiso,
+        fechaFinVigencia: reloj.fechaFinPermiso,
         estado: 'ACTIVO',
         bloquesHorarios: [reloj.bloque],
       }),

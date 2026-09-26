@@ -41,7 +41,7 @@ export interface BloqueHorario {
   horaFin: string
 }
 
-/** contracts/permissions.yaml — PermisoAcceso. */
+/** contracts/permissions.yaml v2.0.0 — PermisoAcceso. */
 export interface PermisoAcceso {
   id: string
   areaAccesoId: string
@@ -49,22 +49,43 @@ export interface PermisoAcceso {
   personaId: string | null
   unidadOrganizativaId: string | null
   companiaId: string | null
+  /** Instante UTC efectivo de inicio: el que evalúa el servidor (RF-083 (b)). */
   fechaHoraInicioVigencia: string
-  /** Obligatoria para los tres alcances (RF-021, RF-071): no existe permiso de vigencia indefinida. */
+  /**
+   * Instante UTC efectivo de fin. Obligatorio para los tres alcances (RF-021, RF-071): no existe permiso de
+   * vigencia indefinida.
+   */
   fechaHoraFinVigencia: string
+  /** Fecha civil de inicio, `AAAA-MM-DD`, en la zona actual de la Principal del área (VF-004, RF-083). */
+  fechaInicioVigencia: string
+  /** Fecha civil de fin, `AAAA-MM-DD`, incluida completa. */
+  fechaFinVigencia: string
+  /**
+   * `true` si los instantes son exactamente días completos: la vigencia se muestra solo con fechas. `false` en
+   * permisos anteriores con hora, que se muestran con fecha y hora (RF-083 (f)).
+   */
+  vigenciaEnDiasCompletos: boolean
+  /** Zona efectiva de la Principal del área con la que se calcularon las fechas civiles (RF-080). */
+  zonaHorariaIana: string
   estado: Estado
   bloquesHorarios: BloqueHorario[]
 }
 
-/** contracts/permissions.yaml — PermisoAccesoRequest. */
+/**
+ * contracts/permissions.yaml v2.0.0 — PermisoAccesoRequest.
+ *
+ * La vigencia viaja como dos fechas civiles `AAAA-MM-DD`; los campos `fechaHora*` de v1.x ya no se aceptan
+ * (F-3). Al editar, reenviar una fecha sin cambios conserva el instante almacenado (F-6): lo decide el
+ * servidor.
+ */
 export interface PermisoAccesoRequest {
   areaAccesoId: string
   alcance: AlcancePermiso
   personaId: string | null
   unidadOrganizativaId: string | null
   companiaId: string | null
-  fechaHoraInicioVigencia: string
-  fechaHoraFinVigencia: string
+  fechaInicioVigencia: string
+  fechaFinVigencia: string
   estado: Estado
   bloquesHorarios: Omit<BloqueHorario, 'id'>[]
 }

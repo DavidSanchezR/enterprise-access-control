@@ -69,6 +69,20 @@ test('UX-17 a UX-22: alta de usuario con rol, detalle, asignación y finalizaci�
 
     // Paso 2 — rol: un GLOBAL_ADMINISTRATOR ve los dos roles del catálogo cerrado (RF-074).
     await expect(dialogo.getByLabel('Administrador global')).toBeVisible()
+
+    // VF-010: cada radio conserva su ancho nativo y los dos quedan alineados en la misma columna. La
+    // regla global `input { width: 100% }` los estiraba (~330 px) y los desplazaba. jsdom no calcula
+    // maquetación, así que esta es la única prueba que puede detectarlo.
+    const cajas = await Promise.all(
+      ['Administrador global', 'Administrador de compañía'].map((rol) =>
+        dialogo.getByLabel(rol).boundingBox(),
+      ),
+    )
+    for (const caja of cajas) {
+      expect(caja!.width).toBeLessThanOrEqual(24)
+    }
+    expect(Math.abs(cajas[0]!.x - cajas[1]!.x)).toBeLessThanOrEqual(1)
+
     await dialogo.getByLabel('Administrador de compañía').check()
     await dialogo.getByRole('button', { name: 'Siguiente' }).click()
 
