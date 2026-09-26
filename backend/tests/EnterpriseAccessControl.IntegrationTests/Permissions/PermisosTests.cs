@@ -58,8 +58,10 @@ public sealed class PermisosTests(SqlServerFixture fixture)
 
         leido!.Alcance.Should().Be(alcance);
         leido.SujetoDe(alcance).Should().NotBeNull();
-        leido.FechaHoraInicioVigencia.Should().Be(peticion.FechaHoraInicioVigencia);
-        leido.FechaHoraFinVigencia.Should().Be(peticion.FechaHoraFinVigencia);
+        // v2.0.0 (VF-004): la vigencia se lee como las fechas civiles enviadas, de días completos.
+        leido.FechaInicioVigencia.Should().Be(peticion.FechaInicioVigencia);
+        leido.FechaFinVigencia.Should().Be(peticion.FechaFinVigencia);
+        leido.VigenciaEnDiasCompletos.Should().BeTrue();
         leido.BloquesHorarios.Select(b => (b.DiaSemana, b.HoraInicio, b.HoraFin))
             .Should().Equal(
                 (DiaSemana.LUNES, "08:00", "12:00"),
@@ -106,7 +108,7 @@ public sealed class PermisosTests(SqlServerFixture fixture)
         {
             ["areaAccesoId"] = escenario.Area.Id,
             ["alcance"] = alcance,
-            ["fechaHoraInicioVigencia"] = EscenarioPermisos.Instante.AddMonths(-1),
+            ["fechaInicioVigencia"] = escenario.FechaCivil(EscenarioPermisos.Instante.AddMonths(-1)),
             ["estado"] = "ACTIVO",
             ["bloquesHorarios"] = new[] { new { diaSemana = "LUNES", horaInicio = "08:00", horaFin = "17:00" } },
             ["personaId"] = alcance == "PERSONA" ? escenario.Persona.Id : null,
@@ -120,10 +122,10 @@ public sealed class PermisosTests(SqlServerFixture fixture)
         respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         respuesta.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
 
-        // El rechazo nombra el campo ausente, no un período inválido derivado de default(DateTime).
+        // El rechazo nombra el campo ausente, no un período inválido derivado de default(DateOnly).
         var problema = await respuesta.Content.ReadFromJsonAsync<ValidationProblemDetails>(ApiFactory.Json);
         problema!.Errors.Keys.Should().Contain(
-            k => string.Equals(k, "fechaHoraFinVigencia", StringComparison.OrdinalIgnoreCase));
+            k => string.Equals(k, "fechaFinVigencia", StringComparison.OrdinalIgnoreCase));
 
         (await PermisosDelAreaAsync(escenario.Area.Id)).Should().BeEmpty();
     }
@@ -150,16 +152,33 @@ public sealed class PermisosTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task Una_vigencia_con_fin_no_posterior_al_inicio_se_rechaza_con_400()
+    public async Task Una_vigencia_con_fecha_de_fin_anterior_al_inicio_se_rechaza_con_400()
     {
         var escenario = await MontarAsync();
+        var hoy = escenario.FechaCivil(EscenarioPermisos.Instante);
 
+        // Desde VF-004 (RF-083) inicio = fin es un permiso válido de un día; lo inválido es un fin anterior.
         using var respuesta = await escenario.PostPermisoAsync(escenario.Peticion(
             AlcancePermiso.PERSONA,
-            inicio: EscenarioPermisos.Instante,
-            fin: EscenarioPermisos.Instante));
+            inicio: hoy,
+            fin: hoy.AddDays(-1)));
 
         await EsperarProblemaAsync(respuesta, HttpStatusCode.BadRequest, "PERIODO_INVALIDO");
+    }
+
+    [Fact]
+    public async Task Un_permiso_de_un_solo_dia_se_acepta()
+    {
+        var escenario = await MontarAsync();
+        var hoy = escenario.FechaCivil(EscenarioPermisos.Instante);
+
+        // CS-045: la misma fecha de inicio y de fin cubre ese día completo.
+        using var respuesta = await escenario.PostPermisoAsync(escenario.Peticion(
+            AlcancePermiso.PERSONA,
+            inicio: hoy,
+            fin: hoy));
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     // --- Bloques horarios (RF-022, RF-039) ------------------------------------------------------
@@ -372,7 +391,7 @@ public sealed class PermisosTests(SqlServerFixture fixture)
                 new BloqueHorarioRequest(DiaSemana.MARTES, "08:00", "12:00"),
             ]));
 
-        var nuevoFin = EscenarioPermisos.Instante.AddYears(1);
+        var nuevoFin = escenario.FechaCivil(EscenarioPermisos.Instante.AddYears(1));
 
         using var respuesta = await escenario.Cliente.PutAsJsonAsync(
             new Uri($"/api/permisos/{creado.Id}", UriKind.Relative),
@@ -389,7 +408,7 @@ public sealed class PermisosTests(SqlServerFixture fixture)
 
         actualizado.Id.Should().Be(creado.Id);
         actualizado.Estado.Should().Be(Estado.INACTIVO);
-        actualizado.FechaHoraFinVigencia.Should().Be(nuevoFin);
+        actualizado.FechaFinVigencia.Should().Be(nuevoFin);
         actualizado.BloquesHorarios.Should().ContainSingle()
             .Which.DiaSemana.Should().Be(DiaSemana.SABADO);
 

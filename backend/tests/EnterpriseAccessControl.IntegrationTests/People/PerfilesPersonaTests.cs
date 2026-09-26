@@ -59,14 +59,16 @@ public sealed class PerfilesPersonaTests(SqlServerFixture fixture)
 
         var tipo = await ContencionTemporalTests.SembrarTipoPersonaAsync(escenario);
 
+        // Ambos periodos caben en la pertenencia del escenario (desde hace un mes hasta dentro de un
+        // año): desde RF-082 (VF-007) un perfil ya no puede empezar antes que ella.
         using (var primero = await escenario.AsignarPerfilAsync(
-            tipo, DateTime.UtcNow.AddMonths(-6), DateTime.UtcNow.AddMonths(-3)))
+            tipo, EscenarioUs5.InicioPertenencia, DateTime.UtcNow.AddMonths(1)))
         {
             primero.StatusCode.Should().Be(HttpStatusCode.Created);
         }
 
         using var segundo = await escenario.AsignarPerfilAsync(
-            tipo, DateTime.UtcNow.AddMonths(-1), DateTime.UtcNow.AddMonths(6));
+            tipo, DateTime.UtcNow.AddMonths(2), DateTime.UtcNow.AddMonths(6));
 
         segundo.StatusCode.Should().Be(HttpStatusCode.Created);
     }
@@ -133,18 +135,24 @@ public sealed class PerfilesPersonaTests(SqlServerFixture fixture)
 
         var tipo = await ContencionTemporalTests.SembrarTipoPersonaAsync(escenario);
 
+        // Fechas relativas y dentro de la pertenencia del escenario: con fechas fijas, la prueba dejaría
+        // de caber en la pertenencia al avanzar el calendario y fallaría por RF-082 (VF-007), no por la
+        // normalización que verifica.
+        var diaInicio = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(1), DateTimeKind.Utc);
+        var diaFin = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddMonths(3), DateTimeKind.Utc);
+
         using var respuesta = await escenario.AsignarPerfilAsync(
             tipo,
-            new DateTime(2026, 9, 1, 15, 30, 0, DateTimeKind.Utc),
-            new DateTime(2026, 12, 31, 8, 15, 0, DateTimeKind.Utc));
+            diaInicio.AddHours(15).AddMinutes(30),
+            diaFin.AddHours(8).AddMinutes(15));
 
         respuesta.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var creado = await respuesta.Content
             .ReadFromJsonAsync<AsignacionTipoPersonaDto>(ApiFactory.Json);
 
-        creado!.FechaHoraInicio.Should().Be(new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
-        creado.FechaHoraFin.Should().Be(new DateTime(2026, 12, 31, 23, 59, 59, 999, DateTimeKind.Utc));
+        creado!.FechaHoraInicio.Should().Be(diaInicio);
+        creado.FechaHoraFin.Should().Be(diaFin.AddDays(1).AddMilliseconds(-1));
     }
 
     [Fact]

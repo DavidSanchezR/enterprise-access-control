@@ -72,34 +72,31 @@ public sealed class VigenciaObligatoriaYContencionTests(SqlServerFixture fixture
             .PropertyType.Should().Be<DateTime?>();
     }
 
-    public static TheoryData<Type> DependientesDeLaPertenencia => new()
+    /// <summary>
+    /// Servicios que aplican la contención temporal: las tres dependientes de RF-072 y, desde el cambio
+    /// post-Baseline VF-007 (RF-082), el alta de perfil y los permisos de alcance PERSONA.
+    /// </summary>
+    /// <remarks>
+    /// Hasta el Baseline, <c>EstadoEfectivoService</c> y <c>PermisoAccesoService</c> figuraban en una
+    /// lista inversa que exigía que <em>no</em> dependieran del validador (RF-072 los excluía). RF-082
+    /// los somete a la contención sin hacerlos dependientes de la pertenencia a efectos de la cascada,
+    /// que sigue verificándose por separado.
+    /// </remarks>
+    public static TheoryData<Type> SujetosAContencion => new()
     {
         typeof(ContextoOperativoService),
         typeof(AsignacionUnidadOrganizativaService),
         typeof(CredencialService),
-    };
-
-    [Theory]
-    [MemberData(nameof(DependientesDeLaPertenencia))]
-    public void Las_tres_dependientes_de_la_pertenencia_validan_la_contencion_con_el_validador_comun(Type servicio)
-    {
-        DependeDelValidador(servicio).Should().BeTrue(
-            "{0} debe delegar la contención de RF-072 en ContencionTemporalValidator", servicio.Name);
-    }
-
-    public static TheoryData<Type> NoSujetosAContencion => new()
-    {
         typeof(EstadoEfectivoService),
         typeof(PermisoAccesoService),
     };
 
     [Theory]
-    [MemberData(nameof(NoSujetosAContencion))]
-    public void Perfiles_y_permisos_no_aplican_contencion_porque_no_dependen_de_la_pertenencia(Type servicio)
+    [MemberData(nameof(SujetosAContencion))]
+    public void Los_servicios_sujetos_a_contencion_la_validan_con_el_validador_comun(Type servicio)
     {
-        // RF-072 excluye expresamente a AsignaciónTipoPersona y a PermisoAcceso: aplicarles la
-        // contención inventaría una dependencia que el modelo de dominio no establece.
-        DependeDelValidador(servicio).Should().BeFalse();
+        DependeDelValidador(servicio).Should().BeTrue(
+            "{0} debe delegar la contención de RF-072/RF-082 en ContencionTemporalValidator", servicio.Name);
     }
 
     [Fact]

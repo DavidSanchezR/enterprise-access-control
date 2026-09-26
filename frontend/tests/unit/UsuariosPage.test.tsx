@@ -244,6 +244,69 @@ describe('UsuariosPage', () => {
     expect(enviado.fechaHoraFin).not.toBe('')
   })
 
+  // --- VF-011 (post-Baseline): la confirmación muestra el nombre de la compañía, nunca su id ----------
+
+  /** Recorre el alta hasta la confirmación. `elegirCompania` indica si el paso 3 ofrece selección. */
+  async function avanzarHastaConfirmacion(
+    wizard: ReturnType<typeof within>,
+    { elegirRolCompania, elegirCompania }: { elegirRolCompania: boolean; elegirCompania: boolean },
+  ): Promise<void> {
+    await userEvent.type(wizard.getByLabelText('Correo'), 'nuevo@empresa.cl')
+    await userEvent.type(wizard.getByLabelText('Contraseña inicial'), 'Contrasena1Segura')
+    await userEvent.click(wizard.getByRole('button', { name: 'Siguiente' }))
+
+    if (elegirRolCompania) {
+      await userEvent.click(wizard.getByLabelText('Administrador de compañía'))
+    }
+    await userEvent.click(wizard.getByRole('button', { name: 'Siguiente' }))
+
+    if (elegirCompania) {
+      await wizard.findByRole('option', { name: 'Minera Propia' })
+      await userEvent.selectOptions(wizard.getByLabelText('Compañía'), COMPANIA_PROPIA)
+    }
+    await userEvent.click(wizard.getByRole('button', { name: 'Siguiente' }))
+
+    await userEvent.type(wizard.getByLabelText('Inicio de vigencia'), '2026-01-01T08:00')
+    await userEvent.type(wizard.getByLabelText('Fin de vigencia'), '2027-01-01T08:00')
+    await userEvent.click(wizard.getByRole('button', { name: 'Siguiente' }))
+  }
+
+  it('la confirmación muestra el nombre de la compañía y no su identificador', async () => {
+    vi.spyOn(api, 'listarUsuarios').mockResolvedValue(pagina([]))
+    const crear = vi.spyOn(api, 'crearUsuario').mockResolvedValue(usuario())
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo usuario' }))
+
+    const wizard = within(screen.getByRole('dialog'))
+    await avanzarHastaConfirmacion(wizard, { elegirRolCompania: true, elegirCompania: true })
+
+    // RF-013 y ux-ui.md §35 paso 5: se presenta la compañía, no su UUID.
+    expect(wizard.getByText('Minera Propia')).toBeInTheDocument()
+    expect(wizard.queryByText(COMPANIA_PROPIA)).not.toBeInTheDocument()
+
+    // El dato interno no cambia: el alta sigue enviando el identificador.
+    await userEvent.click(wizard.getByRole('button', { name: 'Crear usuario' }))
+    expect(crear.mock.calls[0][0].companiaId).toBe(COMPANIA_PROPIA)
+  })
+
+  it('si la compañía no puede resolverse, la confirmación nunca muestra su identificador', async () => {
+    // Un COMPANY_ADMINISTRATOR con una sola compañía la tiene preseleccionada, pero la lista no la
+    // incluye (p. ej. dejó de estar activa): el resumen muestra un texto, no el UUID.
+    const OTRA = '0199b0d0-0000-7000-8000-0000000000bb'
+    sembrarSesion('COMPANY_ADMINISTRATOR', [OTRA])
+    vi.spyOn(api, 'listarUsuarios').mockResolvedValue(pagina([]))
+
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo usuario' }))
+
+    const wizard = within(screen.getByRole('dialog'))
+    await avanzarHastaConfirmacion(wizard, { elegirRolCompania: false, elegirCompania: false })
+
+    expect(wizard.getByText('Compañía no disponible')).toBeInTheDocument()
+    expect(wizard.queryByText(OTRA)).not.toBeInTheDocument()
+  })
+
   it('no avanza del primer paso sin correo ni contraseña', async () => {
     vi.spyOn(api, 'listarUsuarios').mockResolvedValue(pagina([]))
     const crear = vi.spyOn(api, 'crearUsuario')

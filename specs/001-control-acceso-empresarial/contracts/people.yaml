@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Control de Acceso Empresarial — Personas
-  version: "1.0.0"
+  version: "1.1.0"
   description: >
     Registro de personas (Historia 4, RF-012, RF-013, RF-041), histórico de compañía de pertenencia e
     histórico de perfil (Historia 5, RF-014, RF-016, RF-037), y contextos operativos por Compañía Principal
@@ -19,6 +19,8 @@ info:
     (RF-071) y las tres asociaciones dependientes de la pertenencia deben quedar contenidas dentro de su
     vigencia (RF-072). `historial-companias/{asignacionId}/renovar` (RF-073) es la contraparte inversa de
     `/finalizar`: extiende la vigencia de una pertenencia ACTIVA sin cerrarla ni disparar la cascada.
+    v1.1.0 (cambio post-Baseline VF-007, RF-082): el alta de perfil (`/perfiles`) también queda sujeta a la
+    contención de RF-072; se documentan sus respuestas 400/409. Sin cambios de esquema.
 tags:
   - name: Personas
   - name: HistorialPersona
@@ -390,6 +392,10 @@ paths:
     post:
       tags: [HistorialPersona]
       summary: Asignar un perfil adicional a la persona
+      description: >
+        La vigencia del perfil DEBE quedar contenida en la de la AsignacionCompania vigente de la persona en
+        el instante de la operación (RF-082, que aplica RF-072). El perfil no depende de la pertenencia a
+        efectos de la cascada de revocación (RF-061 sin cambios).
       requestBody:
         required: true
         content:
@@ -401,6 +407,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AsignacionTipoPersona" }
+        "400":
+          description: >
+            Datos inválidos (tipoPersonaId vacío o fechas ausentes, RF-071); tipo de persona inexistente o
+            inactivo (codigo VALOR_MAESTRO_INACTIVO, RF-032); o la persona no tiene compañía de pertenencia
+            vigente (codigo SIN_PERTENENCIA_VIGENTE, RF-082)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: >
+            fechaHoraFin no es posterior a fechaHoraInicio (codigo PERIODO_INVALIDO, RF-039); o
+            fechaHoraInicio/fechaHoraFin exceden la vigencia de la AsignacionCompania vigente de la persona
+            (codigo FUERA_DE_CONTENCION_TEMPORAL, RF-082)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
 components:
   securitySchemes:
     bearerAuth:
@@ -569,7 +591,10 @@ components:
         fechaHoraFin:
           type: string
           format: date-time
-          description: Obligatoria desde la creación (RF-071); no sujeta a contención (RF-072 no aplica).
+          description: >
+            Obligatoria desde la creación (RF-071). Contenida en la vigencia de la pertenencia vigente al
+            crearse (RF-082; hasta v1.0.0 no estaba sujeta a contención). Los perfiles existentes conservan
+            sus fechas: la regla no es retroactiva.
         estado: { type: string, enum: [ACTIVO, INACTIVO] }
     AsignacionTipoPersonaRequest:
       type: object

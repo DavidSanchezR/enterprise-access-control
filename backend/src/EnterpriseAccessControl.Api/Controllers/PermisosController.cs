@@ -46,6 +46,7 @@ public sealed class PermisosController(PermisoAccesoService permisos) : Controll
     [ProducesResponseType<PermisoAccesoDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<PermisoAccesoDto>> Crear(
         [FromBody] PermisoAccesoRequest request,
         CancellationToken ct)
@@ -58,6 +59,7 @@ public sealed class PermisosController(PermisoAccesoService permisos) : Controll
     [ProducesResponseType<PermisoAccesoDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<PermisoAccesoDto>> Actualizar(
         Guid id,
         [FromBody] PermisoAccesoRequest request,

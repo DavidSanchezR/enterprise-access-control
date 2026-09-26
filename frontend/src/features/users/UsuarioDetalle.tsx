@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { Dialogo } from '../../components/Dialogo'
 import { aIsoUtc, aValorLocal, formatearFechaHora } from '../../lib/fechas'
+import { useCompanias } from '../companies/hooks'
 import { etiquetaRol } from './CamposAsignacion'
 import { useFinalizarRol, useRenovarRol, useRolesUsuario } from './hooks'
 import { describirError } from './mensajesRol'
@@ -31,6 +32,16 @@ export function UsuarioDetalle({
   const roles = useRolesUsuario(usuario.id)
   const finalizar = useFinalizarRol()
   const renovar = useRenovarRol()
+
+  // Las asignaciones solo traen `companiaId`. El nombre sale de la misma consulta que mantiene
+  // `UsuariosPage` (mismo filtro, misma caché), sin llamadas adicionales. Nunca se muestra el UUID
+  // (RF-013): una compañía inactiva o fuera del alcance actual queda como "no disponible" (RF-077).
+  const companias = useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })
+
+  const nombreCompania = (id: string): ReactElement | string =>
+    companias.data?.items.find((c) => c.id === id)?.nombre ?? (
+      <span className="sin-resolver">Compañía no disponible</span>
+    )
 
   const error =
     describirError(roles.error) ??
@@ -107,7 +118,11 @@ export function UsuarioDetalle({
                   <tr key={asignacion.id}>
                     <td>{etiquetaRol(asignacion.rol)}</td>
                     {/* El alcance global no tiene compañía: se dice, no se deja en blanco. */}
-                    <td>{asignacion.companiaId ?? 'Todas (alcance global)'}</td>
+                    <td>
+                      {asignacion.companiaId
+                        ? nombreCompania(asignacion.companiaId)
+                        : 'Todas (alcance global)'}
+                    </td>
                     <td>{formatearFechaHora(asignacion.fechaHoraInicio)}</td>
                     <td>{formatearFechaHora(asignacion.fechaHoraFin)}</td>
                     <td>
@@ -152,7 +167,11 @@ export function UsuarioDetalle({
                 .map((asignacion) => (
                   <li key={asignacion.id}>
                     {formatearFechaHora(asignacion.fechaHoraInicio)} — {etiquetaRol(asignacion.rol)}
-                    {asignacion.companiaId ? ` · ${asignacion.companiaId}` : ' · alcance global'}
+                    {asignacion.companiaId ? (
+                      <> · {nombreCompania(asignacion.companiaId)}</>
+                    ) : (
+                      ' · alcance global'
+                    )}
                     {` · hasta ${formatearFechaHora(asignacion.fechaHoraFin)}`}
                   </li>
                 ))}

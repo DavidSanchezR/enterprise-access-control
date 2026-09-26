@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Tree, type NodoArbol } from '../../src/components/Tree'
@@ -98,5 +98,74 @@ describe('Tree (patrón ARIA treeview, RF-036 / ux-ui.md §14, §26)', () => {
       .filter((nodo) => nodo.getAttribute('tabindex') === '0')
 
     expect(alcanzables).toHaveLength(1)
+  })
+})
+
+/**
+ * VF-002 (post-Baseline): expandir y contraer con el ratón (RF-036).
+ *
+ * El indicador ▸/▾ alterna la rama; el clic en el nombre solo selecciona. El estado inicial sigue
+ * contraído y la navegación por teclado no cambia.
+ */
+describe('Tree — interacción con el ratón (VF-002, RF-036)', () => {
+  const nodoVisible = (nombre: string): HTMLElement =>
+    screen.getByRole('treeitem', { name: new RegExp(`^${nombre}`) })
+
+  it('empieza contraído: solo se ven las raíces', () => {
+    render(<Tree nodos={nodos} etiqueta="Unidades" />)
+
+    expect(screen.getAllByRole('treeitem')).toHaveLength(2)
+    expect(screen.queryByRole('treeitem', { name: /^Mina/ })).toBeNull()
+    expect(nodoVisible('Operaciones')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('el indicador expande y contrae la rama sin seleccionar el nodo', async () => {
+    const onSeleccionar = vi.fn()
+    render(<Tree nodos={nodos} etiqueta="Unidades" onSeleccionar={onSeleccionar} />)
+
+    await userEvent.click(within(nodoVisible('Operaciones')).getByText('▸'))
+
+    expect(nodoVisible('Operaciones')).toHaveAttribute('aria-expanded', 'true')
+    expect(nodoVisible('Mina')).toBeInTheDocument()
+
+    await userEvent.click(within(nodoVisible('Operaciones')).getByText('▾'))
+
+    expect(nodoVisible('Operaciones')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('treeitem', { name: /^Mina/ })).toBeNull()
+    expect(onSeleccionar).not.toHaveBeenCalled()
+  })
+
+  it('permite bajar varios niveles expandiendo cada rama', async () => {
+    render(<Tree nodos={nodos} etiqueta="Unidades" />)
+
+    await userEvent.click(within(nodoVisible('Operaciones')).getByText('▸'))
+    await userEvent.click(within(nodoVisible('Mina')).getByText('▸'))
+
+    expect(nodoVisible('Mantenimiento')).toHaveAttribute('aria-level', '3')
+  })
+
+  it('el clic en el nombre selecciona sin expandir', async () => {
+    const onSeleccionar = vi.fn()
+    render(<Tree nodos={nodos} etiqueta="Unidades" onSeleccionar={onSeleccionar} />)
+
+    await userEvent.click(screen.getByText('Operaciones'))
+
+    expect(onSeleccionar).toHaveBeenCalledWith(expect.objectContaining({ id: 'operaciones' }))
+    expect(nodoVisible('Operaciones')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('treeitem', { name: /^Mina/ })).toBeNull()
+  })
+
+  it('una hoja no ofrece expandir: su marcador no hace nada y el clic la selecciona', async () => {
+    const onSeleccionar = vi.fn()
+    render(<Tree nodos={nodos} etiqueta="Unidades" onSeleccionar={onSeleccionar} />)
+
+    const hoja = nodoVisible('Administración')
+    expect(within(hoja).queryByText('▸')).toBeNull()
+    expect(hoja).not.toHaveAttribute('aria-expanded')
+
+    await userEvent.click(within(hoja).getByText('•'))
+
+    expect(screen.getAllByRole('treeitem')).toHaveLength(2)
+    expect(onSeleccionar).toHaveBeenCalledWith(expect.objectContaining({ id: 'administracion' }))
   })
 })

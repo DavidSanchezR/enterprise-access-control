@@ -110,6 +110,23 @@
 > cambiar `TipoCompañía` en la misma sección (D6). D2 (bootstrap), D3 (aislamiento por alcance), D4
 > (inactivación de Compañía) y D7 (interfaz de Historia 5) no requieren ningún cambio de modelo de datos —
 > ver research.md §28-30 y §33. D8 y D9 no requieren cambio alguno en este documento.
+>
+> **Nota de revisión (Sesión 2026-09-25, cambio de requisito post-Baseline VF-007)**: undécima revisión,
+> acotada. RF-082 aplica la contención temporal de RF-072 a
+> [`AsignaciónTipoPersona`](#asignacióntipopersona) y a [`PermisoAcceso`](#permisoacceso) con
+> `Alcance = PERSONA`. **No hay cambio estructural**: ninguna entidad, campo, relación, restricción de base
+> de datos ni migración nueva. La regla es una validación de aplicación (research.md §35), igual que la
+> contención de RF-072 (§25). Solo cambian las columnas de reglas de esas dos entidades. La cascada de RF-061
+> no cambia y ninguna de las dos entidades pasa a depender de la pertenencia a efectos de revocación. Los
+> registros existentes conservan sus fechas: la regla no es retroactiva.
+>
+> **Nota de revisión (Sesión 2026-09-25, cambio de requisito post-Baseline VF-004)**: duodécima revisión,
+> acotada a [`PermisoAcceso`](#permisoacceso). RF-083 expresa su vigencia como dos fechas civiles, cada una un
+> día completo en la zona de la Compañía Principal propietaria del área. **No hay cambio estructural**: las
+> columnas `FechaHoraInicioVigencia` y `FechaHoraFinVigencia` siguen siendo `datetime2(3)` UTC y no hay
+> migración de esquema ni de datos. Cambia solo cómo se calculan esos instantes al escribir (research.md
+> §36.1–36.3). Los permisos existentes conservan sus instantes exactos (F-4). Las demás entidades con vigencia
+> diaria no cambian (fuera de alcance; registro de validación §19.6).
 
 Convenciones aplicadas a todas las entidades (no repetidas por entidad):
 
@@ -122,6 +139,8 @@ Convenciones aplicadas a todas las entidades (no repetidas por entidad):
   evaluación de bloques horarios y en la presentación (Principio IV), usando la zona de la Compañía Principal
   correspondiente (`Compañía.ZonaHorariaIana`, RF-080) o la zona global de respaldo cuando el registro no es
   resoluble a una única Principal. *(Antes de la Sesión 2026-09-20 esta convención fijaba `America/Lima`.)*
+  **[VF-004]** Excepción acotada: la vigencia de `PermisoAcceso` se recibe como fechas civiles y se convierte a
+  instantes UTC **al escribir**, con la zona de la Principal del área (RF-083, research.md §36.1).
 - Salvo indicación contraria, todos los campos de negocio listados son obligatorios (RF-028).
 
 ## Índice de entidades
@@ -395,7 +414,7 @@ simultáneos activos (RF-011: "uno o varios") — sin restricción de exclusivid
 | PersonaId | Guid (FK → Persona) | — |
 | TipoPersonaId | Guid (FK → TipoPersona) | Debe estar `ACTIVO` al momento de asignar (RF-032) |
 | FechaHoraInicio | datetime2(3) | — |
-| FechaHoraFin | datetime2(3) (**NOT NULL**) | Fecha/hora real y conocida desde la creación; ya no admite `null` ni fecha centinela (RF-071, Sesión 2026-09-14 "vigencia temporal jerárquica") — no existe vigencia indefinida para esta entidad. **No** sujeta a contención respecto a `AsignaciónPersonaCompañía` (RF-072) — el modelo de dominio no la establece como dependiente de la pertenencia (RF-011: perfiles múltiples sin exclusividad) |
+| FechaHoraFin | datetime2(3) (**NOT NULL**) | Fecha/hora real y conocida desde la creación; ya no admite `null` ni fecha centinela (RF-071, Sesión 2026-09-14 "vigencia temporal jerárquica") — no existe vigencia indefinida para esta entidad. ~~**No** sujeta a contención respecto a `AsignaciónPersonaCompañía` (RF-072) — el modelo de dominio no la establece como dependiente de la pertenencia (RF-011: perfiles múltiples sin exclusividad)~~ **[Baseline; ampliado post-Baseline por RF-082 (VF-007)]** Sujeta a la contención de RF-072 al crearse (RF-082), contra la pertenencia vigente en ese instante. Sigue **fuera** de la cascada de RF-061 |
 | Estado | enum: `ACTIVO`, `INACTIVO` | Baja lógica sin eliminar el histórico |
 
 **Relaciones**: N—1 `Persona`; N—1 `TipoPersona`.
@@ -611,17 +630,25 @@ RF-021).
 | PersonaId | Guid? (FK → Persona, nullable) | Obligatorio y único-no-nulo si `Alcance = PERSONA` |
 | UnidadOrganizativaId | Guid? (FK → UnidadOrganizativa, nullable) | Obligatorio si `Alcance = UNIDAD_ORGANIZATIVA` |
 | CompañíaId | Guid? (FK → Compañía, nullable) | Obligatorio si `Alcance = COMPAÑÍA` |
-| FechaHoraInicioVigencia | datetime2(3) | RF-021 |
-| FechaHoraFinVigencia | datetime2(3) (**NOT NULL**) | RF-021 ya exigía "inicio **y** fin de vigencia" desde el spec original — este campo se documentaba incorrectamente como nullable, contradiciéndolo; se corrige aquí (RF-071, Sesión 2026-09-14 "vigencia temporal jerárquica", hallazgo adicional). Aplica a **los tres alcances** (PERSONA, UNIDAD_ORGANIZATIVA, COMPAÑÍA), no solo PERSONA. **No** sujeto a contención respecto a `AsignaciónPersonaCompañía` (RF-072) — `PermisoAcceso` no está en la lista de entidades revocadas por RF-061; es configuración evaluada independientemente del histórico de pertenencia (Historia 8) |
+| FechaHoraInicioVigencia | datetime2(3) | RF-021. **[VF-004, RF-083]** En altas y en extremos cuya fecha cambia: primer instante válido, en UTC, de la fecha civil de inicio en la zona efectiva de la Principal del área. En registros anteriores y en extremos no modificados, el instante almacenado se conserva sin cambios (F-4, F-6) |
+| FechaHoraFinVigencia | datetime2(3) (**NOT NULL**) | RF-021 ya exigía "inicio **y** fin de vigencia" desde el spec original — este campo se documentaba incorrectamente como nullable, contradiciéndolo; se corrige aquí (RF-071, Sesión 2026-09-14 "vigencia temporal jerárquica", hallazgo adicional). Aplica a **los tres alcances** (PERSONA, UNIDAD_ORGANIZATIVA, COMPAÑÍA), no solo PERSONA. ~~**No** sujeto a contención respecto a `AsignaciónPersonaCompañía` (RF-072) — `PermisoAcceso` no está en la lista de entidades revocadas por RF-061; es configuración evaluada independientemente del histórico de pertenencia (Historia 8)~~ **[Baseline; ampliado post-Baseline por RF-082 (VF-007)]** Con `Alcance = PERSONA`, sujeto a la contención de RF-072 cuando el registro resultante queda `ACTIVO` y se crea, cambia sus fechas o pasa de `INACTIVO` a `ACTIVO`. No se valida al cambiar solo bloques horarios ni al desactivar. No aplica a `UNIDAD_ORGANIZATIVA` ni a `COMPANIA`. Sigue **fuera** de la cascada de RF-061. **[VF-004, RF-083]** En altas y en extremos cuya fecha cambia: primer instante válido del día **siguiente** a la fecha civil de fin, menos 1 ms, en UTC. Para el permiso, la contención de RF-082 se compara por fecha civil (research.md §36.4). En registros anteriores y en extremos no modificados, el instante almacenado se conserva sin cambios |
 | Estado | enum: `ACTIVO`, `INACTIVO` | Baja lógica |
 
 **Relaciones**: N—1 `ÁreaAcceso`; N—1 opcional `Persona` / `UnidadOrganizativa` / `Compañía` según `Alcance`;
 1—N `BloqueHorarioPermiso`.
 
+**Valores derivados, no persistidos (VF-004, research.md §36.5–36.6)**: fecha civil de inicio y de fin (fecha
+local de cada instante en la zona efectiva **actual** de la Principal del área) y `VigenciaEnDiasCompletos`
+(ambos instantes coinciden con los límites de día de esas fechas). Se calculan en cada lectura, así que un
+cambio de zona los recalcula sin modificar ninguna fila (F-7).
+
 **Restricción de base de datos**: `CHECK` que garantiza que exactamente una de `PersonaId`,
 `UnidadOrganizativaId`, `CompañíaId` sea no nula, y que coincida con `Alcance`.
 
-**Validaciones clave**: `FechaHoraFinVigencia` posterior a `FechaHoraInicioVigencia` (RF-039).
+**Validaciones clave**: `FechaHoraFinVigencia` posterior a `FechaHoraInicioVigencia` (RF-039); desde VF-004,
+además, fecha civil de fin igual o posterior a la de inicio (un permiso de un solo día es válido). Con
+`Alcance = PERSONA`, contención temporal respecto a la pertenencia vigente de la persona según las
+operaciones de RF-082 (validación de aplicación; sin restricción de base de datos).
 Evaluado según el flujo de 14 pasos de research.md §7 (que determina primero la Compañía Principal
 propietaria del área y exige un `ContextoOperativoPersonaPrincipal` vigente antes de evaluar cualquier
 permiso — RF-059), con precedencia definitiva PERSONA > UNIDAD_ORGANIZATIVA > COMPAÑÍA cuando varios

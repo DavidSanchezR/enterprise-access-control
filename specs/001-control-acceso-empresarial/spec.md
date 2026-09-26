@@ -407,7 +407,10 @@ deben estar temporalmente contenidas dentro de su vigencia.
   `PermisoAcceso` (configuración compartida evaluada independientemente del histórico de pertenencia —
   RF-061 lo excluye textualmente de la cascada) **NO** están sujetas a contención: su vigencia es
   obligatoria pero libre, sin relación temporal con la pertenencia de la persona. No se asumió ninguna
-  relación de dependencia que RF-061 o Historia 8 no establecieran ya explícitamente.
+  relación de dependencia que RF-061 o Historia 8 no establecieran ya explícitamente. **[AMPLIADA
+  POST-BASELINE en cuanto a la contención — ver Sesión 2026-09-25 (VF-007) y RF-082: desde ese cambio,
+  `AsignaciónTipoPersona` y `PermisoAcceso` con `Alcance = PERSONA` SÍ están sujetas a contención. La
+  exclusión de la cascada de RF-061 descrita aquí se mantiene sin cambios.]**
 - Q: ¿Cómo se representa "vigencia indefinida" si `FechaHoraFin` ya no admite `null`? → A: No se representa
   — negocio confirmó explícitamente que no debe usarse `null` ni una fecha centinela (p. ej.
   `9999-12-31`): `FechaHoraFin` DEBE ser una fecha/hora real y conocida, elegida en el momento de crear la
@@ -621,6 +624,90 @@ explícitamente por el usuario, sin reabrirlas como preguntas.
   corrección de configuración y documentación se realiza fuera de `spec.md`. *(Cierre de la desviación D-5 —
   Sesión 2026-09-20; RF-078 sin cambios de texto.)*
 
+### Sesión 2026-09-25 (cambio de requisito post-Baseline VF-007 — ampliación de la contención temporal)
+
+Cambio de requisito identificado durante la validación funcional posterior al cierre del Baseline de Etapa 1
+(T001–T242). Registro del hallazgo, su análisis y las decisiones D1–D4 en
+`docs/functional-validation/post-baseline-validation.md` §9. Las etiquetas D1–D4 de esta sesión pertenecen a
+VF-007 y **no** se corresponden con las decisiones `D1`–`D9` del cierre de Etapa 1 ni con las desviaciones
+`D-1`–`D-5`.
+
+**Clasificación**: cambio de requisito post-Baseline, **no** defecto ni regresión del Baseline. La exclusión
+de `AsignaciónTipoPersona` y `PermisoAcceso` de la contención (RF-072, Sesión 2026-09-14 "vigencia temporal
+jerárquica") era la regla aprobada, y la implementación T001–T242 la cumplía. Esta sesión amplía esa regla
+hacia adelante mediante RF-082; el texto histórico se conserva y se anota, sin reescribirse.
+
+Decisiones ya tomadas por negocio y formalizadas aquí, sin reabrirlas como preguntas:
+
+- Q: ¿Qué forma tiene la contención para las entidades incorporadas? → A: **Contención completa (D1)**,
+  idéntica a RF-072: `FechaHoraInicio_hija >= FechaHoraInicio_pertenencia` **Y** `FechaHoraFin_hija <=
+  FechaHoraFin_pertenencia`, con igualdad válida en ambos extremos. La pertenencia de referencia es la
+  `AsignaciónPersonaCompañía` vigente por fechas en el instante de la operación.
+- Q: ¿A qué entidades se aplica? → A: **A cinco (D2)**: las tres de RF-072 (`ContextoOperativoPersonaPrincipal`,
+  `AsignaciónPersonaUnidadOrganizativa` y `AsignaciónCredencial`), sin cambios, más `AsignaciónTipoPersona` y
+  `PermisoAcceso` **solo cuando `Alcance = PERSONA`**. No aplica a `PermisoAcceso` con `Alcance =
+  UNIDAD_ORGANIZATIVA` ni `COMPANIA`, porque no tienen una persona cuya pertenencia sirva de límite.
+- Q: ¿Se extiende la cascada de revocación por cese de pertenencia a las entidades incorporadas? → A: **No
+  (D3)**. RF-061 a RF-065 no cambian: `AsignaciónTipoPersona` y `PermisoAcceso` siguen fuera de la cascada. El
+  cambio se limita a la validación de contención.
+- Q: ¿En qué operaciones se valida la contención de las entidades incorporadas? → A: **(D4)** Se valida y se
+  exige pertenencia vigente cuando el registro resultante queda `ACTIVO` y además es nuevo, cambia su
+  `FechaHoraInicio` o `FechaHoraFin` (se valida el rango resultante completo), o pasa de `INACTIVO` a
+  `ACTIVO`. No se valida ni se exige pertenencia al cambiar solo los bloques horarios, al desactivar
+  (`ACTIVO` → `INACTIVO`) ni al consultar.
+- Q: ¿Qué ocurre con los registros creados bajo la regla anterior que quedan fuera de la nueva contención? →
+  A: **Conservan sus fechas.** La regla no es retroactiva: no hay migración, corrección masiva, desactivación,
+  eliminación ni reescritura automática de fechas. Solo cuando uno de esos registros cambia su vigencia o se
+  reactiva debe cumplir la nueva regla; en otro caso sigue siendo consultable y desactivable tal como está.
+
+### Sesión 2026-09-25 (cambio de requisito post-Baseline VF-004 — vigencia diaria del permiso de acceso)
+
+Cambio de requisito identificado durante la validación funcional posterior al cierre del Baseline de Etapa 1
+(T001–T242). Registro del hallazgo, su análisis y las decisiones F-1 a F-7 en
+`docs/functional-validation/post-baseline-validation.md` §19. Las etiquetas F-1 a F-7 pertenecen a VF-004 y no
+se corresponden con ninguna otra serie de decisiones de este documento.
+
+**Clasificación**: cambio de requisito post-Baseline, **no** defecto ni regresión del Baseline. Historia 8 y
+RF-029 exigían fecha **y** hora para la vigencia del permiso, y la implementación T001–T242 las cumplía. Por
+decisión funcional explícita (opción 2 del análisis), la vigencia de `PermisoAcceso` pasa a expresarse en días
+civiles completos. La precisión dentro del día sigue siendo exclusiva de los bloques horarios (RF-022). No es
+un cambio solo de presentación: cambia la semántica de la vigencia. El texto histórico se conserva y se anota,
+sin reescribirse. La regla se formaliza en RF-083.
+
+Decisiones ya tomadas por negocio y formalizadas aquí, sin reabrirlas como preguntas:
+
+- Q: ¿Qué representa la vigencia de un permiso? → A: **Una fecha de inicio y una fecha de fin, sin hora.**
+  Cada fecha es un día civil completo en la zona IANA de la Compañía Principal propietaria del área de acceso
+  (`ÁreaAcceso.CompañíaPrincipalId`, RF-080). Aplica a los tres alcances.
+- Q: ¿Cómo se convierte una fecha civil en instantes UTC? → A: **(F-1)** Inicio = primer instante válido del
+  día local de inicio; fin = primer instante válido del día siguiente a la fecha de fin, menos 1 ms. La
+  evaluación general se mantiene como `inicio <= instante < fin`, sobre instantes UTC.
+- Q: ¿Cómo se valida la contención de RF-082 cuando el registro es un `PermisoAcceso`? → A: **(F-2)** Por
+  **fecha civil** del permiso contra **fecha civil** de la pertenencia, con igualdad válida en ambos extremos.
+  Dos rangos con las mismas fechas civiles no se rechazan por diferencias de representación UTC. No cambia la
+  semántica de RF-072 ni la de RF-082 para las demás entidades.
+- Q: ¿Qué forma tienen las fechas de vigencia en el contrato? → A: **(F-3)** En creación y actualización de
+  permisos pasan de `date-time` a `date`. Las respuestas pueden seguir exponiendo los instantes UTC efectivos
+  cuando sean necesarios para evaluación o auditoría. Es un cambio incompatible del contrato y exige una nueva
+  versión mayor de `contracts/permissions.yaml`.
+- Q: ¿Qué ocurre con los permisos existentes que tienen hora? → A: **(F-4)** Conservan exactamente sus
+  instantes persistidos: no se migran, no se reinterpretan y no hay corrección masiva. La semántica diaria
+  aplica a los permisos nuevos y a los extremos que se modifiquen según F-6.
+- Q: ¿Cómo se presenta la vigencia? → A: **(F-5)** Un permiso cuyos instantes representan exactamente los
+  límites de días civiles completos se muestra solo con fechas. Uno cuyos instantes no los representan (p. ej.
+  un permiso histórico con hora) se muestra con fecha y hora, para no dar una representación engañosa.
+- Q: ¿Qué ocurre al editar un permiso? → A: **(F-6)** Cada extremo se procesa por separado: si su fecha civil
+  no cambia, se conserva el instante persistido; si cambia, ese extremo se normaliza según F-1. El extremo que
+  el usuario no cambió nunca se modifica en silencio. La validación de RF-082 se realiza en el servidor cuando
+  corresponda.
+- Q: ¿Qué ocurre si cambia la zona horaria de la Principal? → A: **(F-7)** Los instantes UTC persistidos no se
+  modifican ni se reinterpretan. La fecha civil presentada puede cambiar, porque se calcula con la zona actual
+  (RF-080).
+
+Fuera de esta sesión, sin cambios: la representación de las vigencias diarias de pertenencias, contextos
+operativos, unidades organizativas, credenciales y perfiles (RF-016, D5); RF-022 y el límite de los bloques
+horarios; la cascada de revocación (RF-061 a RF-065); y cualquier migración de datos existentes.
+
 ## Historias de Usuario y Pruebas
 
 ### Historia 1 - Inicio de sesión y alcance de gestión (Prioridad P1)
@@ -721,7 +808,10 @@ Los períodos incompatibles no deben solaparse. Para compañía de pertenencia, 
 una asignación activa a la vez (histórico secuencial, RF-014, sin cambios respecto a la decisión original).
 Además, todo contexto operativo, asignación de unidad organizativa y credencial que dependa de esa
 pertenencia DEBE estar temporalmente contenido dentro de su vigencia: no puede iniciar antes que ella ni
-extenderse más allá de su fin, aunque sí puede terminar antes (RF-072, contención, no igualdad). La
+extenderse más allá de su fin, aunque sí puede terminar antes (RF-072, contención, no igualdad). Desde el
+cambio post-Baseline VF-007 (Sesión 2026-09-25), la misma contención se aplica también al perfil de la persona
+(`AsignaciónTipoPersona`) y a sus permisos de alcance PERSONA, sin que ninguno pase a depender de la
+pertenencia a efectos de la cascada de revocación (RF-082). La
 `FechaHoraFin` de una pertenencia vigente (`Estado = ACTIVA`) puede **renovarse** — extenderse hacia una
 fecha posterior — sin crear una nueva `AsignaciónPersonaCompañía` ni afectar a sus asociaciones dependientes
 ya existentes; una pertenencia `FINALIZADA` no es renovable (RF-073).
@@ -839,10 +929,23 @@ otorgado por un permiso correspondiente a la Principal B.
 Cada permiso debe tener:
 - área de acceso
 - alcance: PERSONA, UNIDAD_ORGANIZATIVA o COMPAÑÍA
-- fecha/hora de inicio
-- fecha/hora de fin
+- ~~fecha/hora de inicio~~ fecha de inicio de vigencia (día civil completo, sin hora)
+- ~~fecha/hora de fin~~ fecha de fin de vigencia (día civil completo, sin hora)
+  **[MODIFICADO POST-BASELINE — Sesión 2026-09-25 (VF-004), RF-083]**
 - estado
 - uno o varios bloques horarios por día de semana
+
+Un permiso de alcance PERSONA debe tener su vigencia contenida dentro de la pertenencia vigente de esa
+persona cuando el permiso resultante queda `ACTIVO` y además se crea, se cambian sus fechas o se reactiva
+(`INACTIVO` → `ACTIVO`). Crearlo directamente `INACTIVO`, cambiar solo sus bloques horarios o desactivarlo no
+exige esa condición. Los permisos de alcance `UNIDAD_ORGANIZATIVA` o `COMPANIA` no están sujetos a ella
+(RF-082, cambio post-Baseline VF-007). Para el permiso, esa contención se compara por fecha civil (RF-083).
+
+Cada fecha de vigencia del permiso representa un día civil completo en la zona horaria de la Compañía
+Principal propietaria del área y se convierte a instantes UTC según RF-083. El paso 12 sigue comparando esos
+instantes UTC. Las restricciones dentro del día corresponden exclusivamente a los bloques horarios del paso 13
+(RF-022), evaluados en esa misma zona. Los permisos existentes con hora conservan sus instantes y se siguen
+evaluando con ellos (RF-083, cambio post-Baseline VF-004).
 
 La evaluación de acceso DEBE seguir, en orden, los siguientes pasos (mantiene el principio de denegación por
 defecto: cualquier paso sin resultado inequívoco produce DENEGADO):
@@ -1032,6 +1135,8 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 - RF-019: Un área DEBE poder asociarse a uno o varios tipos de persona.
 - RF-020: Los permisos DEBEN soportar alcance persona, unidad organizativa y compañía.
 - RF-021: Todo permiso DEBE tener inicio y fin de vigencia.
+  **[COMPLEMENTADO — Sesión 2026-09-25, VF-004: el inicio y el fin se expresan como fechas civiles; ver
+  RF-083.]**
 - RF-022: Todo permiso DEBE soportar bloques horarios por día de semana.
 - RF-023: La evaluación DEBE utilizar las asignaciones vigentes en la fecha evaluada.
 - RF-024: La elegibilidad de perfil/área DEBE validarse antes de conceder acceso.
@@ -1042,6 +1147,9 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
 - RF-027: La auditoría DEBE ser generada por el sistema.
 - RF-028: Los campos de negocio DEBEN ser obligatorios salvo que se definan explícitamente como opcionales.
 - RF-029: Los campos de fecha/hora DEBEN manejar fecha y hora.
+  **[MATIZADA — Sesión 2026-09-25, VF-004: excepto la vigencia de `PermisoAcceso`, que se expresa en fechas
+  civiles sin hora (RF-083). La precisión dentro del día del permiso la dan sus bloques horarios (RF-022). Este
+  matiz no se pronuncia sobre ninguna otra entidad.]**
 - RF-030: DEBEN existir módulos de mantenimiento para todas las entidades indicadas.
 - RF-031: DEBEN cargarse valores maestros genéricos válidos para Perú.
 - RF-032: Los valores maestros INACTIVOS no pueden utilizarse en nuevas asignaciones.
@@ -1238,11 +1346,14 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   más allá de su fin. Esta contención se valida en el momento de creación/actualización de la asociación
   hija, contra la `AsignaciónPersonaCompañía` vigente en ese momento; es independiente del acortamiento que
   la cascada de RF-061/RF-064 ya aplica cuando la pertenencia se cierra después de que la hija existe (ambos
-  mecanismos son complementarios, no redundantes). `AsignaciónTipoPersona` y `PermisoAcceso` NO están
-  sujetas a esta contención — el modelo de dominio no las establece como dependientes de la pertenencia
-  (RF-011: perfiles múltiples sin exclusividad; `PermisoAcceso` no está en la lista de entidades revocadas
-  por RF-061 — Historia 8 las trata como configuración evaluada independientemente del histórico de
-  pertenencia). *(Nuevo — Sesión 2026-09-14, "vigencia temporal jerárquica"; ver RF-048 reescrito.)*
+  mecanismos son complementarios, no redundantes). **[AMPLIADO POST-BASELINE — ver RF-082 y Sesión
+  2026-09-25 (VF-007)]** ~~`AsignaciónTipoPersona` y `PermisoAcceso` NO están sujetas a esta contención — el
+  modelo de dominio no las establece como dependientes de la pertenencia (RF-011: perfiles múltiples sin
+  exclusividad; `PermisoAcceso` no está en la lista de entidades revocadas por RF-061 — Historia 8 las trata
+  como configuración evaluada independientemente del histórico de pertenencia).~~ La exclusión anterior fue
+  la regla del Baseline de Etapa 1. Desde VF-007, RF-082 aplica esta misma contención a `AsignaciónTipoPersona`
+  y a `PermisoAcceso` con `Alcance = PERSONA`, sin convertirlas en dependientes de la pertenencia a efectos de
+  la cascada de RF-061. *(Nuevo — Sesión 2026-09-14, "vigencia temporal jerárquica"; ver RF-048 reescrito.)*
 - RF-073: `AsignaciónPersonaCompañía.FechaHoraFin` DEBE poder extenderse hacia una fecha posterior a la ya
   vigente mediante una operación explícita de **renovación**, distinta de la creación de una nueva
   `AsignaciónPersonaCompañía` y distinta del cierre por reemplazo/cese (RF-061, RF-064) — la renovación
@@ -1403,6 +1514,10 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   persistidos; sí cambia su representación local en consultas y presentaciones futuras, por lo que DEBE ser
   una operación controlada y auditable. La zona vigente es siempre la actualmente configurada: no se versiona
   históricamente. *(Nuevo — Sesión 2026-09-20, D5; resuelve la ambigüedad de calendario de RF-016.)*
+  **[COMPLEMENTADO — Sesión 2026-09-25, VF-004: esta zona es también la que convierte las fechas civiles de
+  vigencia de un `PermisoAcceso` en instantes UTC (RF-083). La evaluación de acceso sigue comparando instantes
+  UTC. La comparación por fecha civil de RF-083 se limita a validar la contención al escribir el permiso y no
+  es una evaluación temporal de vigencia.]**
 - RF-081: El `TipoCompañía` de una compañía NO DEBE poder modificarse mientras existan dependencias de
   dominio incompatibles con el tipo destino. El sistema DEBE verificarlas antes de aceptar el cambio y, si
   existen, DEBE rechazar la operación informando qué dependencias deben resolverse previamente. NO DEBE
@@ -1418,6 +1533,71 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   como una relación de una compañía consigo misma; (d) contextos operativos asociados a la compañía; (e)
   credenciales cuya pertenencia o contexto dependa de ella. El cambio exitoso DEBE quedar registrado por el
   mecanismo general de auditoría (RF-026, RF-027). *(Nuevo — Sesión 2026-09-20, D6.)*
+- RF-082: La contención temporal de RF-072 DEBE aplicarse también a `AsignaciónTipoPersona` y a `PermisoAcceso`
+  con `Alcance = PERSONA`: `FechaHoraInicio_hija >= FechaHoraInicio_pertenencia` **Y** `FechaHoraFin_hija <=
+  FechaHoraFin_pertenencia` (igualdad válida en ambos extremos). La pertenencia de referencia es la
+  `AsignaciónPersonaCompañía` de la persona vigente por fechas en el instante de la operación. NO aplica a
+  `PermisoAcceso` con `Alcance = UNIDAD_ORGANIZATIVA` ni `COMPANIA`. Para estas dos entidades la contención se
+  valida cuando el registro resultante queda `ACTIVO` y además (a) se crea, (b) cambia su `FechaHoraInicio` o
+  su `FechaHoraFin`, validándose el rango resultante completo, o (c) pasa de `INACTIVO` a `ACTIVO`. En esos
+  casos el sistema DEBE rechazar la operación si la persona no tiene pertenencia vigente o si el rango no
+  queda contenido. NO DEBE validarse la contención ni exigirse pertenencia vigente al cambiar solo los bloques
+  horarios de un permiso, al desactivar un registro (`ACTIVO` → `INACTIVO`) ni al consultarlo. La regla NO es
+  retroactiva: los registros existentes creados antes de este cambio conservan sus fechas aunque queden fuera
+  de la contención, y NO DEBE realizarse ninguna migración, corrección masiva, desactivación, eliminación ni
+  reescritura automática de sus fechas. Esta regla NO convierte a estas entidades en dependientes de la
+  pertenencia a efectos de la cascada: RF-061 a RF-065 no cambian. La renovación de la pertenencia (RF-073)
+  amplía el límite para operaciones posteriores y no modifica los registros existentes de estas entidades. La
+  contención de `ContextoOperativoPersonaPrincipal`, `AsignaciónPersonaUnidadOrganizativa` y
+  `AsignaciónCredencial` sigue rigiéndose por RF-072 sin cambios. *(Nuevo — cambio de requisito
+  post-Baseline VF-007, Sesión 2026-09-25; amplía RF-072 hacia adelante, sin modificar T001–T242.)*
+  **[MATIZADA — Sesión 2026-09-25, VF-004: para `PermisoAcceso` la contención se compara por fecha civil del
+  permiso contra fecha civil de la pertenencia, con igualdad válida en ambos extremos (RF-083). Las
+  comparaciones de `AsignaciónTipoPersona` y de las entidades de RF-072 no cambian. Los supuestos de
+  validación (a), (b) y (c) no cambian; para el permiso, "cambia su `FechaHoraInicio` o su `FechaHoraFin`"
+  significa que cambia la fecha civil de ese extremo.]**
+- RF-083: La vigencia de un `PermisoAcceso`, en sus tres alcances, DEBE expresarse mediante una fecha de inicio
+  y una fecha de fin **sin hora**. Cada fecha representa un día civil completo en la zona horaria IANA de la
+  Compañía Principal propietaria del área de acceso (`ÁreaAcceso.CompañíaPrincipalId`, RF-080). Las
+  restricciones dentro del día corresponden exclusivamente a los bloques horarios (RF-022, Historia 8 paso 13),
+  evaluados en esa misma zona. En particular:
+  (a) **Conversión.** `FechaHoraInicioVigencia` es el primer instante válido del día de inicio en esa zona.
+  `FechaHoraFinVigencia` es el primer instante válido del día siguiente a la fecha de fin, menos 1 ms. "Primer
+  instante válido" cubre los días en que la hora local 00:00 no existe por un cambio de horario. Ambos
+  instantes se persisten en UTC (RF-080). La fecha de fin DEBE ser igual o posterior a la de inicio, de modo
+  que un permiso de un solo día es válido (RF-039). La zona aplicada es la **zona efectiva** de RF-080 y del
+  paso 13 de Historia 8: la de la Compañía Principal del área o, si no fuera resoluble, la zona global de
+  respaldo configurada. Así la vigencia y los bloques horarios se interpretan siempre en la misma zona.
+  *(Aclaración de `/speckit-analyze`, hallazgo I1.)*
+  (b) **Evaluación.** El paso 12 de Historia 8 sigue siendo `FechaHoraInicioVigencia <= instante <
+  FechaHoraFinVigencia` sobre instantes UTC, sin distinguir entre permisos diarios e históricos.
+  (c) **Contención (RF-082, solo `Alcance = PERSONA`).** Se compara por fecha civil: fecha civil de inicio del
+  permiso >= fecha civil de inicio de la pertenencia, **Y** fecha civil de fin del permiso <= fecha civil de fin
+  de la pertenencia, con igualdad válida en ambos extremos. La fecha civil de un extremo del permiso es la de su
+  instante persistido en la zona actual de su Principal. La fecha civil de la pertenencia es el día que ella
+  declara como inicio o fin, no la que resultaría de convertir su instante UTC a la zona del permiso. Dos rangos
+  con las mismas fechas civiles NO DEBEN rechazarse por diferencias de representación UTC.
+  (d) **Edición.** Cada extremo se procesa por separado y el servidor lo determina. Si la fecha civil
+  solicitada para un extremo coincide con la fecha civil de su instante persistido, calculada en la zona
+  actual, ese instante se conserva exactamente, aunque no coincida con un límite de día. Si difiere, ese
+  extremo se normaliza según (a). El extremo que el usuario no cambió NO DEBE modificarse en silencio. La
+  contención (c) se valida en el servidor en los supuestos de RF-082.
+  (e) **Contrato.** En creación y actualización de permisos, las fechas de vigencia DEBEN viajar como fechas
+  (`format: date`), no como `date-time`. Las respuestas PUEDEN exponer además los instantes UTC efectivos
+  cuando sean necesarios para evaluación o auditoría. Es un cambio incompatible del contrato y DEBE publicarse
+  como nueva versión mayor de `contracts/permissions.yaml`.
+  (f) **Presentación.** Un permiso cuyos instantes representan exactamente los límites de días civiles
+  completos en la zona actual de su Principal se muestra solo con fechas. En otro caso se muestra con fecha y
+  hora, para no dar una representación engañosa.
+  (g) **Registros existentes.** La regla NO es retroactiva. Los permisos creados antes de este cambio
+  conservan exactamente sus instantes y se siguen evaluando con ellos. NO DEBE realizarse ninguna migración,
+  corrección masiva ni reinterpretación de sus fechas. La semántica diaria se aplica a los permisos nuevos y a
+  los extremos que cambien según (d).
+  (h) **Cambio de zona.** Cambiar la zona de la Principal NO DEBE modificar ni reinterpretar los instantes UTC
+  persistidos. La fecha civil presentada se calcula con la zona actual y puede cambiar (RF-080). Por (f), un
+  permiso cuyos instantes dejan de coincidir con límites de día en la nueva zona se muestra con fecha y hora.
+  Esta regla no modifica RF-016, D5, RF-022, RF-072 ni la cascada de RF-061 a RF-065. *(Nuevo — cambio de
+  requisito post-Baseline VF-004, Sesión 2026-09-25; sin modificar T001–T286.)*
 
 ## Entidades Principales
 
@@ -1566,6 +1746,36 @@ una decisión arquitectónica de `plan.md`/`contracts/`, fuera de alcance de est
   organizativa, relaciones Contratista↔Principal vigentes, contextos operativos o credenciales dependientes se
   rechaza informando las dependencias a resolver, y ninguna de ellas se modifica; la misma operación sobre una
   compañía sin dependencias se acepta en ambas direcciones (RF-081).
+- CS-042: Dada una `AsignaciónPersonaCompañía` con `FechaHoraInicio = 01/08/2026` y `FechaHoraFin =
+  31/07/2027`, un perfil (`AsignaciónTipoPersona`) o un `PermisoAcceso` de alcance PERSONA nuevo: (a) con
+  `FechaHoraFin = 31/03/2027` es válido; (b) con `FechaHoraFin = 31/07/2027` es válido; (c) con
+  `FechaHoraFin = 01/08/2027` es inválido; (d) con `FechaHoraInicio = 01/07/2026` es inválido; (e) es
+  inválido si la persona no tiene ninguna pertenencia vigente. Un `PermisoAcceso` de alcance
+  `UNIDAD_ORGANIZATIVA` o `COMPANIA` con las fechas de (c) o (d) sigue siendo válido (RF-082).
+- CS-043: Un perfil o un `PermisoAcceso` de alcance PERSONA creado antes de RF-082 y cuyas fechas exceden la
+  pertenencia vigente: (a) se sigue consultando con sus fechas originales, sin alteración; (b) puede
+  desactivarse, y en el caso de un permiso también cambiar solo sus bloques horarios, aunque la persona ya no
+  tenga pertenencia vigente; (c) no puede reactivarse ni cambiar sus fechas a un rango que no quede
+  contenido en la pertenencia vigente. La entrada en vigor de RF-082 no modifica ningún registro existente
+  (RF-082).
+  **[Para `PermisoAcceso`, desde la Sesión 2026-09-25 (VF-004), las fechas de CS-042 son fechas civiles y se
+  comparan como tales (RF-083 (c)). En particular, (b) es válido en cualquier zona de la Principal.]**
+- CS-044: En un área de una Compañía Principal con zona `America/Lima` (UTC−5, sin cambio de horario), un
+  permiso creado con fecha de inicio 25/09/2026 y fecha de fin 30/09/2026 se persiste como
+  `2026-09-25T05:00:00.000Z` – `2026-10-01T04:59:59.999Z` y se muestra como 25/09/2026 – 30/09/2026, sin hora.
+  Con bloques horarios que cubren la hora evaluada, se concede el acceso el 30/09/2026 a las 23:00 hora de Lima
+  y se deniega con `PERMISO_FUERA_DE_VIGENCIA` el 01/10/2026 a las 00:30. Dentro de la vigencia, una hora no
+  cubierta por ningún bloque se deniega con `FUERA_DE_BLOQUE_HORARIO` (RF-083 (a), (b); RF-022).
+- CS-045: Un permiso con fecha de inicio igual a la fecha de fin es válido; uno con fecha de fin anterior a la
+  de inicio se rechaza por periodo inválido (RF-083 (a), RF-039). En una zona donde un día comienza a las
+  01:00 por cambio de horario, el inicio de ese día es su primer instante válido (RF-083 (a)).
+- CS-046: Un permiso existente persistido como `2026-09-25T08:00:00.000Z` – `2026-09-30T17:00:00.000Z` en un
+  área de `America/Lima`: (a) no se modifica al entrar en vigor RF-083 y se sigue evaluando con esos instantes;
+  (b) se muestra con fecha y hora (25/09/2026 03:00 – 30/09/2026 12:00); (c) al cambiar solo sus bloques
+  horarios o su estado conserva ambos instantes; (d) al cambiar solo la fecha de fin a 05/10/2026, conserva el
+  inicio `2026-09-25T08:00:00.000Z` y su fin pasa a `2026-10-06T04:59:59.999Z` (RF-083 (d), (f), (g)).
+- CS-047: Cambiar la zona de la Compañía Principal no modifica ningún instante de sus permisos. Sus fechas
+  presentadas se recalculan con la zona nueva (RF-083 (h), RF-080).
 
 ## Supuestos
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Control de Acceso Empresarial — Permisos de Acceso
-  version: "1.0.0"
+  version: "2.0.0"
   description: >
     Permisos de acceso por persona, unidad organizativa o compañía, con vigencia y bloques horarios
     (Historia 8, RF-020, RF-021, RF-022, RF-039). Cuando alcance = COMPANIA, companiaId puede referenciar
@@ -11,7 +11,20 @@ info:
     Contratista que además tengan un contexto operativo vigente con esa Principal (ver
     contracts/access-evaluation.yaml, RF-059). Las operaciones de creación/actualización quedan limitadas
     al alcance de compañías del usuario autenticado, evaluado contra el companiaPrincipalId del área de
-    acceso referenciada (RF-049).
+    acceso referenciada (RF-049). v1.1.0 (cambio post-Baseline VF-007, RF-082): con alcance = PERSONA, la
+    vigencia DEBE quedar contenida en la pertenencia vigente de la persona cuando el permiso resultante
+    queda ACTIVO y se crea, cambia sus fechas o pasa de INACTIVO a ACTIVO. No se valida al crear en estado
+    INACTIVO, al cambiar solo bloques horarios ni al desactivar. No aplica a UNIDAD_ORGANIZATIVA ni COMPANIA.
+    Antes de consultar la pertenencia se exige el alcance histórico del usuario sobre la persona (404 si
+    está fuera). Sin cambios de esquema.
+    v2.0.0 (cambio post-Baseline VF-004, RF-083; INCOMPATIBLE con v1.x en la petición): la vigencia se
+    expresa como dos fechas civiles sin hora, cada una un día completo en la zona horaria de la Compañía
+    Principal propietaria del área. La petición sustituye fechaHoraInicioVigencia/fechaHoraFinVigencia
+    (date-time) por fechaInicioVigencia/fechaFinVigencia (date). La respuesta conserva los instantes UTC
+    efectivos y añade las fechas civiles, vigenciaEnDiasCompletos y zonaHorariaIana. Los permisos creados
+    antes de v2.0.0 conservan sus instantes. Al actualizar, cada extremo cuya fecha civil no cambia conserva
+    su instante almacenado. Con alcance = PERSONA, la contención de RF-082 se compara por fecha civil.
+    Detalle técnico: research.md §36.
 tags:
   - name: Permisos
 paths:
@@ -63,8 +76,29 @@ paths:
               schema: { $ref: "#/components/schemas/PermisoAcceso" }
         "400":
           description: >
-            Vigencia inválida (fin ≤ inicio), bloque horario inválido (fin ≤ inicio) o bloques
-            solapados dentro del mismo día (RF-039)
+            Vigencia inválida (fecha de fin anterior a la de inicio; la misma fecha es válida — RF-083),
+            fecha ausente o con formato distinto de AAAA-MM-DD, bloque horario inválido (fin ≤ inicio) o bloques
+            solapados dentro del mismo día (RF-039); o, con alcance = PERSONA y cuando el permiso resultante
+            queda ACTIVO, la persona no tiene compañía de pertenencia vigente (codigo SIN_PERTENENCIA_VIGENTE,
+            RF-082). Un alta con estado INACTIVO no consulta la pertenencia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "404":
+          description: >
+            Área de acceso fuera del alcance del usuario (RF-049); o, con alcance = PERSONA y cuando el permiso
+            resultante queda ACTIVO, persona fuera del alcance histórico del usuario (codigo
+            RECURSO_NO_ENCONTRADO). El alcance se evalúa antes de consultar la pertenencia, de modo que una
+            persona fuera de alcance nunca produce SIN_PERTENENCIA_VIGENTE ni FUERA_DE_CONTENCION_TEMPORAL
+            (Principio I; research.md §35.6)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: >
+            Con alcance = PERSONA y cuando el permiso resultante queda ACTIVO, la vigencia excede la de la
+            AsignacionCompania vigente de la persona, comparando fechas civiles (codigo
+            FUERA_DE_CONTENCION_TEMPORAL, RF-082, RF-083)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ProblemDetails" }
@@ -100,7 +134,33 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/PermisoAcceso" }
         "400":
-          description: Vigencia o bloques horarios inválidos (RF-039)
+          description: >
+            Vigencia o bloques horarios inválidos (RF-039, RF-083); alcance distinto del almacenado; o, con
+            alcance = PERSONA, si la operación requiere contención (el permiso resultante queda ACTIVO y cambia
+            la fecha civil de algún extremo o pasa de INACTIVO a ACTIVO), la persona no tiene compañía de
+            pertenencia vigente (codigo SIN_PERTENENCIA_VIGENTE, RF-082)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "404":
+          description: >
+            Permiso inexistente o fuera del alcance del usuario (RF-049); o, con alcance = PERSONA y la
+            operación sujeta a contención, persona fuera del alcance histórico del usuario (codigo
+            RECURSO_NO_ENCONTRADO). El alcance se evalúa antes de consultar la pertenencia (Principio I;
+            research.md §35.6)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
+        "409":
+          description: >
+            Con alcance = PERSONA y la operación sujeta a contención, la vigencia resultante excede la de la
+            AsignacionCompania vigente de la persona, comparando fechas civiles (codigo
+            FUERA_DE_CONTENCION_TEMPORAL, RF-082, RF-083). Cambiar
+            solo los bloques horarios o desactivar nunca produce este error, aunque la vigencia almacenada
+            exceda la pertenencia (registros anteriores a RF-082, CS-043)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProblemDetails" }
 components:
   securitySchemes:
     bearerAuth:
@@ -142,34 +202,74 @@ components:
         personaId: { type: string, format: uuid, nullable: true }
         unidadOrganizativaId: { type: string, format: uuid, nullable: true }
         companiaId: { type: string, format: uuid, nullable: true }
-        fechaHoraInicioVigencia: { type: string, format: date-time }
+        fechaHoraInicioVigencia:
+          type: string
+          format: date-time
+          description: >
+            Instante UTC efectivo de inicio, el que evalúa el paso 12 (inicio <= instante < fin). Desde v2.0.0
+            es de solo lectura: se calcula a partir de fechaInicioVigencia (primer instante válido del día en
+            zonaHorariaIana, RF-083) o se conserva el almacenado (permisos anteriores o extremo sin cambios).
         fechaHoraFinVigencia:
           type: string
           format: date-time
           description: >
-            Obligatoria (RF-021 ya lo exigía desde el spec original; corregido en la Sesión 2026-09-14
-            "vigencia temporal jerárquica" — RF-071 — que antes se documentaba incorrectamente como
-            nullable). Aplica a los tres valores de alcance. No sujeta a contención respecto a
-            AsignacionCompania (RF-072 no aplica — PermisoAcceso no depende de la pertenencia).
+            Instante UTC efectivo de fin (primer instante válido del día siguiente a fechaFinVigencia menos
+            1 ms, o el almacenado). Obligatoria (RF-021 ya lo exigía desde el spec original; corregido en la
+            Sesión 2026-09-14 "vigencia temporal jerárquica" — RF-071 — que antes se documentaba
+            incorrectamente como nullable). Aplica a los tres valores de alcance. Con alcance = PERSONA,
+            sujeta a contención respecto a la AsignacionCompania vigente según RF-082 (hasta v1.0.0 no lo
+            estaba), comparada por fecha civil desde v2.0.0; los permisos existentes conservan sus fechas.
+            UNIDAD_ORGANIZATIVA y COMPANIA no están sujetos a contención.
+        fechaInicioVigencia:
+          type: string
+          format: date
+          description: >
+            Fecha civil de inicio (v2.0.0, RF-083): fecha local de fechaHoraInicioVigencia en zonaHorariaIana.
+            Se recalcula en cada lectura con la zona actual de la Principal (RF-080, F-7).
+        fechaFinVigencia:
+          type: string
+          format: date
+          description: >
+            Fecha civil de fin (v2.0.0, RF-083): fecha local de fechaHoraFinVigencia en zonaHorariaIana.
+        vigenciaEnDiasCompletos:
+          type: boolean
+          description: >
+            true si ambos instantes coinciden exactamente con los límites de día de sus fechas civiles en
+            zonaHorariaIana; la vigencia se presenta entonces solo con fechas. false en permisos anteriores a
+            v2.0.0 con hora (o tras un cambio de zona): se presenta con fecha y hora (RF-083 (f)).
+        zonaHorariaIana:
+          type: string
+          description: >
+            Zona efectiva de la Compañía Principal propietaria del área (la suya o la global de respaldo, igual
+            que en el paso 13) con la que se calcularon las fechas civiles.
         estado: { type: string, enum: [ACTIVO, INACTIVO] }
         bloquesHorarios:
           type: array
           items: { $ref: "#/components/schemas/BloqueHorario" }
     PermisoAccesoRequest:
       type: object
-      required: [areaAccesoId, alcance, fechaHoraInicioVigencia, fechaHoraFinVigencia, estado, bloquesHorarios]
+      required: [areaAccesoId, alcance, fechaInicioVigencia, fechaFinVigencia, estado, bloquesHorarios]
       description: >
         Exactamente uno de personaId, unidadOrganizativaId, companiaId debe informarse, coincidiendo
-        con el valor de alcance. fechaHoraFinVigencia es obligatoria (RF-021, RF-071) para los tres
-        alcances.
+        con el valor de alcance. fechaFinVigencia es obligatoria (RF-021, RF-071) para los tres alcances.
+        v2.0.0 (RF-083): las fechas de vigencia son fechas civiles sin hora; los campos date-time de v1.x ya
+        no se aceptan en la petición. Al actualizar, un extremo cuya fecha coincide con la fecha civil de su
+        instante almacenado conserva ese instante.
       properties:
         areaAccesoId: { type: string, format: uuid }
         alcance: { $ref: "#/components/schemas/AlcancePermiso" }
         personaId: { type: string, format: uuid, nullable: true }
         unidadOrganizativaId: { type: string, format: uuid, nullable: true }
         companiaId: { type: string, format: uuid, nullable: true }
-        fechaHoraInicioVigencia: { type: string, format: date-time }
-        fechaHoraFinVigencia: { type: string, format: date-time }
+        fechaInicioVigencia:
+          type: string
+          format: date
+          description: Fecha civil de inicio en la zona de la Compañía Principal del área (RF-083).
+        fechaFinVigencia:
+          type: string
+          format: date
+          description: >
+            Fecha civil de fin (incluida completa), igual o posterior a fechaInicioVigencia (RF-083).
         estado: { type: string, enum: [ACTIVO, INACTIVO] }
         bloquesHorarios:
           type: array

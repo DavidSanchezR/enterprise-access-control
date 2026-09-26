@@ -150,11 +150,11 @@ public sealed class ContencionTemporalTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task El_perfil_NO_esta_sujeto_a_contencion_temporal()
+    public async Task El_perfil_esta_sujeto_a_contencion_temporal_desde_RF_082()
     {
-        // RF-072 no le aplica: el modelo de dominio no declara AsignaciónTipoPersona dependiente de
-        // la pertenencia (RF-011, perfiles múltiples sin exclusividad). Aplicarle la contención
-        // sería inventar una dependencia que nadie estableció.
+        // Cambio de requisito post-Baseline VF-007: hasta el Baseline esta prueba verificaba lo
+        // contrario (RF-072 excluía a AsignaciónTipoPersona). RF-082 la somete a la misma contención,
+        // sin hacerla dependiente de la pertenencia a efectos de la cascada.
         var escenario = await MontarConPertenenciaFijaAsync();
         using var _ = escenario.Cliente;
 
@@ -165,7 +165,11 @@ public sealed class ContencionTemporalTests(SqlServerFixture fixture)
         using var respuesta = await escenario.AsignarPerfilAsync(
             tipoPersonaId, EscenarioUs5.InicioPertenencia, hasta.AddYears(1));
 
-        respuesta.StatusCode.Should().Be(HttpStatusCode.Created);
+        respuesta.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var problema = await respuesta.Content.ReadFromJsonAsync<ProblemDetails>(ApiFactory.Json);
+        problema!.Extensions["codigo"]!.ToString()
+            .Should().Be(CodigosError.FueraDeContencionTemporal);
     }
 
     internal static async Task<Guid> SembrarTipoPersonaAsync(EscenarioUs5 escenario)

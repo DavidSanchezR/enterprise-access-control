@@ -58,6 +58,35 @@ export function formatearFechaHora(iso: string, zonaIana?: string | null): strin
 }
 
 /**
+ * Fecha civil que declara una vigencia diaria normalizada al día UTC, como la pertenencia
+ * (`AsignaciónPersonaCompañía`): los diez primeros caracteres del instante.
+ *
+ * No se convierte a ninguna zona. En Lima, las 00:00 UTC del primer día de la pertenencia caen en el día
+ * anterior, y el límite del formulario de permisos quedaría un día corrido (RF-082, RF-083; research.md
+ * §36.4, §36.7).
+ */
+export function fechaDeclarada(iso: string): string {
+  return iso.slice(0, 10)
+}
+
+/**
+ * Fecha civil `AAAA-MM-DD` → `dd/mm/aaaa`, sin construir un `Date`.
+ *
+ * Una fecha civil no tiene zona. Pasarla por `new Date` la interpretaría como medianoche UTC y, en una zona
+ * al oeste de UTC, se mostraría el día anterior (VF-004, RF-083 (f)).
+ */
+export function formatearFecha(fecha: string): string {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha)
+
+  if (partes === null) {
+    return ''
+  }
+
+  const [, anio, mes, dia] = partes
+  return `${dia}/${mes}/${anio}`
+}
+
+/**
  * ISO UTC → valor de `datetime-local` interpretado en la zona de la Principal indicada (RF-080).
  *
  * Sin esto, un formulario de la Principal de Santiago mostraría la hora del navegador del operador

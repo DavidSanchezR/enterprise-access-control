@@ -8,6 +8,7 @@ using EnterpriseAccessControl.IntegrationTests.AreaAccess;
 using EnterpriseAccessControl.IntegrationTests.Fixtures;
 using EnterpriseAccessControl.IntegrationTests.People;
 using Microsoft.Extensions.DependencyInjection;
+using NodaTime;
 
 namespace EnterpriseAccessControl.IntegrationTests.Permissions;
 
@@ -149,19 +150,24 @@ internal sealed class EscenarioPermisos(SqlServerFixture fixture)
     /// <summary>Bloque horario del mismo día que **no** cubre el instante evaluado.</summary>
     public BloqueHorarioRequest BloqueQueNoCubre() => new(DiaEvaluado, "18:00", "22:00");
 
+    /// <remarks>
+    /// Desde <c>permissions.yaml</c> v2.0.0 (VF-004, RF-083) la vigencia viaja como fechas civiles. Por
+    /// defecto, las fechas locales de la Principal A de <c>Instante − 1 mes</c> y <c>Instante + 6 meses</c>,
+    /// que caben en la pertenencia de <see cref="EscenarioUs5"/>.
+    /// </remarks>
     public PermisoAccesoRequest Peticion(
         AlcancePermiso alcance,
         Guid? sujetoId = null,
         Guid? areaId = null,
-        DateTime? inicio = null,
-        DateTime? fin = null,
+        DateOnly? inicio = null,
+        DateOnly? fin = null,
         Estado estado = Estado.ACTIVO,
         IReadOnlyList<BloqueHorarioRequest>? bloques = null) =>
         new(
             areaId ?? Area.Id,
             alcance,
-            inicio ?? Instante.AddMonths(-1),
-            fin ?? Instante.AddMonths(6),
+            inicio ?? FechaCivil(Instante.AddMonths(-1)),
+            fin ?? FechaCivil(Instante.AddMonths(6)),
             estado,
             bloques ?? [BloqueQueCubre()],
             PersonaId: alcance == AlcancePermiso.PERSONA ? sujetoId ?? Persona.Id : null,
@@ -169,6 +175,22 @@ internal sealed class EscenarioPermisos(SqlServerFixture fixture)
                 ? sujetoId ?? UnidadId
                 : null,
             CompaniaId: alcance == AlcancePermiso.COMPANIA ? sujetoId ?? PrincipalA.Id : null);
+
+    /// <summary>Fecha civil de un instante en la zona de la Principal A (la de <see cref="Area"/>).</summary>
+    public DateOnly FechaCivil(DateTime instanteUtc) =>
+        Instant.FromDateTimeUtc(DateTime.SpecifyKind(instanteUtc, DateTimeKind.Utc))
+            .InZone(DateTimeZoneProviders.Tzdb[PrincipalA.ZonaHorariaIana ?? "America/Lima"])
+            .Date
+            .ToDateOnly();
+
+    /// <summary>
+    /// Fecha que declara una pertenencia: los componentes UTC de su instante normalizado.
+    /// </summary>
+    /// <remarks>
+    /// Nunca se convierte a la zona del permiso: en Lima, las 00:00 UTC del primer día de la pertenencia
+    /// caen en el día anterior (research.md §36.4).
+    /// </remarks>
+    public static DateOnly FechaDeclarada(DateTime instantePertenencia) => DateOnly.FromDateTime(instantePertenencia);
 
     public Task<HttpResponseMessage> PostPermisoAsync(PermisoAccesoRequest peticion) =>
         Cliente.PostAsJsonAsync(new Uri("/api/permisos", UriKind.Relative), peticion, ApiFactory.Json);

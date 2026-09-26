@@ -1548,3 +1548,780 @@ recibe `404` sobre un recurso real y de identificador conocido de la Principal B
 - **T242 es la única tarea nueva de esta ampliación** y existe porque T237/T238 cubren los cinco servicios
   que la auditoría de D-2 nombró, mientras que CS-037 declara siete recursos. El hallazgo C2 se cerró
   ampliando la cobertura, no recortando el criterio ni reescribiendo T215.
+
+---
+
+# POST-BASELINE — VF-007
+
+> **Bloque de evolución post-Baseline.** El Baseline de Etapa 1 (T001–T242) está cerrado y **no se
+> reabre**. Numerar este bloque a partir de T243 solo continúa la secuencia del archivo, como hicieron los
+> bloques delta anteriores; no reinterpreta ni modifica ninguna tarea previa.
+>
+> **Origen**: hallazgo VF-007 (`docs/functional-validation/post-baseline-validation.md` §9), formalizado como
+> cambio de requisito post-Baseline en spec.md (Sesión 2026-09-25): **RF-082**, **CS-042** y **CS-043**.
+> Diseño: plan.md ("Plan post-Baseline VF-007", paquetes WP-1 a WP-13), research.md §35, data-model.md
+> (undécima revisión), `contracts/people.yaml` y `contracts/permissions.yaml` v1.1.0, quickstart.md §9.
+>
+> **Decisiones de VF-007** (no son las `D1`–`D9` del cierre de Etapa 1 ni las `D-1`–`D-5`):
+> **D1** contención completa (`inicio_hija >= inicio_pertenencia` Y `fin_hija <= fin_pertenencia`, igualdad
+> válida), con la pertenencia vigente por fechas en el instante de la operación como referencia. **D2**
+> `PermisoAcceso` solo con `Alcance = PERSONA`. **D3** sin cambios en la cascada (RF-061 a RF-065). **D4** se
+> valida cuando el registro resultante queda `ACTIVO` y se crea, cambia sus fechas o pasa de `INACTIVO` a
+> `ACTIVO`. No se valida al cambiar solo bloques, al desactivar ni al consultar. Errores:
+> `400 SIN_PERTENENCIA_VIGENTE` y `409 FUERA_DE_CONTENCION_TEMPORAL`.
+>
+> **Fuera de alcance de este bloque**: migración o corrección de datos existentes (RF-082 no es retroactiva);
+> cualquier cambio en `RevocacionService`, `ReglasRevocacion`, `EvaluadorDeAcceso` o
+> `EvaluacionAccesoService`; permisos `UNIDAD_ORGANIZATIVA`/`COMPANIA`; VF-004, VF-008 y VF-009; Etapa 2.
+>
+> **Estado de partida**: `OpenApiSnapshotTests` está en rojo (2/42) desde `/speckit-plan` porque los
+> contratos v1.1.0 declaran respuestas que la API aún no publica: `POST /api/personas/{id}/perfiles`
+> 400/409 y `POST`/`PUT /api/permisos` 409. T247 y T248 lo devuelven a verde (research.md §35.4).
+>
+> **Frontera de alcance (hallazgo C1 de `/speckit-analyze`, research.md §35.6)**: en los permisos PERSONA, el
+> alcance histórico del actor sobre la persona (`PersonaService.ExigirAlcanceHistoricoAsync`, `404
+> RECURSO_NO_ENCONTRADO`) se evalúa **antes** de consultar su pertenencia, para que
+> `SIN_PERTENENCIA_VIGENTE` y `FUERA_DE_CONTENCION_TEMPORAL` no puedan revelar datos de una persona fuera
+> de alcance (Principio I). Queda absorbido por T245, T246, T248 y T252, sin tareas nuevas. La fuga
+> preexistente de `ValidarSujetoAsync` (existencia de la persona) queda fuera de este bloque
+> (post-baseline-validation.md §9.9).
+
+## Phase 27: VF-007 — Backend: contención en perfiles y permisos PERSONA
+
+**Goal**: Aplicar RF-082 en el servidor reutilizando `ContencionTemporalValidator`, sin duplicar su lógica ni
+tocar la cascada.
+
+**Independent Test**: dar de alta un perfil o un permiso PERSONA fuera de la pertenencia devuelve `409`, y sin
+pertenencia devuelve `400`. Un permiso UO/COMPANIA fuera de la pertenencia sigue devolviendo `201`. Un permiso
+PERSONA existente fuera de contención se puede desactivar y cambiar de bloques, pero no reactivar.
+
+- [X] T243 [US8] Crear la función estática pura que decide si una escritura de `PermisoAcceso` requiere contención (research.md §35.2): recibe `AlcancePermiso alcance`, `Estado? estadoPrevio` (`null` = alta), `Estado estadoResultante` y `bool fechasCambian`, y devuelve `true` solo si `alcance == PERSONA` y `estadoResultante == ACTIVO` y (`estadoPrevio is null` o `fechasCambian` o `estadoPrevio == INACTIVO`). Incluir en el mismo archivo la función pura `FechasCambian(inicioAlmacenado, finAlmacenado, inicioRecibido, finRecibido)`, que considera cambio una diferencia ≥ 1 ms en cualquiera de los dos instantes (research.md §35.3, columna `datetime2(3)`). Sin acceso a datos y sin lógica de contención propia (RF-082 D2/D4) en `backend/src/EnterpriseAccessControl.Application/Permissions/ReglaContencionPermiso.cs` (nuevo)
+- [X] T244 [P] [US5] En `EstadoEfectivoService`, inyectar `ContencionTemporalValidator` por constructor (ya está registrado como scoped en `DependencyInjection.cs`, que no requiere cambios; verificarlo) y, en `AsignarPerfilAsync`, invocar `ValidarAsync(personaId, inicio, fin, ct)` justo después de `Vigencia.NormalizarRango` y **antes** de verificar que el `TipoPersona` esté activo, reutilizando sus excepciones (`400 SIN_PERTENENCIA_VIGENTE`, `409 FUERA_DE_CONTENCION_TEMPORAL`) y el mapeo existente a `ProblemDetails`, sin códigos nuevos. Actualizar el `<summary>` del método ("sin contención temporal") y el `<remarks>` de la entidad `AsignacionTipoPersona` ("Tampoco está sujeta a la contención de RF-072"), indicando que RF-082 la somete a contención pero no a la cascada. En el `<remarks>` de `ContencionTemporalValidator` sustituir solo el párrafo "`AsignaciónTipoPersona` queda fuera a propósito" por la referencia a RF-082, **sin cambiar ninguna línea de lógica** (RF-082 D1/D3; CS-042) en `backend/src/EnterpriseAccessControl.Application/People/EstadoEfectivoService.cs`, `backend/src/EnterpriseAccessControl.Domain/Entities/AsociacionesPersona.cs` y `backend/src/EnterpriseAccessControl.Application/People/ContencionTemporalValidator.cs`
+- [X] T245 [US8] En `PermisoAccesoService`, inyectar por constructor `ContencionTemporalValidator` y `PersonaService` (ambos ya registrados como scoped en `DependencyInjection.cs`; no requiere cambios). En `CrearAsync`, después de `ValidarSujetoAsync`, que no cambia y conserva el `400` actual ante una persona inexistente, y antes de `db.PermisosAcceso.Add`: si `ReglaContencionPermiso` indica contención (alta: `estadoPrevio = null`, `estadoResultante = request.Estado`), **primero** invocar `PersonaService.ExigirAlcanceHistoricoAsync(request.PersonaId!.Value, ct)`, que produce `404 RECURSO_NO_ENCONTRADO` si la persona está fuera del alcance histórico del actor, y **solo después** `ContencionTemporalValidator.ValidarAsync(request.PersonaId!.Value, inicio, fin, ct)`. Así, una persona fuera de alcance nunca llega a producir `400 SIN_PERTENENCIA_VIGENTE` ni `409 FUERA_DE_CONTENCION_TEMPORAL` (Principio I; research.md §35.6, hallazgo C1). Reutilizar ese método sin crear lógica de autorización paralela. Los permisos `UNIDAD_ORGANIZATIVA` y `COMPANIA` no se validan nunca, y un alta PERSONA directamente `INACTIVO` tampoco: en ambos casos no se consulta la pertenencia ni se añade control de alcance (RF-082 D2/D4; CS-042) en `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs` — depende de T243
+- [X] T246 [US8] En `PermisoAccesoService.ActualizarAsync`, después de cargar el permiso y de la comprobación de alcance inmutable, y **antes de mutar ninguna propiedad**, capturar `estadoPrevio = permiso.Estado` y calcular `fechasCambian` con `ReglaContencionPermiso.FechasCambian` contra los valores almacenados. Si la regla indica contención, aplicar la misma frontera que T245 sobre el `PersonaId` almacenado: **primero** `PersonaService.ExigirAlcanceHistoricoAsync(permiso.PersonaId!.Value, ct)` (`404 RECURSO_NO_ENCONTRADO` si está fuera del alcance histórico del actor) y **solo después** `ValidarAsync(permiso.PersonaId!.Value, inicio, fin, ct)`, de modo que ni `SIN_PERTENENCIA_VIGENTE` ni `FUERA_DE_CONTENCION_TEMPORAL` puedan revelar datos de una persona fuera de alcance (Principio I; research.md §35.6, hallazgo C1). Solo cambiar bloques, desactivar (`ACTIVO` → `INACTIVO`) o actualizar un registro que queda `INACTIVO` no consulta la pertenencia, aunque la vigencia almacenada la exceda (registros anteriores a RF-082). No se modifica ninguna fecha que el cliente no haya cambiado. Actualizar el `<remarks>` de la entidad `PermisoAcceso` ("**No** está sujeto a la contención temporal de RF-072"), indicando RF-082 para alcance PERSONA y que la cascada no cambia (RF-082 D2/D3/D4; CS-043) en `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs` y `backend/src/EnterpriseAccessControl.Domain/Entities/PermisoAcceso.cs` — depende de T243 y T245 (mismo archivo)
+- [X] T247 [P] [US5] Declarar en `POST /api/personas/{id}/perfiles` las respuestas `400` y `409` con `ProducesResponseType`, junto al `201` existente, para que la API publique lo que declara `contracts/people.yaml` v1.1.0. Sin cambiar la firma ni los DTO (RF-082; research.md §35.4) en `backend/src/EnterpriseAccessControl.Api/Controllers/PersonasController.cs` — depende de T244
+- [X] T248 [P] [US8] Declarar `409` con `ProducesResponseType` en `POST /api/permisos` y `PUT /api/permisos/{id}`, y conservar (o declarar si faltara) `404`, que ahora cubre también la persona fuera del alcance histórico del actor en permisos PERSONA (C1). Así la API publica lo que declara `contracts/permissions.yaml` v1.1.0: `400 SIN_PERTENENCIA_VIGENTE`, `404 RECURSO_NO_ENCONTRADO` y `409 FUERA_DE_CONTENCION_TEMPORAL`. Sin códigos nuevos, firmas ni DTO. Ambas acciones declaran hoy `404` por el área o el permiso fuera de alcance; verificar que se mantiene (RF-082; research.md §35.4 y §35.6) en `backend/src/EnterpriseAccessControl.Api/Controllers/PermisosController.cs` — depende de T245 y T246
+
+**Checkpoint**: RF-082 queda aplicado en el servidor. El validador conserva su lógica; la cascada y la evaluación
+de acceso no se tocan.
+
+---
+
+## Phase 28: VF-007 — Pruebas de backend
+
+**Purpose**: Demostrar CS-042 y CS-043 con pruebas que fallen si se revierte RF-082, y adaptar las pruebas del
+Baseline que verificaban la regla anterior o usaban fechas que la nueva regla rechaza.
+
+- [X] T249 [P] [US8] Prueba unitaria parametrizada (`[Theory]`) de `ReglaContencionPermiso`: todas las combinaciones de alcance (PERSONA/UNIDAD_ORGANIZATIVA/COMPANIA) × estado previo (alta/`ACTIVO`/`INACTIVO`) × estado resultante (`ACTIVO`/`INACTIVO`) × fechas cambiadas (sí/no), con el resultado esperado de D4. Además, `FechasCambian`: igualdad exacta → `false`; diferencia submilisegundo → `false`; diferencia de 1 ms en el inicio o en el fin → `true` (RF-082 D2/D4; research.md §35.2–35.3) en `backend/tests/EnterpriseAccessControl.UnitTests/Permissions/ReglaContencionPermisoTests.cs` (nuevo) — depende de T243
+- [X] T250 [US5] Invertir la prueba del Baseline que verificaba la exclusión: renombrar `El_perfil_NO_esta_sujeto_a_contencion_temporal` a un nombre que exprese la nueva regla y cambiar su aserción de `201` a `409` con `codigo = FUERA_DE_CONTENCION_TEMPORAL`, con un comentario que cite RF-082/VF-007 como cambio post-Baseline. **Ninguna otra prueba de este archivo** (contexto, unidad organizativa, credencial — T088) se modifica (RF-082; CS-042 c) en `backend/tests/EnterpriseAccessControl.IntegrationTests/People/ContencionTemporalTests.cs` — depende de T244
+- [X] T251 [P] [US5] Pruebas de integración CS-042 para perfiles por HTTP (`EscenarioUs5` con `MontarConPertenenciaFijaAsync` o equivalente de fechas relativas): (a) fin anterior al de la pertenencia → `201`; (b) fin igual → `201`; (c) fin un día posterior → `409 FUERA_DE_CONTENCION_TEMPORAL`; (d) inicio un día anterior → `409`; (e) persona sin ninguna pertenencia → `400 SIN_PERTENENCIA_VIGENTE`; además, pertenencia `ACTIVA` cuya `FechaHoraFin` ya pasó → `400`, y dos perfiles distintos simultáneos dentro de la pertenencia → ambos `201` (RF-011 sin cambios). Se verifica el `codigo` del `ProblemDetails`, no solo el estado HTTP (RF-082; CS-042) en `backend/tests/EnterpriseAccessControl.IntegrationTests/People/ContencionPerfilesTests.cs` (nuevo) — depende de T244
+- [X] T252 [P] [US8] Pruebas de integración CS-042 y del cambio de fechas para permisos por HTTP (`EscenarioPermisos`): con alcance PERSONA, casos (a)–(e) del alta con los mismos resultados que T251; alta PERSONA `INACTIVO` fuera de contención → `201`; alta `UNIDAD_ORGANIZATIVA` y alta `COMPANIA` con fechas fuera de la pertenencia de la persona → `201`; `PUT` de un permiso PERSONA vigente que cambia sus fechas a un rango contenido → `200`, a un rango que excede la pertenencia → `409`, y con la persona ya sin pertenencia → `400`; `PUT` de UO/COMPANIA con fechas fuera → `200`. **Aislamiento entre compañías (C1)**: un actor `COMPANY_ADMINISTRATOR` con alcance solo sobre la compañía A, administrador del área, intenta crear un permiso PERSONA `ACTIVO` y actualizar las fechas de uno existente para una persona cuyo único histórico es con la compañía B (sin contexto operativo con A). Resultado esperado en ambos: `404` con `codigo = RECURSO_NO_ENCONTRADO` en el `ProblemDetails`, verificando de forma explícita que **no** se devuelve `400 SIN_PERTENENCIA_VIGENTE` ni `409 FUERA_DE_CONTENCION_TEMPORAL`, tanto con fechas contenidas como con fechas que excederían la pertenencia de B, y que no se persiste ningún cambio (RF-082 D2/D4; CS-042; Principio I, research.md §35.6) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/ContencionPermisosPersonaTests.cs` (nuevo) — depende de T245 y T246
+- [X] T253 [P] [US8] Pruebas de integración CS-043 sobre registros anteriores a RF-082: sembrar **directamente en BD** (patrón `ConDatosAsync` de `RevalidacionDinamicaTests`, sin pasar por los servicios) un `AsignacionTipoPersona` y un `PermisoAcceso` PERSONA `ACTIVO` cuyas fechas exceden la pertenencia, y un segundo permiso PERSONA `INACTIVO` fuera de contención. Verificar: (a) `GET /perfiles` y `GET /api/permisos/{id}` devuelven las fechas originales intactas; (b) `PUT` que solo cambia bloques, reenviando las fechas almacenadas (también con diferencia submilisegundo) → `200`, fechas intactas; (c) `PUT` a `INACTIVO` → `200`, también tras finalizar la pertenencia de la persona; (d) `PUT` del permiso `INACTIVO` a `ACTIVO` → `409` con pertenencia vigente y `400` sin ella; (e) `PUT` que cambia fechas a un rango aún fuera → `409` y a un rango contenido → `200`; (f) las filas sembradas conservan fechas y `Estado` idénticos tras ejecutar altas de otros perfiles/permisos de la misma persona (la regla no reescribe nada por sí misma) (RF-082 D4, no retroactividad; CS-043) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/RegistrosAnterioresRf082Tests.cs` (nuevo) — depende de T244 y T246
+- [X] T254 [P] [US5] Pruebas de integración de la interacción con RF-073 y de la frontera de la cascada: (1) renovar la pertenencia (`POST .../historial-companias/{id}/renovar`) no cambia las fechas de perfiles ni permisos PERSONA existentes, y después un perfil nuevo y un permiso PERSONA nuevo con fin igual al nuevo fin → `201` (antes de renovar habría sido `409`); (2) finalizar la pertenencia (`POST .../finalizar`) deja perfiles y permisos PERSONA existentes con el mismo `Estado` y las mismas fechas (RF-061 a RF-065 sin cambios, D3), mientras contexto, unidad organizativa y credencial sí se revocan (RF-073, RF-082 D3; CS-035 aplicado a RF-082) en `backend/tests/EnterpriseAccessControl.IntegrationTests/People/Rf082RenovacionYCascadaTests.cs` (nuevo) — depende de T244 y T245
+- [X] T255 [US5] Ajustar las pruebas del Baseline cuyas fechas quedan fuera de la pertenencia del escenario (desde hoy − 1 mes hasta hoy + 1 año), sin cambiar lo que verifican: en `El_mismo_perfil_puede_repetirse_en_periodos_distintos`, el primer periodo debe quedar dentro de la pertenencia; en `Los_perfiles_se_normalizan_a_dias_completos`, sustituir las fechas fijas 2026-09-01/2026-12-31 (que fallarían a partir del 2026-10-01) por fechas relativas contenidas. `Los_perfiles_no_se_revocan_al_cerrar_la_pertenencia` **no se modifica**: protege D3 (RF-082 D3) en `backend/tests/EnterpriseAccessControl.IntegrationTests/People/PerfilesPersonaTests.cs` — depende de T244
+- [X] T256 [US8] Ajustar las pruebas del Baseline de permisos PERSONA con fechas fuera de la pertenencia del escenario, sin cambiar lo que verifican: `La_precedencia_no_rescata_un_permiso_de_persona_vencido` (inicio `Instante − 2 meses` → un inicio contenido que conserve el permiso vencido en el instante evaluado) y `Actualizar_cambia_vigencia_estado_y_reemplaza_los_bloques` (`nuevoFin = Instante + 1 año` → un fin contenido y distinto del original) (RF-082) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/PrecedenciaPermisosTests.cs` y `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/PermisosTests.cs` — depende de T245 y T246
+- [X] T257 [US8] Actualizar la prueba estructural de dependencia del validador: mover `EstadoEfectivoService` y `PermisoAccesoService` de `NoSujetosAContencion` a `DependientesDeLaPertenencia` (o a una lista `SujetosAContencion` que incluya los cinco servicios), renombrar `Las_tres_dependientes_...` y `Perfiles_y_permisos_no_aplican_contencion_...` según RF-082, y conservar sin cambios `El_validador_es_el_unico_punto_que_emite_el_error_de_contencion` (garantiza que la lógica no se duplicó) (RF-072, RF-082 D1) en `backend/tests/EnterpriseAccessControl.IntegrationTests/Persistence/VigenciaObligatoriaYContencionTests.cs` — depende de T244 y T245
+
+**Checkpoint**: CS-042 y CS-043 verificados por HTTP. Las pruebas del Baseline que se adaptan lo hacen solo en
+fechas o en la aserción de exclusión, nunca en lo que protegen.
+
+---
+
+## Phase 29: VF-007 — Frontend
+
+**Goal**: Que la interfaz explique los rechazos de RF-082 y oriente con límites de fecha, sin sustituir la regla
+del servidor ni bloquear operaciones que RF-082 permite.
+
+**Independent Test**: un alta de perfil o de permiso PERSONA rechazada por contención muestra un mensaje
+específico, no genérico. Desactivar un permiso o cambiar solo sus bloques se envía sin ninguna comprobación
+de pertenencia en el cliente.
+
+- [X] T258 [US5] Añadir `SIN_PERTENENCIA_VIGENTE` al catálogo de códigos de error del frontend, junto a `FUERA_DE_CONTENCION_TEMPORAL`, que ya existe (RF-082) en `frontend/src/lib/problemDetails.ts`
+- [X] T259 [US5] En `PerfilesPersona.tsx`: (1) obtener la pertenencia vigente con `useHistorialCompanias(personaId)` (`frontend/src/features/people/history/hooks.ts`, ya cacheado por React Query en el historial) y aplicar `min`/`max` a los campos **Desde**/**Hasta** a partir de su `fechaHoraInicio`/`fechaHoraFin` (fecha UTC); (2) si no hay pertenencia vigente, mostrar un aviso y deshabilitar **Asignar perfil** como prevención de una operación obviamente inválida (el servidor sigue siendo quien decide); (3) mensajes específicos para `SIN_PERTENENCIA_VIGENTE` y `FUERA_DE_CONTENCION_TEMPORAL`, siguiendo el patrón de `AsignacionUnidadOrganizativa.tsx`. **No** modificar el texto ni el manejo de `SOLAPAMIENTO_VIGENCIA` (VF-008, fuera de alcance) (RF-082; CS-042; research.md §35.5) en `frontend/src/features/people/perfiles/PerfilesPersona.tsx` — depende de T258 y T244
+- [X] T260 [US8] En `PermisoFormulario.tsx`: (1) mensajes específicos para `SIN_PERTENENCIA_VIGENTE` (`400`) y `FUERA_DE_CONTENCION_TEMPORAL` (`409`) cuando el alcance es PERSONA, en lugar del `error.message` genérico; (2) límite opcional de fechas: al elegir la persona, consultar su historial de pertenencias y, si hay una vigente, calcular `max` desde el instante UTC de su `fechaHoraFin` convertido a la hora local del control `datetime-local`. Si la consulta falla (p. ej. `404`, porque el usuario administra el área pero no la persona), el formulario sigue funcionando sin límite; (3) **ninguna** validación de contención en el esquema `zod` ni en el envío: desactivar y cambiar solo bloques se envían siempre, y los alcances UO/COMPANIA nunca reciben límite. No cambiar la normalización de fechas de los permisos (VF-004, fuera de alcance) (RF-082 D2/D4; research.md §35.5) en `frontend/src/features/permissions/PermisoFormulario.tsx` — depende de T258 y T245/T246
+- [X] T261 [P] [US5] Pruebas de componente de `PerfilesPersona`: límites `min`/`max` derivados de la pertenencia vigente simulada, aviso y botón deshabilitado sin pertenencia vigente, mensaje específico para cada código (`400 SIN_PERTENENCIA_VIGENTE`, `409 FUERA_DE_CONTENCION_TEMPORAL`) y que nunca se muestra un UUID (RF-013) (RF-082) en `frontend/tests/unit/PerfilesPersona.test.tsx` (nuevo) — depende de T259
+- [X] T262 [P] [US8] Ampliar las pruebas de `PermisosPage`/`PermisoFormulario`: mensaje específico ante `409 FUERA_DE_CONTENCION_TEMPORAL` y `400 SIN_PERTENENCIA_VIGENTE` en alcance PERSONA; al editar, cambiar solo bloques o pasar a `INACTIVO` envía la petición sin consultar la pertenencia y conservando las fechas originales exactas (`conservarSiNoCambio`); el formulario funciona sin límite cuando la consulta de pertenencia responde `404`; alcance UO sin límite (RF-082 D2/D4) en `frontend/tests/unit/PermisosPage.test.tsx` — depende de T260
+
+**Checkpoint**: la interfaz refleja RF-082 sin convertirse en frontera de seguridad.
+
+---
+
+## Phase 30: VF-007 — Contrato, regresión y cierre
+
+**Purpose**: Verificar que la API vuelve a coincidir con los contratos v1.1.0, que las tres entidades de RF-072
+no cambian y que VF-007 queda registrado con evidencia.
+
+- [X] T263 [P] Pruebas de contrato de v1.1.0: en `HistorialPersonaContractTests`, que `POST /api/personas/{id}/perfiles` publique `201`, `400` y `409`; en `PermisosContractTests`, que `POST /api/permisos` y `PUT /api/permisos/{id}` publiquen `409`; y que `OpenApiSnapshotTests` pase en verde sobre todos los contratos (0 fallos; hoy 2/42). Se mantiene `El_perfil_no_expone_campos_de_revocacion_en_cascada` (D3). Sin cambios de esquema (RF-082; research.md §35.4) en `backend/tests/EnterpriseAccessControl.ContractTests/HistorialPersonaContractTests.cs` y `backend/tests/EnterpriseAccessControl.ContractTests/PermisosContractTests.cs` — depende de T247 y T248
+- [X] T264 **Regresión explícita de RF-072** para `ContextoOperativoPersonaPrincipal`, `AsignaciónPersonaUnidadOrganizativa` y `AsignaciónCredencial`: ejecutar sin modificarlas `ContencionTemporalValidatorTests` (T101), las pruebas de contención de contexto, unidad organizativa y credencial de `ContencionTemporalTests` (T088; solo la prueba del perfil cambia, en T250), `FechasObligatoriasTests` (T089) y las suites de contexto operativo, unidad organizativa, credenciales y revocación. Confirmar con `git diff` contra el commit de partida que no hay cambios en `ContextoOperativoService.cs`, `AsignacionUnidadOrganizativaService.cs`, `CredencialService.cs`, `RevocacionService.cs`, `ReglasRevocacion.cs`, `EvaluadorDeAcceso.cs` y `EvaluacionAccesoService.cs`, y que en `ContencionTemporalValidator.cs` solo cambian comentarios. **Sin migraciones ni cambios de esquema (G1)**: confirmar con `git status` y `git diff` que no hay archivos nuevos ni modificados en `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Migrations/` (incluido `AppDbContextModelSnapshot.cs`) ni en `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Configurations/`, porque RF-082 no es retroactiva y no requiere migración ni corrección masiva de datos (RF-072, RF-061 a RF-065, RF-082 D3) en `backend/tests/` (verificación, sin archivos nuevos) — depende de T243–T257
+- [X] T265 Ejecutar las cinco suites (unitarias, integración con Testcontainers, contrato, Vitest y Playwright) sin regresión en T001–T242, y reproducir a mano los escenarios 1–6 de quickstart.md §9 registrando el resultado (RF-082; CS-042, CS-043) en `specs/001-control-acceso-empresarial/quickstart.md` §9 (validación) — depende de T258–T264
+- [X] T266 Cierre documental de VF-007: en quickstart.md §9 sustituir la nota "Pendiente de implementación / `OpenApiSnapshotTests` en rojo" por el estado implementado y una tabla de cobertura automatizada (patrón de §8), y en `post-baseline-validation.md` §9.1 pasar VF-007 a **FIXED** con referencia a las tareas T243–T265 y a las pruebas que cubren CS-042/CS-043. VALIDATED queda para la validación funcional del usuario. Sin modificar spec.md ni ninguna tarea T001–T242 (RF-082) en `specs/001-control-acceso-empresarial/quickstart.md` y `docs/functional-validation/post-baseline-validation.md` — depende de T265
+
+**Checkpoint**: VF-007 implementado, verificado y registrado. Baseline intacto.
+
+---
+
+## Dependencies & Execution Order — bloque T243 a T266 (POST-BASELINE — VF-007)
+
+### Orden por fase
+
+- **Phase 27 (backend)**: T243 → T245 → T246 (mismo archivo: `PermisoAccesoService.cs`) → T248. T244 → T247.
+  La cadena de perfiles (T244, T247) y la de permisos (T243, T245, T246, T248) son independientes y pueden
+  avanzar en paralelo.
+- **Phase 28 (pruebas backend)**: cada prueba depende solo del servicio que ejercita. T249 solo de T243. Las
+  de perfiles (T250, T251, T255) de T244. Las de permisos (T252, T256) de T245/T246. T253, T254 y T257 de
+  ambas cadenas.
+- **Phase 29 (frontend)**: T258 → {T259, T260} → {T261, T262}. Puede empezar en paralelo con la Phase 28 una
+  vez cerrada la Phase 27.
+- **Phase 30 (cierre)**: T263 tras T247/T248. T264 tras toda la Phase 28. T265 tras todo lo anterior. T266
+  al final.
+
+### Dependencias puntuales
+
+- T245 y T246 no pueden marcarse `[P]` entre sí: comparten `PermisoAccesoService.cs`.
+- T250 y T251 están en archivos distintos, pero ambas dependen de T244.
+- `OpenApiSnapshotTests` sigue en rojo hasta que T247 **y** T248 estén hechas; T263 lo confirma en verde.
+
+### Oportunidades de paralelismo
+
+- T244 ∥ T243 (cadenas independientes) y T247 ∥ T248 (controladores distintos).
+- T249, T251, T252, T253 y T254 en paralelo una vez satisfechas sus dependencias (archivos nuevos y distintos).
+- T259 ∥ T260 y T261 ∥ T262 (componentes y suites distintos).
+
+### Estrategia de implementación
+
+1. **Incremento mínimo (MVP)**: perfiles → T244, T247, T250, T251, T255. Resuelve la observación original de
+   VF-007 (el perfil ya no puede exceder la pertenencia).
+2. **Permisos PERSONA**: T243, T245, T246, T248, T249, T252, T253, T256.
+3. **Fronteras y estructura**: T254, T257, T263, T264.
+4. **Interfaz**: T258–T262.
+5. **Cierre**: T265, T266.
+
+---
+
+## Trazabilidad VF-007 → requisitos → tareas
+
+```text
+VF-007 (post-baseline-validation.md §9, decisiones D1–D4)
+  -> RF-082 (amplía RF-072 hacia adelante; RF-061..RF-065 y RF-073 sin cambios)
+       -> perfil (AsignaciónTipoPersona) ........ T244, T247, T258, T259
+       -> permiso PERSONA (D2) + D4 ............. T243, T245, T246, T248, T252, T260
+       -> aislamiento de alcance (C1) ........... T245, T246, T248, T252
+  -> CS-042 (alta contenida / igual / posterior / inicio anterior / sin pertenencia; UO y COMPANIA fuera)
+       -> T250, T251, T252, T261, T262
+  -> CS-043 (registros anteriores: consulta, desactivación, solo bloques, reactivación y cambio de fechas
+             rechazados fuera de contención, sin reescritura automática)
+       -> T249, T253, T262
+          [perfiles: desactivar, cambiar fechas y reactivar quedan pendientes de VF-008; ver nota U1]
+  -> T243..T266
+```
+
+| Requisito / decisión | Diseño | Implementación | Evidencia |
+|---|---|---|---|
+| RF-082, D1 (contención completa, validador único) | research.md §35.1 | T244, T245, T246 | T251, T252, T257, T264 |
+| RF-082, D2 (solo PERSONA) y D4 (operaciones), permiso | research.md §35.2–35.3; permissions.yaml v1.1.0 | T243, T245, T246, T248, T260 | T249, T252, T253, T262 |
+| C1: aislamiento de alcance antes de la contención (Principio I) | research.md §35.6; permissions.yaml v1.1.0 (`404`) | T245, T246, T248 | T252 |
+| RF-082, D3 (sin cascada) | plan.md, frontera de la cascada | — (no se toca) | T254, T255 (prueba conservada), T263, T264 |
+| CS-042 | quickstart.md §9.1–9.2 | T244, T245 | T250, T251, T252, T261, T262 |
+| CS-043 | quickstart.md §9.3 | T246 | T249, T253, T262 (perfiles: parcial, pendiente de VF-008) |
+| RF-073 (renovación) | research.md §35 | — | T254 |
+| RF-072 (tres entidades originales) y ausencia de migraciones | research.md §25 | — | T264 |
+| Contratos v1.1.0 / OpenAPI | research.md §35.4 | T247, T248 | T263 |
+
+### Trazabilidad plan.md (WP-1 a WP-13) ↔ tareas
+
+| WP (plan.md) | Trabajo en plan.md | Tareas |
+|---|---|---|
+| WP-1 | Contención en `AsignarPerfilAsync`; 400/409 en `PersonasController`; comentarios | T244, T247 |
+| WP-2 | Predicado D4, `CrearAsync`/`ActualizarAsync` de permisos, 409 en `PermisosController` (+ frontera de alcance C1) | T243, T245, T246, T248 |
+| WP-3 | Prueba unitaria del predicado D4 | T249 |
+| WP-4 | Integración CS-042, perfiles | T251 |
+| WP-5 | Integración CS-042, permisos (+ aislamiento C1) | T252 |
+| WP-6 | Integración CS-043 | T253 |
+| WP-7 | Integración RF-073 y frontera de cascada | T254 |
+| WP-8 | Ajuste de pruebas existentes que verificaban la regla anterior | T250, T255, T256, T257 |
+| WP-9 | Contrato y snapshot OpenAPI | T263 |
+| WP-10 | Frontend de perfiles y `problemDetails.ts` | T258, T259 |
+| WP-11 | Frontend de permisos | T260 |
+| WP-12 | Vitest | T261, T262 |
+| WP-13 | Cierre: suites, quickstart §9, registro VF-007; regresión y comprobación de `git diff` de la sección "Validación y cierre" | T264, T265, T266 |
+
+Recorrido inverso: T243 → WP-2; T244 → WP-1; T245–T246 → WP-2; T247 → WP-1; T248 → WP-2; T249 → WP-3;
+T250 → WP-8; T251 → WP-4; T252 → WP-5; T253 → WP-6; T254 → WP-7; T255–T257 → WP-8; T258–T259 → WP-10;
+T260 → WP-11; T261–T262 → WP-12; T263 → WP-9; T264–T266 → WP-13. Ninguna tarea queda sin WP y ningún WP
+queda sin tarea.
+
+---
+
+## Notas del bloque T243 a T266 (POST-BASELINE — VF-007)
+
+- **Cobertura parcial de CS-043 para perfiles (hallazgo U1)**: RF-082 y CS-043 (b)(c) describen desactivar,
+  cambiar las fechas y reactivar un perfil (`AsignaciónTipoPersona`), pero hoy los perfiles solo exponen
+  `POST` y `GET /api/personas/{id}/perfiles`: esas operaciones no existen y pertenecen al hallazgo VF-008.
+  VF-007 **no** crea endpoints de perfiles ni amplía T243–T266 para cubrirlas. En perfiles, CS-043 queda
+  cubierto parcialmente: consulta del registro anterior sin alteración (T253 a) y no reescritura automática
+  (T253 f). Las partes de desactivación, cambio de fechas y reactivación de perfiles se verificarán cuando
+  VF-008 implemente esas operaciones, que deberán respetar RF-082 D4. Para permisos PERSONA, CS-043 queda
+  cubierto por completo (T249, T253, T262).
+- **Desviación documentada en T256 (implementación)**: `PermisosTests.Actualizar_cambia_vigencia_estado_y_reemplaza_los_bloques`
+  **no se modificó**. Esa prueba deja el permiso en `INACTIVO`, y según D4 desactivar nunca consulta la
+  pertenencia: su `nuevoFin = Instante + 1 año` no rompe con RF-082. Se verificó en verde sin cambios.
+  Tocarla solo habría modificado sin necesidad una prueba del Baseline. T256 se limitó a
+  `PrecedenciaPermisosTests.La_precedencia_no_rescata_un_permiso_de_persona_vencido`, cuyo permiso sí nace
+  `ACTIVO` con un inicio anterior a la pertenencia.
+- **Prueba del Baseline ajustada que el plan no había identificado (detectada en T264)**:
+  `EvaluacionAccesoTests.Sin_ningun_permiso_aplicable_deniega` creaba un permiso PERSONA `ACTIVO` para
+  "otra persona" sembrada sin pertenencia. Con RF-082 eso devuelve, como corresponde,
+  `400 SIN_PERTENENCIA_VIGENTE`. Se le dio a esa persona una pertenencia que contiene la vigencia del
+  permiso, sin cambiar lo que la prueba verifica (un permiso de otra persona no se aplica). Es el mismo tipo
+  de ajuste de precondición que T255/T256, sin tarea nueva.
+- **T265, cómo se cumplió**: las cinco suites en verde (unitarias 141, integración 567, contrato 250, Vitest
+  172, Playwright 9) sobre la API reconstruida (`docker compose up -d --build --no-deps api`). Después de los
+  E2E, el contenedor se devolvió a su configuración original, verificada por hash. Los escenarios de
+  quickstart.md §9 se verificaron mediante sus equivalentes automatizados por HTTP contra la API y SQL Server
+  reales (tabla de quickstart.md §9), sin reproducirlos a mano en la base de validación del usuario, para
+  no escribir en ella datos de prueba. El recorrido manual en la interfaz queda para la validación funcional
+  (VALIDATED).
+- **Montaje E2E ajustado (detectado en T265)**: `frontend/tests/e2e/soporte/seccion5.ts`, compartido por
+  `cs009-quickstart` y `multi-principal-quickstart`, creaba el perfil antes que la pertenencia. Con RF-082
+  esa alta devuelve `400 SIN_PERTENENCIA_VIGENTE`. Solo se invirtió el orden (pertenencia → perfil), con
+  las mismas fechas. quickstart.md §5/§6 lleva la anotación post-Baseline correspondiente.
+- **Correcciones de `/speckit-analyze` absorbidas sin tareas nuevas**: C1 (frontera de alcance) en T245,
+  T246, T248 y T252; I1 en la cabecera del bloque; G1 en T264; I3 en la tabla WP ↔ tareas. I2 y T1 son
+  correcciones de texto en spec.md, data-model.md y `contracts/permissions.yaml`. No se creó T267.
+
+- **T001 a T242 no se regeneraron, renumeraron, reabrieron ni modificaron.** Este bloque es estrictamente
+  aditivo y está marcado como post-Baseline. Ninguna casilla `[X]` anterior cambia de estado.
+- **Por qué se cambian pruebas creadas por tareas cerradas** (T250, T255, T256, T257 tocan archivos de T088,
+  T090, T165 y de Historia 8): esas pruebas verificaban la regla del Baseline (exclusión de RF-072) o usaban
+  fechas que RF-082 ahora rechaza. Se cambia el código de prueba, no la tarea histórica: T088, T090 y T165
+  siguen cerradas y describiendo lo que hicieron en su momento. Es el mismo criterio de los bloques delta
+  anteriores.
+- **Sin tareas de migración, corrección masiva ni reescritura de datos**: RF-082 no es retroactiva (CS-043).
+- **Sin tareas sobre la cascada o la evaluación de acceso** (D3): T254 y T264 verifican que no cambian.
+- **Sin cambios de DI**: `ContencionTemporalValidator`, `EstadoEfectivoService` y `PermisoAccesoService` ya
+  están registrados como scoped. T244 solo verifica que el contenedor resuelve el nuevo parámetro.
+- **Sin prueba E2E nueva**: el plan no la exige y las pruebas de integración por HTTP y de componente cubren
+  CS-042/CS-043. Los E2E existentes (`multi-principal-quickstart.spec.ts`) crean el perfil con las fechas
+  de la pertenencia y el permiso con alcance UO, así que siguen siendo compatibles. T265 lo confirma.
+
+---
+
+# POST-BASELINE — VF-005
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T266 sin reabrir el Baseline
+> (T001–T242) ni el bloque de VF-007 (T243–T266).
+>
+> **Origen**: hallazgo VF-005 (`docs/functional-validation/post-baseline-validation.md` §13). Es un **gap
+> de UX** de severidad baja: el buscador de persona del formulario de Nuevo Permiso (alcance PERSONA) no
+> orienta sobre qué introducir. No cambia ningún requisito, contrato, API ni comportamiento de búsqueda:
+> `GET /api/personas?texto=` sigue buscando por nombres, apellidos o número de documento (RF-035,
+> `contracts/people.yaml`). La etiqueta "Buscar persona" se conserva (ux-ui.md §23: labels persistentes, no
+> depender de placeholders).
+
+## Phase 31: VF-005 — Placeholder del buscador de persona
+
+**Goal**: Que el campo "Buscar persona" muestre el placeholder aprobado sin alterar la etiqueta ni la
+búsqueda.
+
+**Independent Test**: en Nuevo permiso con alcance PERSONA, el campo con etiqueta "Buscar persona" muestra
+exactamente "Ingrese su nro. de documento", y escribir en él sigue enviando el texto a `buscarPersonas`.
+
+- [X] T267 [US8] Añadir `placeholder="Ingrese su nro. de documento"` al input `permiso-buscar-persona`, conservando la etiqueta `<label htmlFor="permiso-buscar-persona">Buscar persona</label>` y sin tocar estado, handlers, `usePersonas`, parámetros de búsqueda, endpoint ni lógica de selección (VF-005; UX-07; ux-ui.md §23) en `frontend/src/features/permissions/PermisoFormulario.tsx`
+- [X] T268 [US8] Pruebas de componente del buscador: con alcance PERSONA en Nuevo permiso, el campo se localiza por su etiqueta "Buscar persona" y tiene exactamente el placeholder "Ingrese su nro. de documento"; escribir en él llama a `buscarPersonas` con ese `texto` (el criterio no cambia, RF-035); con otro alcance el buscador no aparece. Sin cambios en el mock ni en el contrato de `buscarPersonas` (VF-005) en `frontend/tests/unit/PermisosPage.test.tsx` — depende de T267
+- [X] T269 Validar el frontend (tests relevantes, Vitest completo, typecheck y ESLint, separando los problemas preexistentes no relacionados) y cerrar documentalmente VF-005 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED) — depende de T267 y T268
+
+**Checkpoint**: VF-005 cerrado, sin cambios de backend, API, contratos, requisitos ni comportamiento.
+
+### Notas del bloque T267 a T269 (POST-BASELINE — VF-005)
+
+- **T001–T266 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Sin tareas de backend, contrato, integración ni E2E**: el cambio es un atributo de presentación, y el
+  snapshot OpenAPI y las pruebas de `PersonaService` no se ven afectados.
+- **El placeholder orienta hacia el criterio más preciso (documento), pero no restringe la búsqueda**:
+  nombres y apellidos siguen siendo válidos.
+
+---
+
+# POST-BASELINE — VF-010
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T269 sin reabrir el Baseline
+> (T001–T242) ni los bloques de VF-007 (T243–T266) y VF-005 (T267–T269).
+>
+> **Origen**: hallazgo VF-010 (`docs/functional-validation/post-baseline-validation.md` §14). Es un
+> **defecto de implementación visual**, de severidad baja y sin impacto funcional. La regla global
+> `input, select { width: 100% }` de `index.css` estira los `<input type="radio">` del paso "Rol"
+> (`CamposAsignacion`, UX-17 y UX-19) y anula el diseño en línea que el propio componente declara con
+> `.opcion-radio` (flex, `align-items: center`, `gap`). La corrección se acota a `.opcion-radio`, sin tocar
+> `index.css`, el TSX, la lógica de roles, la autorización ni los contratos.
+
+## Phase 32: VF-010 — Alineación de los radios de rol
+
+**Goal**: Que los radios de rol se muestren con su tamaño nativo y alineados con su texto en una sola línea.
+
+**Independent Test**: en el paso "Rol" del alta de usuario, cada radio mide su ancho nativo (no el de la
+etiqueta) y los dos radios comparten la misma posición horizontal.
+
+- [X] T270 [US1] Añadir `.opcion-radio input { width: auto; }` junto a `.opcion-radio`, para anular solo en ese componente el `width: 100%` global, sin modificar `index.css`, el marcado de `CamposAsignacion.tsx`, `rolesAsignables` ni los handlers (VF-010; UX-17, UX-19; ux-ui.md §35 paso 2) en `frontend/src/features/users/users.css`
+- [X] T271 [US1] Ampliar el paso UX-17 del E2E con una comprobación de geometría de los radios de rol: el ancho de `boundingBox()` de cada radio es como máximo 24 px y ambos comparten la misma `x`. jsdom no calcula maquetación, así que solo Playwright puede detectar esta regresión visual. Sin cambiar el flujo existente del paso (VF-010; UX-17) en `frontend/tests/e2e/administracion-usuarios.spec.ts` — depende de T270
+- [X] T272 Validar (Vitest, typecheck, ESLint separando los problemas preexistentes no relacionados, y el E2E de administración de usuarios con la API restaurada después a su configuración original) y cerrar documentalmente VF-010 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED) — depende de T270 y T271
+
+**Checkpoint**: VF-010 cerrado, sin cambios de backend, API, contratos, requisitos ni comportamiento.
+
+### Notas del bloque T270 a T272 (POST-BASELINE — VF-010)
+
+- **T001–T269 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Por qué no se corrige en `index.css`**: una regla global para radios y casillas cambiaría el aspecto de
+  otras pantallas que VF-010 no cubre. La corrección acotada reutiliza el recurso que el proyecto ya usa
+  para inputs concretos (`width: auto`).
+- **Alcance**: `CamposAsignacion` es compartido por el alta de usuario (UX-17) y la asignación de rol
+  (UX-19), así que ambos se corrigen con la misma regla. No se toca ningún otro componente.
+
+---
+
+# POST-BASELINE — VF-011
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T272 sin reabrir el Baseline
+> (T001–T242) ni los bloques de VF-007 (T243–T266), VF-005 (T267–T269) y VF-010 (T270–T272).
+>
+> **Origen**: hallazgo VF-011 (`docs/functional-validation/post-baseline-validation.md` §15). Es un
+> **defecto de implementación** de severidad baja con impacto solo de presentación. El paso "Confirmación"
+> del alta de usuario muestra el UUID de la compañía (`asignacion.companiaId`), incumpliendo RF-013 ("IDs …
+> ocultos en la interfaz") y ux-ui.md §35 paso 5 ("Mostrar: Correo → Rol → Compañía …"). El nombre ya está
+> disponible en la consulta `useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })`, que comparte caché con
+> el selector del paso "Compañía" y con `UsuariosPage`. No cambia backend, API, contratos, requisitos,
+> modelo de datos, autorización ni el cuerpo del alta.
+
+## Phase 33: VF-011 — Nombre de la compañía en la confirmación del alta de usuario
+
+**Goal**: Que la confirmación del alta muestre el nombre de la compañía y nunca su identificador.
+
+**Independent Test**: al crear un administrador de compañía, la pantalla de confirmación muestra el nombre
+de la compañía elegida y no su UUID, y el alta sigue enviando el mismo `companiaId`.
+
+- [X] T273 [US1] En la fila "Compañía" del paso "Confirmación", mostrar el nombre resolviendo `asignacion.companiaId` contra `useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })` (mismo filtro que el selector, para compartir caché y no añadir llamadas HTTP), con un respaldo textual que nunca sea el UUID (RF-013). Sin tocar `BorradorAsignacion`, `CamposAsignacion`, la validación ni el cuerpo del `POST` (VF-011; UX-17; ux-ui.md §35 paso 5) en `frontend/src/features/users/CrearUsuarioWizard.tsx`
+- [X] T274 [US1] Prueba de componente: un `GLOBAL_ADMINISTRATOR` crea un "Administrador de compañía" eligiendo "Minera Propia"; la confirmación muestra "Minera Propia" y no su UUID, y el alta envía ese mismo `companiaId`. Si la compañía no puede resolverse, se muestra el respaldo y nunca el UUID (VF-011; RF-013) en `frontend/tests/unit/UsuariosPage.test.tsx` — depende de T273
+- [X] T275 Validar (pruebas relevantes, Vitest completo, typecheck y ESLint separando los problemas preexistentes no relacionados) y cerrar documentalmente VF-011 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED) — depende de T273 y T274
+
+**Checkpoint**: VF-011 cerrado, sin cambios de backend, API, contratos, requisitos ni comportamiento.
+
+### Notas del bloque T273 a T275 (POST-BASELINE — VF-011)
+
+- **T001–T272 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Por qué no se guarda el nombre en el borrador**: obligaría a cambiar `BorradorAsignacion` y
+  `CamposAsignacion`, compartidos con la asignación de rol (UX-19), y duplicaría un dato que la caché ya
+  contiene.
+- **Sin E2E**: jsdom verifica el texto renderizado, así que una prueba de componente basta.
+- **Fuera de alcance**: `UsuarioDetalle.tsx` también muestra `companiaId` sin resolver en sus asignaciones.
+  No forma parte del texto de VF-011 y se registra como observación independiente (registro §15), sin
+  tareas en este bloque.
+
+---
+
+# POST-BASELINE — VF-011 (extensión)
+
+> **Extensión del mismo hallazgo VF-011, no un hallazgo nuevo (no hay VF-012).** La observación que el bloque
+> T273–T275 dejó fuera de alcance (registro §15.8) se incorpora a VF-011 por decisión aprobada: es el mismo
+> incumplimiento de RF-013, un UUID de compañía visible en la interfaz. T273–T275 no se modifican.
+>
+> **Corrección de premisa**: `GET /api/usuarios/{id}/roles` (`AsignacionRolAdministrativoDto`, contrato
+> `AsignacionRolAdministrativo`) devuelve solo `companiaId`, no el nombre. El nombre se toma de
+> `useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })`, la consulta que `UsuariosPage` (única vía de apertura
+> de `UsuarioDetalle`) ya mantiene activa: se sirve desde caché, sin llamada HTTP adicional. No se modifican
+> backend ni contratos. Las compañías históricas inactivas o fuera del alcance actual se muestran como
+> "Compañía no disponible", sin consulta adicional sin filtro de estado (RF-077).
+
+## Phase 34: VF-011 (extensión) — Nombre de la compañía en el detalle de usuario
+
+**Goal**: Que las pestañas Asignaciones e Histórico del detalle de usuario muestren el nombre de la compañía
+y nunca su identificador.
+
+**Independent Test**: en el detalle de un usuario, la tabla de asignaciones y el histórico muestran "Minera
+Propia" y no su UUID. Una compañía no resoluble muestra "Compañía no disponible" y el alcance global conserva
+su texto.
+
+- [X] T276 [US1] En la pestaña Asignaciones (columna Compañía) y en el Histórico, resolver `asignacion.companiaId` contra `useCompanias({ estado: 'ACTIVO', tamañoPagina: 200 })` con el mismo patrón que T273: nombre si se resuelve, "Compañía no disponible" (`.sin-resolver`) si no, nunca el UUID. El alcance global conserva "Todas (alcance global)" y "alcance global". Sin tocar `AsignacionRol`, `useRolesUsuario`, los diálogos de renovar y finalizar, los payloads, el backend ni los contratos (VF-011 extensión; RF-013; UX-18) en `frontend/src/features/users/UsuarioDetalle.tsx`
+- [X] T277 [US1] Pruebas de componente: simular `listarCompanias` en `beforeEach` (el componente ahora consulta compañías) y comprobar que la tabla de Asignaciones y el Histórico muestran "Minera Propia" y no su UUID, que una compañía no resoluble muestra "Compañía no disponible" sin UUID y que el alcance global conserva su texto (VF-011 extensión; RF-013) en `frontend/tests/unit/UsuarioDetalle.test.tsx` — depende de T276
+- [X] T278 Validar (pruebas relevantes, prueba negativa sin la corrección, Vitest completo, typecheck y ESLint separando los problemas preexistentes no relacionados) y documentar la extensión en `docs/functional-validation/post-baseline-validation.md` §15, devolviendo VF-011 a CLOSED — depende de T276 y T277
+
+**Checkpoint**: VF-011 vuelve a CLOSED con la extensión, sin cambios de backend, API, contratos, requisitos ni comportamiento.
+
+### Notas del bloque T276 a T278 (POST-BASELINE — VF-011, extensión)
+
+- **T001–T275 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo; la nota "Fuera de
+  alcance" del bloque T273–T275 se conserva como registro histórico de ese cierre.
+- **Sin cambios en los diálogos de renovar y finalizar**: allí `companiaId` solo decide el texto ("en esa
+  compañía" o "con alcance global") y nunca muestra el UUID.
+
+---
+
+# POST-BASELINE — VF-001
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T278 sin reabrir el Baseline
+> (T001–T242) ni los bloques de VF-007, VF-005, VF-010 y VF-011 (T243–T278).
+>
+> **Origen**: hallazgo VF-001 (`docs/functional-validation/post-baseline-validation.md` §16). Es un **defecto
+> de implementación frontend** de severidad alta. En "Nueva compañía" y "Editar compañía", "Tipo de
+> documento" es un campo de texto donde hay que escribir el UUID del maestro. Eso incumple RF-013 ("IDs …
+> ocultos en la interfaz") y el Principio II, y no trata el campo como la referencia al catálogo que declara
+> data-model (`TipoDocumentoId → TipoDocumento`). El backend y el contrato (`CompaniaRequest.tipoDocumentoId`,
+> UUID) ya funcionan con el ID y no se modifican. Se reutiliza el patrón de `PersonaFormulario`.
+
+## Phase 35: VF-001 — Selector de tipo de documento en el formulario de compañía
+
+**Goal**: Elegir el tipo de documento por su nombre desde el catálogo, sin ver ni escribir su UUID, y seguir
+enviando el ID.
+
+**Independent Test**: en Nueva compañía, "Tipo de documento" es un selector con los nombres de los tipos
+activos y el alta envía el ID del elegido. En Editar compañía aparece preseleccionado el tipo actual (si está
+activo) con su nombre.
+
+- [X] T279 [US2] Sustituir el `<input type="text">` de "Tipo de documento" por un `<select>` alimentado con `useMaestro('tipos-documento', 'ACTIVO')` (opción inicial "Seleccione…", `value={tipo.id}`, texto `{tipo.nombre}`), cambiar la validación a `z.string().min(1, 'Seleccione el tipo de documento.')` y retirar la ayuda "Identificador del maestro de tipos de documento.". En edición se conserva `tipoDocumentoId` como valor del formulario; un tipo inactivo o no resoluble no recibe opción especial y exige elegir uno activo para guardar, como en `PersonaFormulario` (RF-032). Sin cambios de backend, contratos ni payload (VF-001; RF-013; Principio II) en `frontend/src/features/companies/CompaniaFormulario.tsx`
+- [X] T280 [US2] Pruebas de componente: simular `listarMaestro`; ajustar las dos pruebas existentes que escribían el UUID para que elijan el tipo por su nombre; añadir que el selector ofrece nombres y no UUIDs, que el alta envía el ID elegido, que la edición preselecciona el tipo actual mostrando su nombre y lo envía sin cambios, y que un tipo actual no disponible exige elegir uno para guardar (VF-001; RF-013) en `frontend/tests/unit/CompaniasPage.test.tsx` — depende de T279
+- [X] T281 Validar (pruebas relevantes, prueba negativa sin la corrección, Vitest completo, typecheck y ESLint separando los problemas preexistentes no relacionados) y cerrar documentalmente VF-001 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED) — depende de T279 y T280
+
+**Checkpoint**: VF-001 cerrado, sin cambios de backend, API, contratos, requisitos, modelo de datos ni autorización.
+
+### Notas del bloque T279 a T281 (POST-BASELINE — VF-001)
+
+- **T001–T278 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Fuera de alcance por decisión aprobada**: `CompaniaService` no comprueba que el tipo de documento exista y
+  esté activo (a diferencia de `PersonaService`), y `Compania.TipoDocumentoId` no tiene FK en base de datos. No
+  se implementa en VF-001 ni se abre un hallazgo nuevo en este bloque.
+
+---
+
+# POST-BASELINE — VF-002
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T281 sin reabrir el Baseline
+> (T001–T242) ni los bloques anteriores (T243–T281).
+>
+> **Origen**: hallazgo VF-002 (`docs/functional-validation/post-baseline-validation.md` §17). Es un **defecto
+> de implementación frontend** de severidad alta. La página de Unidades Organizativas ya muestra un árbol (el
+> componente compartido `Tree`, patrón ARIA `treeview`) con la jerarquía anidada que entrega
+> `GET /api/unidades-organizativas/arbol`. Sin embargo, con el ratón no se puede expandir ni contraer: el clic
+> solo selecciona, el indicador `▸`/`▾` es decorativo y la expansión solo funciona con el teclado. Eso incumple
+> **RF-036** ("Los árboles DEBEN permitir expandir, contraer y seleccionar nodos") y ux-ui.md §14. Se corrige en
+> `Tree.tsx`, sin librerías nuevas ni cambios de backend, contratos, modelo o autorización.
+
+## Phase 36: VF-002 — Expandir y contraer el árbol con el ratón
+
+**Goal**: Que el usuario con ratón pueda expandir y contraer ramas desde el indicador, conservando la
+selección con el clic en el nombre y toda la navegación por teclado.
+
+**Independent Test**: en el árbol de unidades organizativas, un clic en `▸` muestra los hijos y un clic en
+`▾` los oculta, sin cambiar la selección. Un clic en el nombre selecciona el nodo sin expandirlo.
+
+- [X] T282 Hacer interactivo el indicador de expansión de los nodos con hijos: un clic alterna expandido/contraído (con `stopPropagation`, de modo que no seleccione), y el clic en el nombre sigue solo seleccionando. El indicador conserva `aria-hidden` y queda fuera del orden de tabulación, porque el teclado ya cubre la expansión con las flechas. Las hojas (`•`) no tienen acción. El estado inicial sigue contraído, sin props nuevas ni auto-expansión. Sin cambios en la API pública del componente, en la navegación por teclado ni en la accesibilidad existente (VF-002; RF-036; ux-ui.md §14) en `frontend/src/components/Tree/Tree.tsx`
+- [X] T283 Pruebas: en el `Tree`, el clic en el indicador expande y contrae (incluidos varios niveles) sin seleccionar, el clic en el nombre selecciona sin expandir, las hojas no expanden y el estado inicial sigue contraído; en `UnidadesOrganizativasPage`, el hijo de la jerarquía solo se ve tras expandir su raíz con el ratón y la selección habilita las acciones existentes. Las pruebas de teclado existentes no se modifican (VF-002; RF-036) en `frontend/tests/unit/Tree.test.tsx` y `frontend/tests/unit/UnidadesOrganizativasPage.test.tsx` — depende de T282
+- [X] T284 Validar (pruebas relevantes, prueba negativa sin la corrección, Vitest completo, typecheck y ESLint separando los problemas preexistentes no relacionados) y cerrar documentalmente VF-002 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED) — depende de T282 y T283
+
+**Checkpoint**: VF-002 cerrado, sin cambios de backend, API, contratos, modelo, autorización ni dependencias.
+
+### Notas del bloque T282 a T284 (POST-BASELINE — VF-002)
+
+- **T001–T281 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Componente compartido**: `Tree` también lo usan Áreas de acceso (`AreasAccesoPage`) y la asignación de unidad
+  organizativa (`AsignacionUnidadOrganizativa`), que heredan el cambio. Por decisión aprobada, **VF-003
+  permanece como hallazgo independiente** y no se cierra por este bloque.
+- **Fuera de alcance por decisión aprobada**: búsqueda y breadcrumb del árbol (ux-ui.md §14). No se implementan
+  ni se abre un hallazgo nuevo; quedan como observación pendiente en el registro.
+
+---
+
+# POST-BASELINE — VF-003
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T284 sin reabrir el Baseline
+> (T001–T242) ni los bloques anteriores (T243–T284).
+>
+> **Origen**: hallazgo VF-003 (`docs/functional-validation/post-baseline-validation.md` §18). Es un **defecto
+> de implementación frontend** con **la misma causa raíz que VF-002**: el árbol de Áreas de acceso
+> (`AreasAccesoPage`, T125) usa el componente compartido `Tree`, cuyo indicador `▸`/`▾` no permitía expandir ni
+> contraer con el ratón (RF-036). **La corrección de código ya se hizo en T282** (VF-002). Este bloque **no
+> modifica código de producción**: aporta la evidencia específica de Áreas de acceso y cierra VF-003 como
+> hallazgo independiente. Sin cambios de `Tree.tsx`, `AreasAccesoPage.tsx`, backend, contratos, modelo ni
+> dependencias.
+
+## Phase 37: VF-003 — Evidencia del árbol de Áreas de acceso
+
+**Goal**: Demostrar en la propia pantalla de Áreas de acceso que el árbol se recorre con el ratón y que la
+selección de un área sigue gobernando sus acciones y su panel de tipos de persona.
+
+**Independent Test**: en Áreas de acceso, `▸` despliega la raíz y muestra el hijo, `▾` la vuelve a contraer,
+se alcanza un segundo nivel, el clic en el nombre selecciona sin expandir, y seleccionar un área hija habilita
+crear y mover y muestra el panel de tipos de persona de esa área.
+
+- [X] T285 [US6] Pruebas de página específicas de Áreas de acceso: el árbol empieza contraído; el clic en `▸` expande la raíz y muestra el hijo; el clic en `▾` la contrae; se recorre un segundo nivel; el clic en el nombre selecciona sin expandir; y seleccionar un área hija habilita "Crear bajo la seleccionada" y "Mover" y muestra el panel de tipos de persona de esa área (RF-019). Las pruebas de teclado existentes no se modifican (VF-003; RF-009; RF-036) en `frontend/tests/unit/AreasAccesoPage.test.tsx`
+- [X] T286 Validar (pruebas de `AreasAccesoPage`, `Tree` y de Áreas de acceso relacionadas, prueba negativa con el `Tree` anterior a T282, Vitest completo, typecheck y ESLint de los archivos afectados) y cerrar documentalmente VF-003 en `docs/functional-validation/post-baseline-validation.md` (ANALYZING → FIXED → VALIDATED → CLOSED), registrando que la corrección de código fue T282 — depende de T285
+
+**Checkpoint**: VF-003 cerrado con evidencia propia, sin cambios de código de producción.
+
+### Notas del bloque T285 a T286 (POST-BASELINE — VF-003)
+
+- **T001–T284 no se modificaron, renumeraron ni reabrieron.** El bloque es aditivo.
+- **Por qué no hay tarea de corrección de código**: la causa raíz (indicador de expansión decorativo en el `Tree`
+  compartido) se eliminó en T282. VF-003 se mantuvo independiente por decisión aprobada y se cierra con su propia
+  evidencia, no por arrastre de VF-002.
+- **Fuera de alcance**: búsqueda y breadcrumb (ux-ui.md §14, observación ya registrada en VF-002 §17.8);
+  auto-expansión del primer nivel (descartada); presentación jerárquica del selector "Nueva área superior".
+
+---
+
+# POST-BASELINE — VF-004
+
+> **Bloque de evolución post-Baseline.** Continúa la numeración después de T286 sin reabrir el Baseline
+> (T001–T242) ni los bloques anteriores (T243–T286).
+>
+> **Origen**: hallazgo VF-004 (`docs/functional-validation/post-baseline-validation.md` §19), formalizado como
+> cambio de requisito post-Baseline en spec.md (Sesión 2026-09-25 VF-004): **RF-083**, **CS-044** a **CS-047**,
+> y matices de Historia 8, RF-021, RF-029, RF-080 y RF-082. Diseño: plan.md ("Plan post-Baseline VF-004",
+> paquetes WP-1 a WP-12), research.md §36, data-model.md (duodécima revisión), `contracts/permissions.yaml`
+> **v2.0.0**, quickstart.md §10 y ux-ui.md §18.
+>
+> **Decisiones de VF-004** (F-1 a F-7; no son las series `D1`–`D9`, `D-1`–`D-5` ni D1–D4 de VF-007):
+> **F-1** inicio = primer instante válido del día local; fin = primer instante válido del día siguiente − 1 ms;
+> se persiste en UTC y la evaluación sigue siendo `inicio <= instante < fin`. **F-2** para `PermisoAcceso`, la
+> contención de RF-082 se compara por fecha civil (RF-072 no cambia). **F-3** la petición usa `format: date`;
+> contrato incompatible v2.0.0, sin doble versión. **F-4** los permisos existentes con hora no se migran ni se
+> reinterpretan. **F-5** solo fechas si la vigencia es de días completos; en otro caso, fecha y hora. **F-6**
+> cada extremo se edita por separado (fecha sin cambios → instante conservado). **F-7** cambiar la zona no
+> modifica instantes.
+>
+> **Estado de partida**: desde `/speckit-plan`, `OpenApiSnapshotTests` (2 casos de `permissions.yaml`) y
+> `PermisosContractTests` (2 casos) están en rojo, porque el contrato v2.0.0 declara una forma que la API aún no
+> publica. T302 los devuelve a verde.
+>
+> **Fuera de alcance de este bloque** (no se toca): `EvaluadorDeAcceso`, `PermisoAcceso.EstaVigenteEn` (solo
+> comentarios), `EvaluacionAccesoService`, `Vigencia` (normalización general al día UTC; registro §19.6),
+> `ContencionTemporalValidator.ValidarAsync`, RF-022 y `BloqueHorarioPermiso` (incluido el tramo
+> 23:59–24:00), la cascada (`RevocacionService`, `ReglasRevocacion`), RF-072 y D1–D4 de VF-007, migraciones,
+> esquema de base de datos, scripts de conversión de datos, y los servicios de pertenencias, contextos, unidades,
+> credenciales y perfiles.
+>
+> **Orden de autorización obligatorio** (Principio I, research.md §35.6 y §36.4): (1) alcance del actor sobre
+> el área (`404`); (2) sujeto; (3) alcance histórico del actor sobre la persona (`404`), solo si hay contención;
+> (4) contención por fecha civil; (5) escritura. La zona de la Principal, las fechas de contención y la
+> pertenencia **nunca** se obtienen de un recurso fuera del alcance del actor: un recurso fuera de alcance sigue
+> produciendo el `404` del Baseline.
+
+## Phase 38: VF-004 — Backend: conversión diaria, contención por fecha civil y contrato
+
+**Goal**: Disponer de la conversión fecha civil ↔ instante UTC con tzdb, de la contención por fecha civil y de
+los DTO de la v2.0.0, sin tocar la evaluación ni RF-072.
+
+**Independent Test**: las pruebas unitarias de T294–T296 pasan: Lima, Santiago con el día sin 00:00 y el de 25
+horas, conservación y normalización por extremo, y contención con igualdad válida en ambos extremos.
+
+- [X] T287 [US8] Crear la clase estática pura `VigenciaDiariaPermiso` (research.md §36.1, §36.3; RF-083 (a), (d), (f); F-1, F-6), sin acceso a datos ni reloj. Operaciones: • `InicioUtc(DateOnly fecha, DateTimeZone zona)`: `zona.AtStartOfDay(LocalDate.FromDateOnly(fecha)).ToInstant().ToDateTimeUtc()`. • `FinUtc(DateOnly fecha, DateTimeZone zona)`: `AtStartOfDay` del día siguiente menos `Duration.FromMilliseconds(1)`. • `FechaCivil(DateTime instanteUtc, DateTimeZone zona)`: fecha local de `Instant.FromDateTimeUtc(...)` en la zona, como `DateOnly`. • `EsDiaCompleto(DateTime inicioUtc, DateTime finUtc, DateTimeZone zona)`: `true` solo si ambos instantes coinciden exactamente con `InicioUtc`/`FinUtc` de sus propias fechas civiles. • `ResolverExtremo(DateTime almacenadoUtc, DateOnly solicitada, DateTimeZone zona, bool esFin)`: devuelve `(DateTime Instante, bool Cambia)`, que conserva el instante almacenado si `FechaCivil(almacenado) == solicitada` y, si no, lo normaliza con `InicioUtc` o `FinUtc`. • `Zona(string zonaEfectiva)`: `DateTimeZoneProviders.Tzdb[zonaEfectiva]`. Si `AtStartOfDay` lanza `SkippedTimeException` (la zona omite el día entero), traducirla a `ReglaNegocioInvalidaException(CodigosError.ValidacionEntrada, "La fecha {fecha} no existe en la zona horaria de la Compañía Principal del área.")`. **Prohibido** calcular límites de día o cambios de horario con aritmética de `DateTime`/`TimeSpan` o con `Vigencia.NormalizarInicio/NormalizarFin` (normalizan el día UTC). Archivo: `backend/src/EnterpriseAccessControl.Application/Permissions/VigenciaDiariaPermiso.cs` (nuevo). Prueba: T294.
+- [X] T288 [P] [US8] En `ContencionTemporalValidator`, añadir la variante por fecha civil (research.md §36.4; RF-082 matizado, RF-083 (c); F-2): • `ValidarFechasCivilesAsync(Guid personaId, DateOnly inicio, DateOnly fin, CancellationToken ct)`: obtiene la pertenencia con el `ObtenerPertenenciaVigenteAsync` existente, **sin modificarlo**, y delega en la comprobación pura. • `static ValidarFechasCiviles(AsignacionPersonaCompania pertenencia, DateOnly inicio, DateOnly fin)`: fecha declarada = `DateOnly.FromDateTime(pertenencia.FechaHoraInicio)` y `DateOnly.FromDateTime(pertenencia.FechaHoraFin)`, sus componentes UTC. **Nunca** convierte esos instantes a otra zona. `inicio < inicioDeclarado` → `409 FUERA_DE_CONTENCION_TEMPORAL`; `fin > finDeclarado` → `409`. La igualdad es válida en ambos extremos. Mismos códigos y textos que `Validar`. `ValidarAsync`, `Validar` y `ObtenerPertenenciaVigenteAsync` no cambian una sola línea de lógica: siguen siendo los de RF-072 y perfiles. En el `<remarks>` de la clase, añadir un párrafo sobre la variante de VF-004. Archivo: `backend/src/EnterpriseAccessControl.Application/People/ContencionTemporalValidator.cs`. Prueba: T295.
+- [X] T289 [US8] DTOs y validador de la v2.0.0 (research.md §36.5; `contracts/permissions.yaml` v2.0.0; F-3): • `PermisoAccesoRequest`: sustituir `DateTime FechaHoraInicioVigencia`/`FechaHoraFinVigencia` por `DateOnly FechaInicioVigencia`/`FechaFinVigencia`, que se serializan como `fechaInicioVigencia`/`fechaFinVigencia` con `format: date`. • `PermisoAccesoDto`: conservar `DateTime FechaHoraInicioVigencia`/`FechaHoraFinVigencia` (instantes UTC efectivos) y añadir `DateOnly FechaInicioVigencia`, `DateOnly FechaFinVigencia`, `bool VigenciaEnDiasCompletos` y `string ZonaHorariaIana`. • `PermisoAccesoRequestValidator`: `NotEqual(default(DateOnly))` con `WithName("fechaInicioVigencia")`/`WithName("fechaFinVigencia")` y los mensajes de obligatoriedad actuales (RF-021, RF-071). Actualizar el `<remarks>`. Un cuerpo con los campos antiguos `fechaHora*` deja las fechas en `default` y se rechaza con `400`, que nombra los campos nuevos. Sin doble versión ni aceptación de los campos antiguos. Rompe la compilación del servicio y de las pruebas hasta T290–T293 y T297: hacerlo en el mismo tramo. Archivos: `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoDtos.cs` y `backend/src/EnterpriseAccessControl.Application/Permissions/Validators/PermisosRequestValidators.cs`. Pruebas: T299 y T302.
+
+**Checkpoint**: piezas puras y contrato de C# listos. La evaluación, RF-072 y la cascada siguen sin cambios.
+
+---
+
+## Phase 39: VF-004 — `PermisoAccesoService`: zona, creación, actualización y lecturas
+
+**Goal**: Aplicar RF-083 en el servidor manteniendo el orden de autorización y sin reinterpretar datos
+existentes.
+
+**Independent Test**: un alta de 25/09–30/09 en un área de Lima persiste `2026-09-25T05:00:00.000Z` –
+`2026-10-01T04:59:59.999Z`. Un permiso sembrado con hora conserva sus instantes al cambiar solo bloques o
+estado. Un área fuera de alcance devuelve `404` sin leer la zona.
+
+- [X] T290 [US8] Zona efectiva de la Principal del área, solo dentro del alcance (research.md §36.2; RF-080, RF-083; Principio I): • Inyectar `IRelojEmpresarial` en `PermisoAccesoService` (ya es singleton en `DependencyInjection.cs`; verificar que no requiere cambios). • Cambiar `ExigirAreaEnAlcanceAsync` para que, en la **misma** consulta que hoy confirma el alcance (`AreasAcceso` filtrada por `alcance.EsGlobal || companias.Contains(a.CompaniaPrincipalId)`), proyecte `Compania.ZonaHorariaIana` de la Principal del área y devuelva `VigenciaDiariaPermiso.Zona(reloj.ZonaEfectiva(zona))`. Si no es visible, conserva el `404` actual y no lee ninguna zona. • Añadir `ZonaDelAreaAsync(Guid areaAccesoId)`, que solo se invoca con el `AreaAccesoId` de un permiso ya obtenido por `ObtenerEnAlcanceAsync`. • Añadir `ZonasDeAsync(IReadOnlyCollection<Guid> areaIds)` por lote para las lecturas (patrón de `BloquesDeAsync`), aplicada solo a permisos ya filtrados por `EnAlcance`. Así ninguna zona se obtiene de un recurso fuera de alcance. Archivo: `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs`. Depende de T287. Prueba: T300 (área fuera de alcance → `404`).
+- [X] T291 [US8] Creación (`CrearAsync`) según RF-083 (research.md §36.1, §36.4; RF-082; F-1, F-2). Orden exacto: (1) `ValidarVigencia` por fechas: pura, antes del alcance como hoy; `FechaFinVigencia < FechaInicioVigencia` → `400 PERIODO_INVALIDO`; la igualdad es válida. (2) `ValidarBloques` (sin cambios). (3) `ExigirAreaEnAlcanceAsync` → zona (T290). (4) `ValidarSujetoAsync` (sin cambios). (5) Conversión con `VigenciaDiariaPermiso.InicioUtc`/`FinUtc`. (6) Si `ReglaContencionPermiso.RequiereContencion(alcance, null, estado, true)`: `ContenerEnPertenenciaAsync(personaId, fechaInicio, fechaFin, inicioUtc, finUtc, ct)`, que llama **primero** a `personas.ExigirAlcanceHistoricoAsync` (`404`) y **después** a `contencion.ValidarFechasCivilesAsync(personaId, fechaInicio, fechaFin, ct)` con las fechas de la petición. El método recibe las fechas civiles de inicio y fin **y** los instantes UTC ya resueltos de esos extremos (paso 5). La implementación normal usa solo las fechas civiles para la contención por día civil (RF-082, F-2). Los instantes forman parte de los datos ya resueltos y se pasan para que la regresión dirigida de T310 (b) pueda sustituir únicamente la llamada por `ValidarAsync(personaId, inicioUtc, finUtc, ct)`. No cambian la regla funcional de VF-004. (7) Escritura. UO y COMPANIA, o un alta directamente `INACTIVO`, no consultan la pertenencia. Archivo: `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs`. Depende de T288–T290. Pruebas: T299 y T300.
+- [X] T292 [US8] Actualización (`ActualizarAsync`) por extremo (research.md §36.3; RF-083 (d), (g); F-4, F-6; D4 sin cambios). Orden: (1) `ValidarVigencia` y `ValidarBloques`. (2) `ObtenerEnAlcanceAsync` (`404`) y la comprobación de alcance inmutable (sin cambios). (3) Zona por `ZonaDelAreaAsync(permiso.AreaAccesoId)`. (4) `VigenciaDiariaPermiso.ResolverExtremo` para el inicio y para el fin, cada uno contra su instante almacenado. (5) **Validación obligatoria de los instantes resueltos**: si `FinUtc <= InicioUtc` → `400 PERIODO_INVALIDO` (RF-039, data-model.md `PermisoAcceso`). Con un extremo antiguo conservado, dos fechas válidas pueden dar instantes vacíos o invertidos, y no hay CHECK en base de datos que lo impida. Se valida **antes** de la contención y de persistir, sin mutar nada. (6) `fechasCambian = inicio.Cambia || fin.Cambia`. (7) `RequiereContencion(permiso.Alcance, permiso.Estado, request.Estado, fechasCambian)`, sin cambios; si aplica, `ContenerEnPertenenciaAsync(permiso.PersonaId!.Value, fechaInicio, fechaFin, inicioUtc, finUtc, ct)` (alcance histórico → fecha civil), **antes** de mutar. Recibe las fechas civiles de la petición **y** los instantes UTC ya resueltos en el paso 4, ya sean conservados o normalizados. Igual que en T291, la contención usa solo las fechas civiles, y los instantes quedan disponibles para la regresión dirigida de T310 (b), sin cambiar la regla funcional. (8) Asignar **solo** el extremo que cambia; nunca reescribir el que no cambió. (9) Estado y bloques como hoy. Eliminar `ReglaContencionPermiso.FechasCambian` y su `Difieren`, que quedan sin uso (la tolerancia de 1 ms de research.md §35.3 no aplica a fechas civiles), y actualizar el `<remarks>` de `ReglaContencionPermiso`. `RequiereContencion` no cambia. Archivos: `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs` y `backend/src/EnterpriseAccessControl.Application/Permissions/ReglaContencionPermiso.cs`. Depende de T291 (mismo archivo). Pruebas: T296 y T301.
+- [X] T293 [US8] Lecturas y presentación (research.md §36.5–36.6; RF-083 (f), (h); F-5, F-7): • `AMapa` recibe la zona de cada permiso y rellena `FechaInicioVigencia = FechaCivil(inicio)`, `FechaFinVigencia = FechaCivil(fin)`, `VigenciaEnDiasCompletos = EsDiaCompleto(inicio, fin, zona)` y `ZonaHorariaIana = zona.Id`. • `ListarAsync` usa `ZonasDeAsync` sobre la página ya filtrada; `ObtenerAsync`, `CrearAsync` y `ActualizarAsync` usan la zona ya resuelta. • Nada de esto se persiste: se recalcula en cada lectura, así que un cambio de zona no modifica filas. • Actualizar el `<summary>`/`<remarks>` de `PermisoAccesoService` y el de las propiedades de vigencia de `PermisoAcceso`, indicando que los instantes se calculan desde fechas civiles (RF-083). `EstaVigenteEn` no cambia su lógica. Archivos: `backend/src/EnterpriseAccessControl.Application/Permissions/PermisoAccesoService.cs` y `backend/src/EnterpriseAccessControl.Domain/Entities/PermisoAcceso.cs` (solo comentarios). Depende de T292. Pruebas: T299 y T301.
+
+**Checkpoint**: RF-083 aplicado en el servidor; la API publica la v2.0.0. La evaluación, la cascada y RF-072 no
+cambian.
+
+---
+
+## Phase 40: VF-004 — Pruebas de backend (unitarias e integración)
+
+**Purpose**: Pruebas nuevas que fallen si se revierte RF-083, y adaptar las existentes solo donde cambia la
+forma de la petición o la expectativa.
+
+- [X] T294 [P] [US8] Pruebas unitarias nuevas de `VigenciaDiariaPermiso` con zonas tzdb reales (research.md §36.1; CS-044, CS-045; F-1, F-6): • **America/Lima**: `2026-09-25` → `2026-09-25T05:00:00.000Z`; fin `2026-09-30` → `2026-10-01T04:59:59.999Z`. • **America/Santiago, día sin 00:00**: `InicioUtc` equivale a las 01:00 locales y el día dura 23 h (`FinUtc − InicioUtc + 1 ms`). • **America/Santiago, día de 25 horas**: el día dura 25 h y el fin del día anterior es `InicioUtc − 1 ms`. Ambas fechas de transición de Santiago se localizan con `zona.GetZoneIntervals(...)` en la propia prueba, con una aserción previa que garantiza la premisa (hueco o repetición). No se codifican offsets a mano. • **Instantes antiguos**: `FechaCivil` de `2026-09-25T08:00Z` y `2026-09-30T17:00Z` en Lima → 25/09 y 30/09. • **`EsDiaCompleto`**: `true` para una vigencia normalizada; `false` para la antigua y para la normalizada en Lima evaluada en Santiago (F-7). • **`ResolverExtremo`**: conserva con la misma fecha y normaliza con otra, para inicio y fin. • **Día omitido**: `Pacific/Apia`, `2011-12-30` → `ReglaNegocioInvalidaException` `VALIDACION_ENTRADA`. Archivo: `backend/tests/EnterpriseAccessControl.UnitTests/Permissions/VigenciaDiariaPermisoTests.cs` (nuevo). Depende de T287.
+- [X] T295 [P] [US8] Pruebas unitarias nuevas de `ContencionTemporalValidator.ValidarFechasCiviles` (research.md §36.4; F-2), con una pertenencia construida con `Vigencia.NormalizarRango` del 01/08/2026 al 31/07/2027: • inicio 01/08/2026 y fin 31/07/2027 → válido (igualdad en ambos extremos); • fin 01/08/2027 → `FUERA_DE_CONTENCION_TEMPORAL`; • inicio 31/07/2026 → `FUERA_DE_CONTENCION_TEMPORAL`. Se eliminó el antiguo cuarto caso ("un fin cuyo instante en Lima supera al de la pertenencia"): la función solo recibe fechas civiles y ese caso no distinguía nada, porque era idéntico al primero. La garantía de que dos rangos con la misma fecha civil no se rechazan por la diferencia de instantes UTC queda **explícitamente en T300** (fin = último día en Lima; inicio = primer día en `Asia/Tokyo`), en el punto de llamada del servicio, que es donde T310 (b) introduce la regresión. `ContencionTemporalValidatorTests` (T101) no se modifica. Archivo: `backend/tests/EnterpriseAccessControl.UnitTests/People/ContencionFechaCivilPermisoTests.cs` (nuevo). Depende de T288.
+- [X] T296 [P] [US8] Adaptar `ReglaContencionPermisoTests`: eliminar solo los casos de `FechasCambian` (tolerancia de 1 ms), que desaparece en T292, y mantener sin cambios la matriz de `RequiereContencion` (D4). Archivo: `backend/tests/EnterpriseAccessControl.UnitTests/Permissions/ReglaContencionPermisoTests.cs`. Depende de T292.
+- [X] T297 [US8] Adaptar la forma de las peticiones de permisos en las pruebas de integración: • `EscenarioPermisos.Peticion` pasa a `DateOnly? inicio`/`DateOnly? fin`. Por defecto, la fecha civil en la zona de `PrincipalA` de `Instante.AddMonths(-1)` y de `Instante.AddMonths(6)`. • Añadir en el escenario los helpers `FechaCivil(DateTime)` (zona de la Principal) y `FechaDeclarada(DateTime)` (componentes UTC de un instante de pertenencia). • Actualizar las llamadas de `ContencionPermisosPersonaTests` y `Rf082RenovacionYCascadaTests` con `FechaDeclarada` de la pertenencia, **nunca** convirtiéndola a Lima. • Actualizar también `PrecedenciaPermisosTests`, `GateCredencialTests`, `RevalidacionDinamicaTests`, `EvaluacionAccesoContratistaTests`, `EvaluacionAccesoTests`, `PermisosTests`, `RegistrosAnterioresRf082Tests` y cualquier otra llamada a `Peticion` o cuerpo JSON de `/api/permisos`, sin cambiar lo que verifica cada prueba. Archivos: `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/*.cs` y `backend/tests/EnterpriseAccessControl.IntegrationTests/People/Rf082RenovacionYCascadaTests.cs`. Depende de T289.
+- [X] T298 [US8] Adaptar las tres pruebas cuya **expectativa** cambia con RF-083 (plan.md, Regresión VF-004): • `PermisosTests`: la petición con inicio = fin deja de ser `PERIODO_INVALIDO`. Se sustituye por fin anterior a inicio y se añade el caso de un solo día → `201`. El caso de campo ausente nombra `fechaFinVigencia`. • `EvaluacionAccesoTests`: el permiso "vencido" con fin `Instante − 1 h` cae el mismo día en Lima; se usa como fin la fecha civil del día anterior a `Instante`. • `RegistrosAnterioresRf082Tests`: el caso de tolerancia `AddTicks(±5000)` se sustituye por "reenviar las mismas fechas civiles conserva los instantes"; los demás casos envían fechas civiles. Archivos: `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/PermisosTests.cs`, `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/EvaluacionAccesoTests.cs` y `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/RegistrosAnterioresRf082Tests.cs`. Depende de T293 y T297.
+- [X] T299 [P] [US8] Integración nueva de CS-044 y CS-045 por HTTP con SQL Server real (Testcontainers). **Fechas relativas obligatorias**: ninguna fecha absoluta como dependencia temporal del escenario. Todas se derivan de `EscenarioPermisos.Instante` (D = fecha civil en Lima de `Instante`, más desplazamientos en días). 25/09–30/09/2026 queda solo como ejemplo documental de spec.md CS-044. Conversión esperada en `America/Lima` (UTC−5 fijo, sin cambio de horario): fecha de inicio D → `D 05:00:00.000Z`; fecha de fin D → `(D+1) 04:59:59.999Z`. • **CS-044**: • un alta de D a D+5 en un área de Lima → `201`, y la fila persiste exactamente `D 05:00:00.000Z` / `(D+6) 04:59:59.999Z`; • la respuesta trae las fechas civiles D y D+5, `vigenciaEnDiasCompletos = true` y `zonaHorariaIana = America/Lima`; • con bloques que cubren la hora evaluada (p. ej. 00:00–23:59 del día de semana correspondiente), la evaluación el día D+5 a las 23:00 de Lima (`(D+6) 04:00Z`) → `CONCEDIDO` y el D+6 a las 00:30 (`(D+6) 05:30Z`) → `PERMISO_FUERA_DE_VIGENCIA`; dentro de la vigencia y sin bloque → `FUERA_DE_BLOQUE_HORARIO`. Pertenencia, contexto y credencial del escenario cubren esos instantes. • **CS-045**: • permiso de un solo día → `201`, con vigencia de 00:00 a 23:59:59.999 locales; • fin anterior a inicio → `400 PERIODO_INVALIDO`; • **contrato antiguo**: un cuerpo con `fechaHoraInicioVigencia`/`fechaHoraFinVigencia` → `400` cuyos errores nombran `fechaInicioVigencia` y `fechaFinVigencia`; • fecha con hora o mal formada → `400`. • **Cambio de horario de extremo a extremo**: con una Principal del escenario en `America/Santiago`, un alta de alcance `UNIDAD_ORGANIZATIVA` o `COMPANIA` (sin dependencia de la pertenencia) que empieza el próximo día sin 00:00 posterior a `Instante`, localizado con tzdb (`GetZoneIntervals`), persiste en UTC las 01:00 locales de ese día. • **UO y COMPANIA**: con fechas fuera de la pertenencia, `201` sin contención. Archivo: `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/VigenciaDiariaPermisosTests.cs` (nuevo). Depende de T293 y T297.
+- [X] T300 [P] [US8] Integración nueva de RF-082 por fecha civil y aislamiento (research.md §36.2, §36.4; F-2; Principio I), con una persona con pertenencia del día D1 al D2 (fechas relativas a `Instante`) y un área de Lima: • fin del permiso = D2 → `201`, aunque su instante UTC (`(D2+1) 04:59:59.999Z`) supere al de la pertenencia (`D2 23:59:59.999Z`); se verifica en la fila; • fin = D2 + 1 → `409 FUERA_DE_CONTENCION_TEMPORAL`; • inicio = D1 → `201`; inicio = D1 − 1 → `409`; • **zona al este de UTC**: con un área de una Principal en `Asia/Tokyo` (UTC+9, sin cambio de horario) y la misma persona (el alta no exige contexto operativo; basta con que el actor administre el área), inicio = D1 → `201`, aunque su instante UTC (`(D1−1) 15:00:00.000Z`) sea anterior al de la pertenencia (`D1 00:00:00.000Z`); se verifica en la fila. Es el caso que distingue fecha civil de instante en el extremo inicial, y lo usa T310 (b); • persona sin pertenencia → `400 SIN_PERTENENCIA_VIGENTE`; • **aislamiento**: un `COMPANY_ADMINISTRATOR` sobre una persona fuera de su alcance histórico → `404 RECURSO_NO_ENCONTRADO` con cualquier fecha, nunca `400`/`409`; • área fuera del alcance del actor → `404`, en alta y en actualización; • en todos los rechazos no se escribe ninguna fila. Archivo: `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/ContencionPermisoFechaCivilTests.cs` (nuevo). Depende de T293 y T297.
+- [X] T301 [P] [US8] Integración nueva de permisos históricos, edición por extremo y cambio de zona (CS-046, CS-047; RF-083 (d), (g), (h); F-4, F-6, F-7). **Fechas relativas obligatorias**: todas se derivan de `EscenarioPermisos.Instante`, con Da y Db fechas relativas (p. ej. Da = D − 5 y Db = Da + 5, siendo D la fecha civil en Lima de `Instante`). El escenario **garantiza** que Da − 1, Da, Db y Db + 5 están dentro de la pertenencia vigente de la persona (inicio declarado ≤ Da − 1 y Db + 5 ≤ fin declarado), porque los `PUT` que cambian una fecha de un permiso PERSONA `ACTIVO` validan la contención y deben aceptarse por fecha y no rechazarse por quedar accidentalmente fuera de la pertenencia. Si la pertenencia por defecto no lo cumple, se crea con fechas que lo cumplan antes de sembrar. El ejemplo `2026-09-25T08:00Z – 2026-09-30T17:00Z` de CS-046 queda solo como referencia documental, y se **mantienen los desplazamientos históricos 08:00Z/17:00Z**. Sembrar **directamente en BD**, igual que en `RegistrosAnterioresRf082Tests`, un permiso PERSONA `Da 08:00:00.000Z` – `Db 17:00:00.000Z` en un área de Lima (03:00 y 12:00 locales): • `GET` → instantes idénticos, fechas civiles Da y Db y `vigenciaEnDiasCompletos = false`; • `PUT` que reenvía las mismas fechas y cambia solo bloques → ambos instantes intactos al milisegundo; • `PUT` que cambia solo el estado → intactos, y a `INACTIVO` sin consultar la pertenencia (D4); • `PUT` que cambia solo la fecha de fin a Db + 5 → inicio intacto y fin `(Db+6) 04:59:59.999Z`; • `PUT` que cambia solo la fecha de inicio a Da − 1 (dentro de la pertenencia) → fin intacto e inicio `(Da−1) 05:00:00.000Z`; • **instantes invertidos por edición de un extremo (U1)**: con **`Dx = Da + 2`**, fecha relativa al escenario que el escenario garantiza dentro de la pertenencia vigente (igual que Da − 1, Da, Db y Db + 5), sembrar otro permiso antiguo con fin exactamente `Dx 05:00:00.000Z` (00:00 locales del día Dx, así que su fecha civil de fin es Dx) e inicio anterior (p. ej. `Da 08:00:00.000Z`). Un `PUT` con `fechaInicioVigencia = Dx` y `fechaFinVigencia = Dx` pasa la validación de fechas, conserva el fin y normaliza el inicio a `Dx 05:00:00.000Z`, con lo que `FinUtc <= InicioUtc` → `400 PERIODO_INVALIDO`. El permiso existente no cambia (instantes, estado y bloques idénticos en BD) y la operación no consulta ni modifica la pertenencia, porque la validación ocurre antes de la contención; • **CS-047, cambio de zona**: (1) crear explícitamente por `POST /api/permisos` un permiso nuevo en el área de Lima con fechas relativas dentro de la pertenencia, y comprobar que se normaliza (`vigenciaEnDiasCompletos = true`, límites `05:00:00.000Z`/`04:59:59.999Z`); (2) guardar los instantes de todas las filas de `PermisoAcceso` del escenario (este permiso nuevo y los antiguos sembrados); (3) cambiar la zona de la Principal a `America/Santiago` por la API de compañías; (4) verificar que ninguna fila cambia (instantes idénticos al milisegundo) y que, en la lectura, las fechas civiles y `vigenciaEnDiasCompletos` se recalculan con la zona nueva: el permiso nuevo pasa a `false`, porque `05:00Z` no es el inicio de un día en Santiago, y `zonaHorariaIana = America/Santiago`. Archivo: `backend/tests/EnterpriseAccessControl.IntegrationTests/Permissions/PermisosHistoricosVigenciaDiariaTests.cs` (nuevo). Depende de T293 y T297.
+
+**Checkpoint**: CS-044 a CS-047, el último día de la pertenencia, el día siguiente rechazado, el aislamiento
+`404`, el contrato antiguo `400`, el permiso de un día, el cambio de horario, los permisos históricos y la
+edición por extremo quedan cubiertos.
+
+---
+
+## Phase 41: VF-004 — Contrato y OpenAPI
+
+- [X] T302 [US8] Pruebas de contrato de la v2.0.0 y trazabilidad `permissions.yaml` ↔ DTO ↔ validador (research.md §36.5; F-3): • `PermisosContractTests`: • `PermisoAccesoRequest` exige `fechaInicioVigencia` y `fechaFinVigencia` con `format: date` en el documento publicado por la API, y ya no declara `fechaHoraInicioVigencia`/`fechaHoraFinVigencia`; • `PermisoAcceso` declara los instantes `date-time`, las fechas `date`, `vigenciaEnDiasCompletos` y `zonaHorariaIana`; • `fechaHoraFinVigencia` sigue sin ser anulable; • adaptar `La_vigencia_completa_es_obligatoria_para_los_tres_alcances` a los nombres nuevos. • `OpenApiSnapshotTests`: en verde sobre todos los contratos (0 fallos). • Verificar sin cambios que `PermisosController` ya declara `400`, `404` y `409` en `POST`/`PUT`. Archivo: `backend/tests/EnterpriseAccessControl.ContractTests/PermisosContractTests.cs`. Depende de T289 y T293.
+
+---
+
+## Phase 42: VF-004 — Frontend date-only
+
+**Goal**: Formularios y listado de permisos con fechas civiles; permisos históricos con fecha y hora en la zona
+de la Principal.
+
+**Independent Test**: en Vitest, el formulario envía `fechaInicioVigencia`/`fechaFinVigencia` como
+`AAAA-MM-DD`, el listado muestra solo fechas o fecha y hora según `vigenciaEnDiasCompletos`, y la edición de un
+permiso con hora muestra la nota de conservación.
+
+- [X] T303 [P] [US8] Añadir dos helpers sin conversión de zona (research.md §36.7): • `fechaDeclarada(iso: string): string`, que devuelve los 10 primeros caracteres de un instante de vigencia diaria normalizada al día UTC (pertenencias; registro §19.6); • `formatearFecha(fecha: string): string`, que formatea `AAAA-MM-DD` como `dd/mm/aaaa` sin construir un `Date` (evita el desplazamiento de zona). `aValorLocal`, `aIsoUtc`, `formatearFechaHora` y `aValorLocalEnZona` no cambian. Pruebas en `frontend/tests/unit/fechas.test.ts` (nuevo). Archivo: `frontend/src/lib/fechas.ts`.
+- [X] T304 [US8] Tipos de la v2.0.0 en `permissions/api.ts`: • `PermisoAccesoRequest` con `fechaInicioVigencia` y `fechaFinVigencia` (`AAAA-MM-DD`), sin los campos `fechaHora*`; • `PermisoAcceso` con `fechaHoraInicioVigencia` y `fechaHoraFinVigencia` (instantes), `fechaInicioVigencia`, `fechaFinVigencia`, `vigenciaEnDiasCompletos` y `zonaHorariaIana`; • comentarios con referencia a `contracts/permissions.yaml` v2.0.0. Archivo: `frontend/src/features/permissions/api.ts`. Depende de T289 (contrato).
+- [X] T305 [US8] Formulario de permisos con fechas civiles (research.md §36.7; ux-ui.md §18; RF-083; F-5, F-6): • inputs `type="date"` con las mismas etiquetas "Inicio de vigencia" y "Fin de vigencia"; • zod: ambas obligatorias y fin ≥ inicio (comparación de `AAAA-MM-DD`; igualdad válida), con el mensaje en `fechaFinVigencia`; • en edición, valores iniciales = `edicion.fechaInicioVigencia` y `edicion.fechaFinVigencia`; se envían tal cual y se elimina `conservarSiNoCambio` (el servidor decide); • si `edicion.vigenciaEnDiasCompletos === false`, nota informativa con `formatearFechaHora(fechaHora*, edicion.zonaHorariaIana)` y el aviso de que conservar una fecha conserva su hora; • límites de RF-082: `min`/`max` = `fechaDeclarada(vigente.fechaHoraInicio/Fin)`, y la ayuda muestra la pertenencia con `formatearFecha`; • se mantienen los mensajes de `SIN_PERTENENCIA_VIGENTE` y `FUERA_DE_CONTENCION_TEMPORAL` y el funcionamiento sin límites si la pertenencia no es visible (research.md §35.5). Archivo: `frontend/src/features/permissions/PermisoFormulario.tsx`. Depende de T303 y T304. Prueba: T307.
+- [X] T306 [US8] Listado de permisos (research.md §36.6; F-5, F-7; RF-080): • si `vigenciaEnDiasCompletos`, `formatearFecha(fechaInicioVigencia)` – `formatearFecha(fechaFinVigencia)`; • si no, `formatearFechaHora(fechaHoraInicioVigencia, zonaHorariaIana)` – `formatearFechaHora(fechaHoraFinVigencia, zonaHorariaIana)`. Sustituye los `new Date(...).toLocaleString()` actuales, que usan la zona del navegador. Archivo: `frontend/src/features/permissions/PermisosPage.tsx`. Depende de T303 y T304. Prueba: T307.
+- [X] T307 [US8] Vitest de permisos. Adaptar los casos existentes a la v2.0.0: valores `AAAA-MM-DD`, petición con los campos nuevos y aserción de que no se envían `fechaHora*`; límites RF-082 por fecha declarada. Añadir casos: • listado de un permiso de días completos → solo fechas; • permiso histórico → fecha y hora en `America/Lima` aunque el navegador tenga otra zona; • edición de un permiso histórico → nota con sus instantes; • edición sin cambios → reenvía las mismas fechas; • permiso de un día → se envía; • fin anterior a inicio → error y sin petición; • `min`/`max` = fechas declaradas de la pertenencia. Archivos: `frontend/tests/unit/PermisosPage.test.tsx` y `frontend/tests/unit/fechas.test.ts`. Depende de T305 y T306.
+
+---
+
+## Phase 43: VF-004 — E2E
+
+- [X] T308 [US8] E2E con la v2.0.0 (research.md §36.10): • en `soporte/tiempo.ts`, `inicio = referencia − 2 días`, y añadir a `Reloj` `fechaInicioPermiso = inicio.slice(0, 10)` y `fechaFinPermiso = fin.slice(0, 10)` (fechas declaradas de la pertenencia del escenario), con un comentario sobre por qué el `inicio` anterior fallaba entre las 22:00 y las 23:59 de Lima; • `soporte/seccion5.ts` y `multi-principal-quickstart.spec.ts` envían `fechaInicioVigencia`/`fechaFinVigencia` en `POST /api/permisos`; • ejecutar Playwright sobre el contenedor `eac-api` reconstruido (`docker compose up -d --build --no-deps api`), comprobar la equivalencia de configuración por hash **sin imprimir secretos** y devolver el contenedor a su configuración original al terminar; • `administracion-usuarios.spec.ts` (vigencia de un rol, no de un permiso) no cambia. Archivos: `frontend/tests/e2e/soporte/tiempo.ts`, `frontend/tests/e2e/soporte/seccion5.ts` y `frontend/tests/e2e/multi-principal-quickstart.spec.ts`. Depende de T293 y T305.
+
+---
+
+## Phase 44: VF-004 — Regresión, datos existentes, documentación y cierre
+
+- [X] T309 **Regresión y datos existentes** (plan.md, Regresión y Datos existentes VF-004; F-4; RF-072; D1–D4): • con `git diff` contra el commit de partida, confirmar que no cambian: • `EvaluadorDeAcceso.cs`, `EvaluacionAccesoService.cs`, `BloqueHorarioPermiso.cs`, `Vigencia.cs`, `RevocacionService.cs`, `ReglasRevocacion.cs` y los servicios de pertenencia, contexto, unidad, credencial y perfiles; • la lógica de `PermisoAcceso.EstaVigenteEn` (solo comentarios); • `ContencionTemporalValidator.ValidarAsync`, `Validar` y `ObtenerPertenenciaVigenteAsync`; • con `git status` y `git diff`, confirmar que no hay archivos nuevos ni modificados en `backend/src/EnterpriseAccessControl.Infrastructure/Persistence/Migrations/` (incluido `AppDbContextModelSnapshot.cs`) ni en `Persistence/Configurations/`, y que no existe ningún script de conversión de datos; • ejecutar sin modificarlas las suites de RF-072 (`ContencionTemporalValidatorTests`, `ContencionTemporalTests`), perfiles, evaluación (`EvaluadorDeAccesoTests`), revocación y bloques; • confirmar con la evidencia de T301 que los permisos históricos conservan sus instantes, que editar bloques o estado no altera la vigencia y que editar un extremo no modifica el otro. Verificación sin archivos nuevos, en `backend/`. Depende de T287–T302.
+- [X] T310 **Regresión dirigida (prueba negativa) sobre la implementación ya hecha**. **No** se restaura la versión completa de `PermisoAccesoService.cs` anterior a VF-004: no compila con los DTO `DateOnly` de T289, así que daría un error de compilación en vez de una demostración. En su lugar se introduce **temporalmente**, de **una en una**, cada regresión conceptual de RF-083 y se comprueba que las pruebas la detectan. Antes de empezar, guardar en el scratchpad copias y hashes de `VigenciaDiariaPermiso.cs`, `ContencionTemporalValidator.cs` y `PermisoAccesoService.cs`. (a) **Día UTC en vez del día local**: `InicioUtc`/`FinUtc` calculados con `Vigencia.NormalizarInicio`/`Vigencia.NormalizarFin` → deben fallar los casos de Lima y Santiago de T294 y la persistencia exacta de CS-044 en T299; restaurar. (b) **Contención por instantes en el punto de llamada**: la regresión se introduce en `PermisoAccesoService.ContenerEnPertenenciaAsync`, **no** dentro de `ValidarFechasCiviles`, que solo recibe fechas civiles y no puede comparar instantes. La implementación correcta llama a `contencion.ValidarFechasCivilesAsync(personaId, fechaInicio, fechaFin, ct)`; durante la regresión se sustituye temporalmente esa llamada por `contencion.ValidarAsync(personaId, inicioUtc, finUtc, ct)` con los instantes ya convertidos en la zona efectiva del área correspondiente (Lima o Tokio según el caso: cada caso usa la zona de su propia área). Esos instantes ya llegan a `ContenerEnPertenenciaAsync` como parámetros (T291, T292), así que la regresión cambia **solo esa llamada**, sin tocar la firma del método. Deben fallar los dos casos de T300 que distinguen la comparación por fecha civil de la comparación por instante: "fin = último día de la pertenencia → `201`" en el área de **Lima** (UTC−5: el fin del permiso, `(D2+1) 04:59:59.999Z`, supera al de la pertenencia, `D2 23:59:59.999Z`, y la regresión devuelve `409`), e "inicio = primer día de la pertenencia → `201`" en el área de **`Asia/Tokyo`** (UTC+9: el inicio del permiso, `(D1−1) 15:00:00.000Z`, es anterior al de la pertenencia, `D1 00:00:00.000Z`, y la regresión devuelve `409`). En Lima el caso del inicio no distingue ambas lógicas, porque `D1 05:00Z` no es anterior a `D1 00:00Z`. Por eso se usa una zona al este de UTC. Restaurar. (c) **Sin conservación por extremo**: `ResolverExtremo` normaliza siempre → deben fallar los casos de conservación de T294 y los de T301 (solo bloques o estado, cambiar un solo extremo); restaurar. (d) **Restauración exacta**: verificar por hash y con `git diff` frente a las copias que `VigenciaDiariaPermiso.cs`, `ContencionTemporalValidator.cs` y **`PermisoAccesoService.cs`** son idénticos a la implementación correcta, sin rastro de ningún cambio temporal, y volver a ejecutar en verde las suites afectadas (unitarias de T294–T296 e integración de T299–T301). Registrar qué pruebas falló cada alteración: demuestra que las pruebas detectan **individualmente** las tres regresiones. Sin archivos nuevos en el repositorio. Depende de T309.
+- [X] T311 Ejecutar las suites completas: unitarias, integración con Testcontainers, contrato (incluido `OpenApiSnapshotTests` en verde), Vitest, typecheck, ESLint de los archivos afectados (informando aparte los problemas previos no relacionados) y Playwright (T308). Registrar los totales, sin regresión en T001–T286. Depende de T310.
+- [X] T312 **Cierre documental de VF-004**: • en quickstart.md §10, sustituir la presentación de "escenarios pendientes" por el estado implementado y una tabla de cobertura automatizada (patrón de §9); • verificar que research.md §36, data-model.md, `contracts/permissions.yaml` v2.0.0, ux-ui.md §18 y spec.md RF-083 coinciden con lo implementado, registrando cualquier desviación como nota de este bloque; • en `post-baseline-validation.md` §19.1, pasar VF-004 a **FIXED** (T287–T311) y a **VALIDATED** con la evidencia técnica de T309–T311; • pasar a **CLOSED** solo con la validación funcional del usuario en la interfaz; si aún no existe, dejar VF-004 en VALIDATED y registrarlo; • confirmar que el diff de tasks.md se limita a este bloque: T001–T286 sin cambios (líneas 1–2065 idénticas byte a byte a las de partida) y ninguna tarea posterior a T312; • confirmar que no hay cambios fuera del alcance aprobado. Archivos: `specs/001-control-acceso-empresarial/quickstart.md`, `docs/functional-validation/post-baseline-validation.md` y `specs/001-control-acceso-empresarial/tasks.md` (solo casillas de este bloque). Depende de T311.
+
+**Checkpoint**: VF-004 implementado, verificado y registrado. Baseline y bloques anteriores intactos.
+
+---
+
+## Dependencies & Execution Order — bloque T287 a T312 (POST-BASELINE — VF-004)
+
+### Orden por fase
+
+- **Phase 38**: T287 ∥ T288 (archivos distintos). T289 rompe la compilación hasta T293 y T297: hacerlo en el
+  mismo tramo que la Phase 39.
+- **Phase 39**: T290 → T291 → T292 → T293. Todas comparten `PermisoAccesoService.cs`, así que ninguna es `[P]`
+  entre sí.
+- **Phase 40**:
+  - T294 tras T287; T295 tras T288; T296 tras T292;
+  - T297 tras T289 y T298 tras T297 y T293;
+  - T299, T300 y T301 (archivos nuevos y distintos) tras T293 y T297, en paralelo entre sí.
+- **Phase 41**: T302 tras T289 y T293.
+- **Phase 42**: T303 ∥ T304; T305 y T306 después de ambas; T307 al final. Puede avanzar en paralelo con la
+  Phase 40 porque el contrato ya está fijado.
+- **Phase 43**: T308 tras T293 y T305.
+- **Phase 44**: T309 → T310 → T311 → T312.
+
+### Oportunidades de paralelismo
+
+- T287 ∥ T288; T294 ∥ T295 ∥ T296; T299 ∥ T300 ∥ T301; T303 ∥ T304.
+- Frontend (Phase 42) ∥ pruebas de backend (Phase 40), una vez terminada la Phase 39.
+
+### Estrategia de implementación
+
+1. **Núcleo** (MVP técnico): T287, T288, T294, T295. Conversión con tzdb y contención por fecha civil,
+   verificables de forma aislada.
+2. **Servidor v2.0.0**: T289–T293, T296–T298 y T302. La API publica el contrato nuevo y el snapshot vuelve a
+   verde.
+3. **Evidencia de negocio**: T299–T301 (CS-044 a CS-047, RF-082 por fecha civil, aislamiento, históricos).
+4. **Interfaz**: T303–T307.
+5. **E2E y cierre**: T308–T312.
+
+---
+
+## Trazabilidad VF-004 → requisitos → tareas
+
+```text
+VF-004 (post-baseline-validation.md §19; decisiones F-1..F-7)
+  -> RF-083 (nuevo) + matices de Historia 8, RF-021, RF-029, RF-080, RF-082
+       -> (a) conversión F-1, cambio de horario ...... T287, T290, T291 | T294, T299
+       -> (b) evaluación sin cambios ............... T309 | T299
+       -> (c) contención por fecha civil F-2 ....... T288, T291, T292, T305 | T295, T300, T307
+       -> (d) edición por extremo F-6 .............. T287, T292 | T294, T301
+       -> (e) contrato v2.0.0 F-3 .................. T289, T304, T308 | T299, T302
+       -> (f) presentación F-5 ..................... T293, T305, T306 | T299, T301, T307
+       -> (g) datos existentes F-4 ................. T292, T309 | T301
+       -> (h) cambio de zona F-7 ................... T290, T293 | T294, T301
+  -> CS-044 -> T299 | CS-045 -> T299 | CS-046 -> T301 | CS-047 -> T301
+  -> T287..T312
+```
+
+| Clarify | Plan (WP) | Diseño | Tareas | Evidencia |
+|---|---|---|---|---|
+| F-1 | WP-1, WP-4 | research.md §36.1–36.2 | T287, T290, T291 | T294, T299 |
+| F-2 | WP-2, WP-4, WP-9 | research.md §36.4 | T288, T291, T292, T305 | T295, T300, T307 |
+| F-3 | WP-3, WP-8, WP-9, WP-11 | research.md §36.5; `permissions.yaml` v2.0.0 | T289, T304, T308 | T299, T302 |
+| F-4 | WP-4, WP-6 | research.md §36.8 | T292, T309 | T301, T309 |
+| F-5 | WP-4, WP-9, WP-10 | research.md §36.6–36.7; ux-ui.md §18 | T293, T305, T306 | T301, T307 |
+| F-6 | WP-1, WP-4 | research.md §36.3 | T287, T292 | T294, T296, T301 |
+| F-7 | WP-4, WP-6 | research.md §36.2, §36.8 | T290, T293 | T294, T301 |
+| Aislamiento (Principio I) | WP-4, WP-6 | research.md §36.2, §36.4 | T290, T291, T292 | T300 |
+| Regresión y cierre | WP-7, WP-12 | plan.md, Regresión VF-004 | T297, T298, T309–T312 | T309–T311 |
+
+Trazabilidad del contrato: `contracts/permissions.yaml` v2.0.0 → `PermisoAccesoDtos.cs` y
+`PermisosRequestValidators.cs` (T289) → `PermisoAccesoService.AMapa` (T293) → `frontend/src/features/permissions/api.ts`
+(T304) → `PermisosContractTests` y `OpenApiSnapshotTests` (T302) → helpers E2E (T308).
+
+## Notas del bloque T287 a T312 (POST-BASELINE — VF-004)
+
+- **T001–T286 no se modificaron, renumeraron ni reabrieron.** El bloque es estrictamente aditivo.
+- **Por qué se cambian pruebas creadas por tareas cerradas** (T297, T298 tocan archivos de Historia 8 y de
+  VF-007): cambia la forma de la petición (v2.0.0) o una expectativa que RF-083 modifica (inicio = fin ya es
+  válido; un fin una hora antes cae el mismo día). Se cambia el código de prueba, no la tarea histórica.
+- **Sin migraciones, scripts de conversión ni reinterpretación de datos** (F-4): T301 y T309 lo verifican.
+- **Sin cambios en la evaluación, la cascada, `Vigencia`, RF-022 ni RF-072**: T309 lo verifica con `git diff`.
+- **Sin cambios de DI**: `IRelojEmpresarial`, `ContencionTemporalValidator` y `PersonaService` ya están
+  registrados. T290 solo verifica que el contenedor resuelve el nuevo parámetro.
+- **`PermisosController` no cambia**: ya declara `400`, `404` y `409`. T302 lo verifica.
+- **Código de una tarea cerrada que se retira (I2)**: T292 retira `ReglaContencionPermiso.FechasCambian`
+  (introducido por T243); T243 permanece cerrada y no se modifica. Igual que con las pruebas, se cambia el
+  código, no la tarea histórica.
+- **Correcciones de `/speckit-analyze` absorbidas sin tareas nuevas**: F1 en T310 (regresión dirigida en lugar
+  de restaurar el servicio anterior, incompatible con los DTO `DateOnly`); U1 en T292 (`FinUtc > InicioUtc`
+  tras resolver los extremos → `400 PERIODO_INVALIDO`) y en T301 (caso de instantes invertidos); U2 en T299 y
+  T301 (fechas relativas a `Instante`); I1 en spec.md RF-083 (a); I2 en esta nota; I3 en research.md §35.3 y
+  §35.5. Numeración T287–T312 sin cambios.
+- **Correcciones del segundo `/speckit-analyze`, sin tareas nuevas**: U3 en T310 (b), cuya regresión pasa al
+  punto de llamada de `PermisoAccesoService.ContenerEnPertenenciaAsync` (`ValidarAsync` por instantes en lugar
+  de `ValidarFechasCivilesAsync`), con `PermisoAccesoService.cs` incluido en las copias, los hashes y la
+  restauración; en T295, que elimina el cuarto caso no discriminante; y en T300, que añade el caso de inicio en
+  `Asia/Tokyo`, necesario porque en Lima el extremo inicial no distingue fecha civil de instante. U4 en T301
+  (Da − 1, Da, Db y Db + 5 dentro de la pertenencia; `POST` explícito del permiso normalizado para CS-047). I4
+  en plan.md (WP-4 y "Validación y cierre"). I5 en quickstart.md §10.
+- **Correcciones del tercer `/speckit-analyze`, sin tareas nuevas**: L1 en T310 (b), donde los instantes son los
+  de la zona efectiva del área de cada caso (Lima o Tokio); L2 en T291 y T292, donde `ContenerEnPertenenciaAsync`
+  recibe las fechas civiles y los instantes UTC ya resueltos, usa solo las fechas y deja los instantes para que
+  T310 (b) cambie únicamente la llamada; L3 en T301, con `Dx = Da + 2` dentro de la pertenencia.
+
+### Notas de implementación del bloque T287 a T312 (T312)
+
+- **Evidencia final**: unitarias 155/155, integración 593/593, contrato 252/252 (incluido
+  `OpenApiSnapshotTests`), Vitest 203/203, Playwright 9/9. Typecheck (`tsconfig.app.json` y
+  `tsconfig.node.json`) y ESLint de los archivos de VF-004 sin problemas. El detalle y la regresión dirigida
+  están en `post-baseline-validation.md` §19.1.
+- **Datos de montaje en T299 y T300**: el usuario del escenario solo administra la Contratista y las Principales
+  A y B. Para los casos de `America/Santiago` (T299) y `Asia/Tokyo` (T300), la zona de la Principal B se cambia
+  directamente en la base de datos como dato de montaje, sin crear una Principal fuera de su alcance. El cambio de
+  zona que **se prueba** (CS-047, T301) sí pasa por la API de compañías, como exige la tarea.
+- **T310, ejecución inválida descartada**: la primera medición de la alteración (a) usó `--no-build` después de
+  compilar solo el proyecto de integración, así que las pruebas unitarias corrieron con el binario correcto y
+  pasaron. Se repitió compilando, y los resultados registrados en §19.1 son los de esa segunda ejecución.
+- **T311 y Playwright**: los E2E se ejecutaron en T308 sobre el código definitivo. Después no cambió ningún
+  archivo de `backend/src` ni de `frontend`, como verifican los hashes de T310. El contenedor `eac-api` quedó
+  reconstruido con el código de VF-004, se devolvió a su configuración original (hash del entorno igual al
+  inicial, `Database=EnterpriseAccessControl`) y se dejó parado, junto con `eac-sqlserver`, como estaba antes.
+- **Formato**: `frontend/src/lib/fechas.ts` ya no cumplía Prettier antes de VF-004 (diferencia en todo el
+  archivo por los finales de línea); se dejó así para no mezclar un reformateo completo con el cambio.
+  `PermisoFormulario.tsx` y `PermisosPage.test.tsx` se formatearon, y solo cambiaron líneas nuevas.
+- **ESLint preexistente, ajeno a VF-004**: 1 error y 4 advertencias en `PertenenciaContextoWizard.tsx` y
+  `CamposAsignacion.tsx`, los mismos que en los hallazgos anteriores.
+- **Contrato (T302)**: el modelo `ContratoOpenApi` de las pruebas no expone `format`. Por eso la trazabilidad
+  compara propiedades y obligatorios contra `permissions.yaml`, y los formatos (`date`, `date-time`,
+  `boolean`, `string`) contra el documento OpenAPI que publica la API.
+- **Sin desviaciones funcionales**: la implementación coincide con spec.md RF-083, research.md §36, data-model.md
+  (duodécima revisión), `contracts/permissions.yaml` v2.0.0 y ux-ui.md §18. No hizo falta modificar la
+  especificación, el plan ni la definición de las tareas durante la implementación.

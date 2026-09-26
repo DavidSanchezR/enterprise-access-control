@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as areasApi from '../../src/features/area-access/api'
 import type { AreaAcceso, NodoArbolArea } from '../../src/features/area-access/api'
 import { AreasAccesoPage } from '../../src/features/area-access/AreasAccesoPage'
+import * as tiposPorAreaApi from '../../src/features/area-access/TiposPersonaPorArea/api'
 import * as companiasApi from '../../src/features/companies/api'
 import type { Compania, PaginaCompanias } from '../../src/features/companies/api'
+import * as maestrosApi from '../../src/features/masters/api'
 
 const P1 = '0199b0d0-0000-7000-8000-00000000000a'
 const P2 = '0199b0d0-0000-7000-8000-00000000000b'
@@ -259,6 +261,115 @@ describe('AreasAccesoPage', () => {
     // RF-046: una CONTRATISTA no posee áreas, así que no debe ni aparecer como opción.
     expect(vi.mocked(companiasApi.listarCompanias).mock.calls[0][0]).toMatchObject({
       tipoCompania: 'PRINCIPAL_MANDANTE',
+    })
+  })
+
+  // --- VF-003 (post-Baseline): el árbol de áreas se recorre con el ratón (RF-009, RF-036) ------------
+  //
+  // La causa se corrigió en el Tree compartido (T282, VF-002). Estas pruebas aportan la evidencia de
+  // esta pantalla: la jerarquía se despliega desde el indicador y la selección sigue gobernando las
+  // acciones y el panel de tipos de persona del área (RF-019).
+
+  describe('árbol de áreas con el ratón (VF-003)', () => {
+    /** Planta Concentradora > Molienda > Chancado, en P1. */
+    const arbol = [
+      nodo('r', 'Planta Concentradora', [nodo('h', 'Molienda', [nodo('n', 'Chancado')])]),
+    ]
+
+    const area = (id: string, nombre: string, areaSuperiorId: string | null): AreaAcceso => ({
+      id,
+      nombre,
+      areaSuperiorId,
+      companiaPrincipalId: P1,
+      estado: 'ACTIVO',
+    })
+
+    // Los nombres también aparecen en el selector "Nueva área superior": se busca dentro del árbol.
+    const enArbol = () => within(screen.getByRole('tree'))
+
+    const itemDelArbol = (nombre: string): HTMLElement =>
+      screen.getByRole('treeitem', { name: new RegExp(`^${nombre}`) })
+
+    async function montarArbol(): Promise<HTMLElement> {
+      vi.spyOn(areasApi, 'obtenerArbolAreas').mockResolvedValue(arbol)
+      vi.spyOn(areasApi, 'listarAreas').mockResolvedValue([
+        area('r', 'Planta Concentradora', null),
+        area('h', 'Molienda', 'r'),
+        area('n', 'Chancado', 'h'),
+      ])
+
+      renderizar()
+      await elegirPrincipal(P1, 'Minera Norte')
+
+      return screen.findByRole('treeitem', { name: /^Planta Concentradora/ })
+    }
+
+    it('empieza contraído, se despliega con ▸ y se vuelve a contraer con ▾', async () => {
+      const raiz = await montarArbol()
+
+      expect(raiz).toHaveAttribute('aria-expanded', 'false')
+      expect(enArbol().queryByText('Molienda')).not.toBeInTheDocument()
+
+      await userEvent.click(within(raiz).getByText('▸'))
+
+      expect(itemDelArbol('Planta Concentradora')).toHaveAttribute('aria-expanded', 'true')
+      expect(enArbol().getByText('Molienda')).toBeInTheDocument()
+
+      await userEvent.click(within(itemDelArbol('Planta Concentradora')).getByText('▾'))
+
+      expect(itemDelArbol('Planta Concentradora')).toHaveAttribute('aria-expanded', 'false')
+      expect(enArbol().queryByText('Molienda')).not.toBeInTheDocument()
+    })
+
+    it('permite recorrer un segundo nivel de la jerarquía', async () => {
+      const raiz = await montarArbol()
+
+      await userEvent.click(within(raiz).getByText('▸'))
+      await userEvent.click(within(itemDelArbol('Molienda')).getByText('▸'))
+
+      expect(itemDelArbol('Chancado')).toHaveAttribute('aria-level', '3')
+    })
+
+    it('el clic en el nombre selecciona el área sin desplegarla', async () => {
+      await montarArbol()
+
+      await userEvent.click(enArbol().getByText('Planta Concentradora'))
+
+      expect(itemDelArbol('Planta Concentradora')).toHaveAttribute('aria-selected', 'true')
+      expect(itemDelArbol('Planta Concentradora')).toHaveAttribute('aria-expanded', 'false')
+      expect(enArbol().queryByText('Molienda')).not.toBeInTheDocument()
+    })
+
+    it('seleccionar un área hija habilita sus acciones y muestra su panel de tipos de persona', async () => {
+      const tiposDelArea = vi
+        .spyOn(tiposPorAreaApi, 'listarTiposPersonaDeArea')
+        .mockResolvedValue(['tp-operario'])
+      vi.spyOn(maestrosApi, 'listarMaestro').mockResolvedValue([
+        { id: 'tp-operario', nombre: 'Operario', estado: 'ACTIVO' },
+      ])
+
+      const raiz = await montarArbol()
+
+      // Sin selección, las acciones sobre el área y su panel no están disponibles.
+      expect(screen.getByRole('button', { name: 'Mover' })).toBeDisabled()
+      expect(screen.queryByRole('heading', { name: 'Tipos de persona autorizados' })).toBeNull()
+
+      await userEvent.click(within(raiz).getByText('▸'))
+      await userEvent.click(enArbol().getByText('Molienda'))
+
+      expect(itemDelArbol('Molienda')).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('button', { name: 'Mover' })).toBeEnabled()
+
+      await userEvent.type(screen.getByLabelText('Nombre'), 'Chancado secundario')
+      expect(screen.getByRole('button', { name: 'Crear bajo la seleccionada' })).toBeEnabled()
+
+      // El panel corresponde al área hija seleccionada, no a su raíz (RF-019).
+      expect(
+        await screen.findByRole('heading', { name: 'Tipos de persona autorizados' }),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Molienda', { selector: 'strong' })).toBeInTheDocument()
+      expect(tiposDelArea).toHaveBeenCalledWith('h')
+      expect(await screen.findByRole('checkbox', { name: 'Operario' })).toBeChecked()
     })
   })
 })

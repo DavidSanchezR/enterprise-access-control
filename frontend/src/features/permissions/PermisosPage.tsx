@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { ApiError } from '../../lib/apiClient'
+import { formatearFecha, formatearFechaHora } from '../../lib/fechas'
 import { useAreas } from '../area-access/hooks'
 import type { Estado } from '../companies/api'
 import { useCompanias } from '../companies/hooks'
@@ -172,9 +173,7 @@ export function PermisosPage(): ReactElement {
                     {nombreSujeto(permiso)}
                   </td>
                   <td>
-                    {new Date(permiso.fechaHoraInicioVigencia).toLocaleString()}
-                    <br />
-                    hasta {new Date(permiso.fechaHoraFinVigencia).toLocaleString()}
+                    <Vigencia permiso={permiso} />
                   </td>
                   <td>
                     <ul className="permisos-bloques">
@@ -212,5 +211,33 @@ export function PermisosPage(): ReactElement {
         />
       )}
     </section>
+  )
+}
+
+/**
+ * Vigencia de un permiso (VF-004, RF-083 (f); F-5, F-7).
+ *
+ * Un permiso de días completos se muestra solo con sus fechas civiles. Uno anterior con hora, o uno que dejó
+ * de coincidir con límites de día tras un cambio de zona, se muestra con fecha y hora en la zona de su
+ * Principal (RF-080), nunca en la del navegador: mostrar solo la fecha daría a entender un día completo que
+ * no es.
+ */
+function Vigencia({ permiso }: { permiso: PermisoAcceso }): ReactElement {
+  if (permiso.vigenciaEnDiasCompletos) {
+    return (
+      <>
+        {formatearFecha(permiso.fechaInicioVigencia)}
+        <br />
+        hasta {formatearFecha(permiso.fechaFinVigencia)}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {formatearFechaHora(permiso.fechaHoraInicioVigencia, permiso.zonaHorariaIana)}
+      <br />
+      hasta {formatearFechaHora(permiso.fechaHoraFinVigencia, permiso.zonaHorariaIana)}
+    </>
   )
 }

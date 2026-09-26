@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as companiasApi from '../../src/features/companies/api'
@@ -212,5 +212,27 @@ describe('UnidadesOrganizativasPage', () => {
 
     // El estado no puede depender solo del color (ux-ui.md §26).
     expect(await screen.findByText('Gerencia (inactiva)')).toBeInTheDocument()
+  })
+
+  it('la jerarquía se recorre con el ratón y la selección habilita las acciones (VF-002)', async () => {
+    vi.spyOn(unidadesApi, 'obtenerArbol').mockResolvedValue([
+      nodo('r', 'Gerencia General', [nodo('h', 'Operaciones')]),
+    ])
+
+    renderizar()
+    await elegirPrincipal(P1, 'Minera Norte')
+
+    const raiz = await screen.findByRole('treeitem', { name: /^Gerencia General/ })
+
+    // RF-036: el árbol arranca contraído y la rama se despliega desde su indicador.
+    expect(screen.queryByText('Operaciones')).toBeNull()
+    await userEvent.click(within(raiz).getByText('▸'))
+    expect(screen.getByText('Operaciones')).toBeInTheDocument()
+
+    // Seleccionar el hijo sigue habilitando las acciones sobre la unidad seleccionada.
+    await userEvent.click(screen.getByText('Operaciones'))
+    expect(
+      screen.getByText('La nueva unidad heredará la compañía principal de su unidad superior.'),
+    ).toBeInTheDocument()
   })
 })

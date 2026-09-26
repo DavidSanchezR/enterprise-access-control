@@ -19,10 +19,15 @@ namespace EnterpriseAccessControl.Domain.Entities;
 /// área de la Principal a la que presta servicios es un caso legítimo. El acceso efectivo sigue
 /// condicionado a que cada persona tenga contexto operativo y credencial vigentes con esa Principal.
 ///
-/// **No** está sujeto a la contención temporal de RF-072 ni a la revocación en cascada de RF-061: un
-/// permiso es configuración del área, no una asociación de la persona con su compañía. Tratarlo como
-/// dependiente de la pertenencia obligaría a reescribir permisos de alcance COMPAÑÍA cada vez que
-/// alguien cambia de empresa, cuando lo correcto es que la evaluación deje de encontrarlos aplicables.
+/// **No** está sujeto a la revocación en cascada de RF-061: un permiso es configuración del área, no una
+/// asociación de la persona con su compañía. Tratarlo como dependiente de la pertenencia obligaría a
+/// reescribir permisos de alcance COMPAÑÍA cada vez que alguien cambia de empresa, cuando lo correcto
+/// es que la evaluación deje de encontrarlos aplicables.
+///
+/// Desde el cambio post-Baseline VF-007, un permiso de alcance PERSONA sí queda contenido en la
+/// pertenencia vigente de su persona cuando se crea, cambia su vigencia o se reactiva quedando
+/// <c>ACTIVO</c> (RF-082). Es una restricción de escritura, no una dependencia: la cascada sigue sin
+/// alcanzarlo. Los alcances UNIDAD_ORGANIZATIVA y COMPANIA no se contienen.
 /// </remarks>
 public class PermisoAcceso : EntidadBase
 {
@@ -36,6 +41,12 @@ public class PermisoAcceso : EntidadBase
 
     public Guid? CompaniaId { get; set; }
 
+    /// <summary>Inicio de vigencia: instante UTC (RF-021).</summary>
+    /// <remarks>
+    /// Desde VF-004 (RF-083) se calcula desde una fecha civil: el primer instante válido de ese día en la zona
+    /// de la Compañía Principal del área. En los permisos anteriores, y en un extremo no modificado, es el
+    /// instante almacenado, que se conserva sin reinterpretarse.
+    /// </remarks>
     public required DateTime FechaHoraInicioVigencia { get; set; }
 
     /// <summary>
@@ -44,6 +55,9 @@ public class PermisoAcceso : EntidadBase
     /// <remarks>
     /// No admite null como "vigencia abierta" ni fechas centinela: un permiso de acceso sin fin
     /// conocido sobrevive indefinidamente a la razón que lo motivó.
+    ///
+    /// Desde VF-004 (RF-083) se calcula desde la fecha civil de fin: el primer instante válido del día
+    /// siguiente menos 1 ms, en la zona de la Principal del área. Los permisos anteriores conservan el suyo.
     /// </remarks>
     public required DateTime FechaHoraFinVigencia { get; set; }
 
@@ -53,6 +67,10 @@ public class PermisoAcceso : EntidadBase
     public byte[]? RowVersion { get; set; }
 
     /// <summary>Vigencia efectiva: siempre por fechas, nunca por <see cref="Estado"/> (Principio IV).</summary>
+    /// <remarks>
+    /// Compara instantes UTC. VF-004 no la cambia: la vigencia diaria se resuelve al escribir, así que aquí
+    /// basta con los instantes persistidos, sean diarios o anteriores con hora (RF-083 (b)).
+    /// </remarks>
     public bool EstaVigenteEn(DateTime instante) =>
         FechaHoraInicioVigencia <= instante && instante < FechaHoraFinVigencia;
 

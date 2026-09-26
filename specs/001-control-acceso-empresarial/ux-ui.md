@@ -452,6 +452,18 @@ Filtros:
 - área;
 - estado.
 
+**Vigencia del permiso** *(cambio post-Baseline VF-004, spec.md RF-083)*:
+
+- Se captura con dos controles de fecha (`DatePicker`), inicio y fin, sin hora. Cada fecha es un día completo
+  en la zona de la Compañía Principal del área. Un permiso de un solo día es válido. Las restricciones dentro
+  del día se configuran con los bloques horarios.
+- Con alcance PERSONA, las fechas se limitan a las de la pertenencia vigente, que se muestran como fechas.
+- En el listado, la vigencia se muestra solo con fechas (`25/09/2026 – 30/09/2026`). Un permiso anterior al
+  cambio cuyos instantes no coinciden con días completos se muestra con fecha y hora en la zona de la Principal
+  (`25/09/2026 03:00 – 30/09/2026 12:00`), para no dar una representación engañosa.
+- Al editar un permiso de ese tipo, se muestran sus instantes actuales y se indica que conservar una fecha
+  conserva su hora; solo cambia el extremo cuya fecha se modifica.
+
 ## 19. Evaluación de acceso
 
 Pantalla administrativa explicativa:

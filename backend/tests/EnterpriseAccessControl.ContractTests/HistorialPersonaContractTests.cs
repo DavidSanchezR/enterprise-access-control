@@ -62,6 +62,7 @@ public sealed class HistorialPersonaContractTests(ApiContratoFixture fixture)
     [InlineData("/api/personas/{id}/contextos-operativos", "post")]
     [InlineData("/api/personas/{id}/contextos-operativos/{contextoId}/unidad-organizativa", "post")]
     [InlineData("/api/personas/{id}/perfiles", "get")]
+    [InlineData("/api/personas/{id}/perfiles", "post")]
     [InlineData("/api/personas/{id}/estado-efectivo", "get")]
     public void La_api_declara_los_codigos_de_estado_del_contrato(string ruta, string metodo)
     {
@@ -69,6 +70,18 @@ public sealed class HistorialPersonaContractTests(ApiContratoFixture fixture)
         var declarados = fixture.DocumentoApi.EstadosDeclarados(ruta, metodo);
 
         declarados.Should().Contain(esperados);
+    }
+
+    [Fact]
+    public void El_alta_de_perfil_declara_los_rechazos_de_contencion_de_RF_082()
+    {
+        // Cambio post-Baseline VF-007 (people.yaml v1.1.0): 400 SIN_PERTENENCIA_VIGENTE y
+        // 409 FUERA_DE_CONTENCION_TEMPORAL deben figurar en el contrato y publicarse en la API. Si ambos
+        // lados los retiraran a la vez, la comparación genérica de arriba no lo notaría.
+        const string Ruta = "/api/personas/{id}/perfiles";
+
+        Contrato.Estados[(Ruta, "post")].Should().Contain(["201", "400", "409"]);
+        fixture.DocumentoApi.EstadosDeclarados(Ruta, "post").Should().Contain(["201", "400", "409"]);
     }
 
     [Fact]
