@@ -4,19 +4,17 @@ Solución web para administrar el acceso físico a instalaciones empresariales: 
 unidades organizativas, personas con históricos de pertenencia y contexto operativo, permisos con vigencia
 y bloques horarios, credenciales/fotocheck, y evaluación de acceso con denegación por defecto.
 
-> **Estado del repositorio (2026-09-23):** el **baseline de Etapa 1 está implementado por completo** — las
-> 242 tareas de [`tasks.md`](specs/001-control-acceso-empresarial/tasks.md) (T001 a T242) están cerradas, el
-> defecto crítico de autorización que bloqueaba el cierre (F-01/F-02) está corregido y verificado en el
-> código, y el **gate de calidad de requisitos se cerró el 2026-09-21** con sus 45 ítems satisfechos
-> ([`checklists/baseline-gate.md`](specs/001-control-acceso-empresarial/checklists/baseline-gate.md)).
+> **Estado final (2026-09-26): PROYECTO CERRADO.** El **baseline de Etapa 1** (T001–T242) está cerrado, con
+> sus decisiones de negocio y su gate de requisitos (45/45) cerrados. La **validación funcional post-Baseline**
+> también está cerrada: los 11 hallazgos (VF-001 a VF-011) terminaron en `CLOSED`, con sus correcciones en
+> bloques de tareas nuevos (T243–T312) que no reescribieron el Baseline, y con **validación funcional manual de
+> la interfaz** además de las pruebas automatizadas. El trabajo post-Baseline se consolidó en el commit `244fa09`
+> (*feat: complete post-baseline functional validation*) y se integró en `main` mediante el PR #5 (merge
+> `6a72260`). Registro completo:
+> [`post-baseline-validation.md` §23](docs/functional-validation/post-baseline-validation.md).
 >
-> Las cinco suites se re-ejecutaron en este repositorio hoy: las cuatro de backend y frontend pasan
-> íntegras; la de extremo a extremo pasa 8 de 9 desde una base de datos limpia, por un caso que depende del
-> historial de ejecuciones anteriores y no de un defecto del producto
-> ([detalle](#la-suite-e2e-no-es-reproducible-desde-una-base-limpia)). Corregir esa prueba es lo único
-> pendiente que exige tocar código; el resto para congelar el baseline son actos de gobierno. Ver
-> [Estado actual de las pruebas](#estado-actual-de-las-pruebas) y
-> [Próximos pasos](#próximos-pasos-para-congelar-el-baseline).
+> Ver [Estado actual de las pruebas](#estado-actual-de-las-pruebas) y
+> [Alcance del proyecto cerrado](#alcance-del-proyecto-cerrado).
 >
 > Las cifras y afirmaciones técnicas de este documento están verificadas contra el código, los archivos de
 > proyecto y las dependencias instaladas, no contra la especificación. Donde ambas divergen, se indica
@@ -42,7 +40,7 @@ y bloques horarios, credenciales/fotocheck, y evaluación de acceso con denegaci
 16. [Despliegue (producción)](#despliegue-producción)
 17. [Estado actual del proyecto](#estado-actual-del-proyecto)
 18. [Decisiones de la auditoría: todas resueltas](#decisiones-de-la-auditoría-todas-resueltas)
-19. [Próximos pasos para congelar el baseline](#próximos-pasos-para-congelar-el-baseline)
+19. [Alcance del proyecto cerrado](#alcance-del-proyecto-cerrado)
 
 ## Objetivo
 
@@ -97,7 +95,7 @@ clarificación de negocio** que corrigieron y afinaron el modelo original— viv
 | 8 | Permisos de acceso con vigencia, bloques horarios y evaluación de acceso (motor de 15 pasos) | P1 | Implementada (API + UI) |
 | 9 | Mantenimiento de credencial/fotocheck por Compañía Principal | P2 | Implementada (API + UI dentro del historial de la persona) |
 | 10 | Auditoría automática por entidad (RF-026, RF-027) | P2 | Implementada (interceptor de EF Core) |
-| 10 | Consultas transversales: auditoría agregada, históricos y dashboard (RF-067 a RF-069, CS-032) | P2 | **Diferida a Etapa 2** (decisión D8) |
+| 10 | Consultas transversales: auditoría agregada, históricos y dashboard (RF-067 a RF-069, CS-032) | P2 | **Fuera del alcance del proyecto cerrado** (decisión D8) |
 
 Las historias 1 a 9 están implementadas y respaldadas por prueba automatizada, con interfaz incluida: la de
 credenciales (Historia 9) vive dentro del historial de la persona, no como módulo propio.
@@ -108,7 +106,8 @@ contrato de API, código ni pantalla. Eso es visible en la navegación de la SPA
 ([`AppShell.tsx`](frontend/src/app/AppShell.tsx)), que ofrece Compañías, Unidades organizativas, Áreas de
 acceso, Permisos, Evaluación de acceso, Personas, Datos maestros y —bajo Configuración— Usuarios y roles
 administrativos, **sin entradas de Históricos ni de Auditoría**; y la ruta `/` renderiza un marcador de
-Dashboard pendiente en lugar de los indicadores agregados que describe `ux-ui.md` §8.
+Dashboard en lugar de los indicadores agregados que describe `ux-ui.md` §8. Estas consultas quedaron fuera del
+alcance del proyecto cerrado.
 
 ## Documentación de especificación (Spec Kit)
 
@@ -371,8 +370,8 @@ Dos detalles de persistencia que conviene conocer antes de tocar el esquema:
 - El índice clúster sobre `CreatedAt` —con la PK `Id` como `NONCLUSTERED`— se aplica hoy a **dos**
   entidades: `HistorialContraseña` y `AsignaciónRolAdministrativo`. El comentario de
   `ConfiguracionExtensions.ConClusterPorCreatedAt` afirma que cubre "las 6 entidades de histórico de alto
-  volumen"; eso no coincide con el modelo actual y es una corrección pendiente en el código, no en este
-  documento.
+  volumen"; eso no coincide con el modelo actual. Es una inconsistencia menor conocida del código, fuera del
+  alcance del cierre.
 
 **Frontend**
 
@@ -512,11 +511,24 @@ temporales inválidos y fuga de datos entre compañías:
 
 No hay todavía un pipeline de integración continua configurado en el repositorio (sin `.github/workflows`);
 las suites se ejecutan localmente según [Instrucciones de desarrollo](#instrucciones-de-desarrollo).
-Automatizarlas en CI es uno de los [próximos pasos](#próximos-pasos-para-congelar-el-baseline).
+La integración continua quedó [fuera del alcance del proyecto cerrado](#alcance-del-proyecto-cerrado).
 
 ## Estado actual de las pruebas
 
-Ejecutadas en este repositorio el **2026-09-23**, con Docker activo:
+Ejecución final del **2026-09-25**, al cerrar la validación post-Baseline (VF-004), con Docker activo:
+
+| Suite | Resultado final (2026-09-25) | Baseline (2026-09-23) |
+|---|---|---|
+| Backend — Unitarias (`EnterpriseAccessControl.UnitTests`) | ✅ 155/155 | 101/101 |
+| Backend — Integración (`EnterpriseAccessControl.IntegrationTests`) | ✅ 593/593 | 534/534 |
+| Backend — Contrato (`EnterpriseAccessControl.ContractTests`) | ✅ 252/252 | 246/246 |
+| Frontend — Vitest (`npm run test`) | ✅ 203/203 (20 archivos) | 160/160 |
+| Frontend — E2E (Playwright) | ✅ 9/9 sobre la base E2E acumulada · 8/9 desde base limpia | 8/9 · 9/9 |
+
+Además de estas suites, la validación post-Baseline incluyó la **validación funcional manual de la interfaz**
+(registro, §23). El crecimiento respecto del Baseline corresponde a los bloques T243–T312.
+
+Registro del 2026-09-23 (Baseline), conservado como referencia:
 
 | Suite | Resultado | Antes (auditoría 2026-09-20) |
 |---|---|---|
@@ -686,8 +698,8 @@ compose se niega a arrancar.
    reutilizables. Estos valores quedaron **ratificados como definitivos** por la decisión de negocio #1,
    cerrada el 2026-09-20, sin umbrales especiales para ningún usuario y sin mecanismo adicional de
    recuperación. *(Nota de desincronización: los comentarios de `docker-compose.prod.yml` todavía los
-   califican de "PROVISIONALES pendientes de la Decisión #1"; ese texto quedó obsoleto con D9 y es una
-   corrección pendiente en el archivo, no en este documento.)*
+   califican de "PROVISIONALES pendientes de la Decisión #1"; ese texto quedó obsoleto con D9. Es una
+   inconsistencia menor conocida del archivo, fuera del alcance del cierre.)*
 5. **Migraciones**: la API **no las aplica al arrancar** y **falla si el esquema no existe** (ver
    [Instrucciones de desarrollo](#instrucciones-de-desarrollo)); ejecuta `dotnet ef database update` contra
    SQL Server **antes** de levantar la API. El repositorio incluye 12 migraciones de esquema más una
@@ -782,13 +794,13 @@ la Principal B, y un `GLOBAL_ADMINISTRATOR` alcanza recursos de ambas Principale
 - Una compañía `INACTIVA` deniega el acceso de forma dinámica y reversible, sin cascada de escritura
   (RF-079).
 
-**5. Etapa 2 / futuro**
+**5. Fuera del alcance del proyecto cerrado**
 
 - **Consultas transversales** (RF-067 a RF-069, CS-032): auditoría agregada filtrable, históricos
   transversales e indicadores operativos del Dashboard. Diferidas explícitamente por la decisión D8, sin
-  tareas ni código en este cierre. La ruta `/` del frontend muestra un marcador de Dashboard pendiente.
-- **Revocación en cascada al finalizar una `RelaciónContratistaPrincipal`**: sigue abierta como decisión de
-  negocio. Hoy ese caso está protegido únicamente por la re-validación dinámica de la evaluación de acceso
+  tareas ni código. La ruta `/` del frontend muestra un marcador de Dashboard.
+- **Revocación en cascada al finalizar una `RelaciónContratistaPrincipal`**: no se decidió dentro del proyecto
+  y quedó fuera de su alcance. Ese caso está protegido únicamente por la re-validación dinámica de la evaluación de acceso
   (RF-059/RF-065), sin cascada de escritura equivalente a RF-061.
 - **Integración continua**: no hay `.github/workflows`; las cinco suites se ejecutan localmente.
 
@@ -807,7 +819,7 @@ negocio**. Las 16 quedaron respondidas el 2026-09-20, las nueve decisiones está
 | D5 | Calendario de vigencias | Zona horaria IANA por Compañía Principal, con zona global de respaldo; UTC siempre persistido (RF-080) |
 | D6 | Reclasificar el tipo de una Compañía | Rechazo si hay dependencias incompatibles, simétrico en ambas direcciones, sin cascada (RF-081) |
 | D7 | Interfaz de Historia 5 | Se corrige y completa dentro de Etapa 1, no se traslada |
-| D8 | Consultas transversales (RF-067 a RF-069, CS-032) | Diferidas a Etapa 2, anotadas en `spec.md`, sin tareas de baseline |
+| D8 | Consultas transversales (RF-067 a RF-069, CS-032) | Diferidas a Etapa 2, anotadas en `spec.md`, sin tareas de baseline; quedaron fuera del alcance del proyecto cerrado |
 | D9 | Heredadas #1, #3 y #7 | Política de contraseñas actual ratificada; sin retención ni purga en el baseline; Historia 9 se mantiene en P2 |
 
 El gate de calidad de requisitos del 2026-09-21 revisó los 45 ítems de
@@ -826,7 +838,21 @@ Detalle de cada decisión, sus alternativas y su análisis de impacto:
 [`auditoria-decision-d2-d5-2026-09-20.html`](docs/auditorias/auditoria-decision-d2-d5-2026-09-20.html).
 **Las páginas del 16/09 conservan a propósito el estado previo a las respuestas**, como registro histórico.
 
-## Próximos pasos para congelar el baseline
+## Alcance del proyecto cerrado
+
+**El proyecto está cerrado.** Lo implementado y validado es el Baseline de Etapa 1 (T001–T242) y la validación
+funcional post-Baseline (T243–T312, VF-001 a VF-011 en `CLOSED`), integrados en `main` mediante los PR #1 a #5.
+
+Quedan **fuera del alcance del proyecto cerrado**, sin tareas ni compromiso de implementación:
+
+- las consultas transversales de auditoría e históricos y el Dashboard (RF-067 a RF-069, decisión D8);
+- la cascada de revocación al finalizar una `RelaciónContratistaPrincipal`;
+- la eliminación de perfiles (VF-008) y las limitaciones conocidas registradas en
+  [`post-baseline-validation.md` §23](docs/functional-validation/post-baseline-validation.md);
+- la integración continua, la reproducibilidad de UX-22 desde una base limpia, el acta formal de un nuevo
+  gate y el tag de release.
+
+### Secuencia de cierre del Baseline (registro histórico)
 
 De la secuencia acordada en la auditoría de cierre, los cinco primeros pasos están completados:
 
@@ -842,7 +868,8 @@ De la secuencia acordada en la auditoría de cierre, los cinco primeros pasos es
 5. ~~**Regresión completa** de las cinco suites.~~ **Completada** el 2026-09-20 y re-ejecutada en este
    repositorio el 2026-09-23 (ver [Estado actual de las pruebas](#estado-actual-de-las-pruebas)).
 
-Queda pendiente. Salvo el primer punto, es trabajo de gobierno más que de construcción:
+Los puntos siguientes eran la propuesta del 2026-09-23 para después del Baseline. **No se ejecutaron dentro del
+proyecto y quedan fuera del alcance del proyecto cerrado**; se conservan como registro:
 
 6. **Hacer reproducible la suite E2E desde una base limpia.** `UX-22: la búsqueda encuentra a un usuario
    que no está en la primera página` solo pasa si la base acumuló más de 20 usuarios en corridas previas
@@ -857,7 +884,7 @@ Queda pendiente. Salvo el primer punto, es trabajo de gobierno más que de const
 10. **Abrir formalmente la Etapa 2**: consultas transversales (RF-067 a RF-069, CS-032) y la decisión de
     negocio todavía abierta sobre la cascada al finalizar una `RelaciónContratistaPrincipal`.
 
-Correcciones menores detectadas al homologar este documento con el código, ninguna funcional:
+Inconsistencias menores conocidas (no funcionales), fuera del alcance del cierre:
 
 - `docker-compose.prod.yml` califica la política de contraseñas de "PROVISIONAL pendiente de la Decisión
   #1", que D9 cerró el 2026-09-20.
