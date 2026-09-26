@@ -103,10 +103,10 @@ Si además contradice una decisión explícita del Baseline, deberá registrarse
 | VF-003 | Áreas de Acceso | El control que muestra las áreas de acceso creadas no es amigable con el usuario. No se puede interactuar con el control, que debería ser un control del tipo árbol que permita desplegar los nodos y/o ramas de acuerdo con la jerarquía de las áreas de acceso registradas. | Defecto de implementación (frontend) — registrado inicialmente como UX; ver §18 | Captura | Alta |
 | VF-004 | Permisos de Acceso | La fecha de inicio y fin de vigencia solo debería ser del tipo fecha y el control solo debería mostrar la fecha correspondiente. | Cambio de requisito post-Baseline (modifica Historia 8 y RF-029; crea RF-083) — registrado inicialmente como defecto funcional; ver §19 | Comportamiento esperado no especificado | Media |
 | VF-005 | Permisos de Acceso | En el formulario de Nuevo Permiso, por Persona, en el control de "Buscar Persona", debería existir un placeholder que indique: "Ingrese su nro. de documento". | UX | Captura | Baja |
-| VF-006 | Personas | En el formulario de históricos de la persona, en el registro de los contextos operativos, no permite elegir la unidad administrativa a asignar a la persona. Debería permitir abrir un modal donde se liste toda la estructura de las unidades organizativas y permita elegir la que se encuentre habilitada y que corresponda. | Defecto Funcional | Captura | Alta |
+| VF-006 | Personas | En el formulario de históricos de la persona, en el registro de los contextos operativos, no permite elegir la unidad administrativa a asignar a la persona. Debería permitir abrir un modal donde se liste toda la estructura de las unidades organizativas y permita elegir la que se encuentre habilitada y que corresponda. | Comportamiento correcto — cerrado sin cambios tras validación manual; registrado inicialmente como defecto funcional; ver §20 | Captura | Alta |
 | VF-007 | Personas | Mientras el trabajador tenga al menos una vigencia con una compañía o registro de pertenencia, al momento de asignar un tipo de perfil y/o tipo de persona, debería permitir registrarle dicho dato, limitando su vigencia a la fecha fin de vigencia de la compañía asociada o del registro de pertenencia. Esta regla de contención temporal debe aplicarse también a las entidades que actualmente no se encuentran sujetas a dicha contención: `AsignaciónTipoPersona` y `PermisoAcceso`. | Cambio de requisito post-Baseline (modifica RF-072; ver §9) | Captura | Alta |
-| VF-008 | Personas | En el formulario de históricos de la persona, el registro del perfil y/o tipo de persona de la persona seleccionada está permitiendo solapamiento de fechas. Solo debería existir un tipo de persona asignado en un rango de tiempo y debería permitir eliminar y/o eliminar el perfil seleccionado. | Defecto Funcional | Captura | Alta |
-| VF-009 | Personas | Mientras el trabajador tenga al menos una vigencia con una compañía o registro de pertenencia, al momento de asignar una credencial, debería permitir registrarle dicho dato, limitando su vigencia a la fecha fin de vigencia de la compañía asociada o del registro de pertenencia. | Defecto Funcional | Captura | Alta |
+| VF-008 | Personas | En el formulario de históricos de la persona, el registro del perfil y/o tipo de persona de la persona seleccionada está permitiendo solapamiento de fechas. Solo debería existir un tipo de persona asignado en un rango de tiempo y debería permitir eliminar y/o eliminar el perfil seleccionado. | Comportamiento conforme a RF-011 — cerrado sin cambios tras validación manual; registrado inicialmente como defecto funcional; ver §21 | Captura | Alta |
+| VF-009 | Personas | Mientras el trabajador tenga al menos una vigencia con una compañía o registro de pertenencia, al momento de asignar una credencial, debería permitir registrarle dicho dato, limitando su vigencia a la fecha fin de vigencia de la compañía asociada o del registro de pertenencia. | Comportamiento correcto (RF-072) — cerrado sin cambios tras validación manual; registrado inicialmente como defecto funcional; ver §22 | Captura | Alta |
 | VF-010 | Usuario | En el formulario de crear nuevo usuario, los controles de Rol de Usuario se muestran desalineados, brindando una mala experiencia al usuario. | Defecto de implementación (visual) — registrado inicialmente como UX; ver §14 | Captura | Baja |
 | VF-011 | Usuario | En el formulario de crear nuevo usuario, en la última pantalla de resumen se está mostrando el ID de la compañía en vez de mostrarse el nombre de la compañía, que es lo que el usuario debe visualizar. | Defecto de implementación — registrado inicialmente como UX; ver §15 | Captura | Baja |
 
@@ -1153,15 +1153,16 @@ también pasan. Después, `Tree.tsx` se restauró al estado de T282 y el hash de
 
 ### 19.1 Estado
 
-**VALIDATED** (técnicamente, 2026-09-25). Pendiente de la validación funcional del usuario en la interfaz
-para pasar a **CLOSED**.
+**CLOSED** (cierre registrado el 2026-09-26). ~~**VALIDATED** (técnicamente, 2026-09-25). Pendiente de la
+validación funcional del usuario en la interfaz para pasar a **CLOSED**.~~ La validación funcional manual de la
+interfaz se completó con resultado satisfactorio.
 
 | Estado | Detalle |
 |---|---|
 | ANALYZING | Análisis completado; opción 2 aprobada por negocio; decisiones F-1 a F-7 cerradas en clarify y registradas en spec.md (Sesión 2026-09-25 VF-004, RF-083, CS-044–CS-047). Plan técnico en plan.md ("Plan post-Baseline VF-004", WP-1 a WP-12) y research.md §36; data-model.md (duodécima revisión), `contracts/permissions.yaml` v2.0.0, quickstart.md §10 y ux-ui.md §18 actualizados. Tres pasadas de `/speckit-analyze` corregidas antes de implementar. |
 | FIXED | Implementado como cambio de requisito post-Baseline mediante el bloque POST-BASELINE — VF-004 de tasks.md, **T287–T311**, con cierre documental en T312. T001–T286 intactas y ninguna tarea posterior a T312. |
 | VALIDATED | Validación **técnica** (T309–T311): las cinco suites en verde (tabla siguiente), regresión dirigida de T310 y verificación de regresión y de datos existentes de T309. |
-| CLOSED | **Pendiente.** Requiere la validación funcional del usuario en la interfaz: alta y edición de permisos con controles de fecha, listado con fechas o con fecha y hora, y rechazos de contención. |
+| CLOSED | Validación funcional **manual** de la interfaz realizada por el usuario, con resultado satisfactorio: alta y edición de permisos con controles de fecha, listado con fechas o con fecha y hora, y rechazos de contención. La implementación se integró en `main` mediante el commit `244fa09` (*feat: complete post-baseline functional validation*), el PR #5 y el merge `6a72260`. |
 
 Evidencia automatizada:
 
@@ -1269,3 +1270,112 @@ queda **fuera de VF-004** por decisión expresa y no se abre un hallazgo.
 - Pruebas (T294–T302, T307, T308): unitarias, de integración, de contrato, Vitest y E2E, según tasks.md.
 - No se modificaron T001–T286. No se creó ninguna tarea posterior a T312.
 - No se abrió Stage 2 ni ningún otro hallazgo.
+
+---
+
+## 20. Análisis de VF-006 — Unidad organizativa en el contexto operativo
+
+### 20.1 Estado
+
+**CLOSED** (cierre registrado el 2026-09-26).
+
+| Estado | Detalle |
+|---|---|
+| ANALYZING | El hallazgo pedía poder elegir la unidad organizativa al registrar el contexto operativo, idealmente en un diálogo con toda la estructura. |
+| VALIDATED | Validación funcional **manual** de la interfaz realizada por el usuario: el comportamiento esperado ya estaba disponible. |
+| CLOSED | Cerrado **sin cambios de código ni tareas nuevas**. |
+
+### 20.2 Clasificación y evidencia
+
+- **Clasificación**: comportamiento correcto; no es un defecto.
+- **Evidencia en el repositorio**: en el historial de la persona, cada contexto operativo muestra el componente
+  `AsignacionUnidadOrganizativa`, que presenta el árbol de unidades de su Compañía Principal (componente `Tree`)
+  para elegir la unidad vigente (Historia 5, casos A y B, decisión D7). Lo cubre la prueba E2E
+  `historia5-casos-a-b.spec.ts` ("CS-021: la unidad organizativa se elige sobre el árbol, no sobre una lista
+  plana").
+- **Observación**: la selección se hace sobre el árbol dentro del propio contexto, no en un diálogo modal. La
+  validación manual confirmó que esa forma cubre la necesidad del hallazgo.
+
+---
+
+## 21. Análisis de VF-008 — Perfiles simultáneos de la persona
+
+### 21.1 Estado
+
+**CLOSED** (cierre registrado el 2026-09-26).
+
+| Estado | Detalle |
+|---|---|
+| ANALYZING | El hallazgo indicaba que se permitía el solapamiento de perfiles (tipos de persona) y pedía poder eliminarlos. |
+| VALIDATED | Validación funcional **manual** de la interfaz realizada por el usuario. |
+| CLOSED | Cerrado **sin cambios de código ni tareas nuevas**. |
+
+### 21.2 Clasificación y evidencia
+
+- **Clasificación**: comportamiento conforme a la especificación; no es un defecto.
+- **Solapamiento**: RF-011 establece que "una persona DEBE poder tener uno o varios tipos/perfiles", y el
+  modelo trata los perfiles como múltiples y sin exclusividad (spec.md, Supuestos). Que dos perfiles coincidan
+  en el tiempo es el comportamiento especificado. Desde VF-007 (RF-082), cada perfil queda además contenido en
+  la pertenencia vigente de la persona.
+- **Eliminación de perfiles**: la API de perfiles expone solo `GET` y `POST /api/personas/{id}/perfiles`, y la
+  especificación no define su eliminación ni su desactivación. Queda **fuera del alcance del proyecto cerrado**;
+  no se implementó ni se abre como tarea.
+
+---
+
+## 22. Análisis de VF-009 — Contención de la credencial en la pertenencia
+
+### 22.1 Estado
+
+**CLOSED** (cierre registrado el 2026-09-26).
+
+| Estado | Detalle |
+|---|---|
+| ANALYZING | El hallazgo pedía limitar la vigencia de la credencial a la de la pertenencia vigente de la persona. |
+| VALIDATED | Validación funcional **manual** de la interfaz realizada por el usuario: el comportamiento esperado ya existía. |
+| CLOSED | Cerrado **sin cambios de código ni tareas nuevas**. |
+
+### 22.2 Clasificación y evidencia
+
+- **Clasificación**: comportamiento correcto; no es un defecto.
+- **Evidencia en el repositorio**: `AsignaciónCredencial` está sujeta a la contención temporal de RF-072 desde el
+  Baseline (`ContencionTemporalValidator`, `CredencialService`), con pruebas de contención en
+  `ContencionTemporalTests`. Durante la validación funcional de VF-007 (§9.1) ya se había comprobado en la
+  interfaz que la asignación de credenciales respeta esa contención.
+
+---
+
+## 23. Cierre de la validación funcional post-Baseline
+
+**CLOSED.** Los once hallazgos siguieron el ciclo OPEN → ANALYZING → FIXED → VALIDATED → CLOSED. Los que
+estaban correctos desde el inicio pasaron de VALIDATED a CLOSED sin corrección.
+
+| Hallazgo | Resultado | Tareas | Estado final |
+|---|---|---|---|
+| VF-001 | Corregido (selector de tipo de documento) | T279–T281 | CLOSED |
+| VF-002 | Corregido (árbol de unidades organizativas) | T282–T284 | CLOSED |
+| VF-003 | Evidencia propia de la corrección de T282 | T285–T286 | CLOSED |
+| VF-004 | Cambio de requisito implementado (RF-083) | T287–T312 | CLOSED |
+| VF-005 | Corregido (placeholder del buscador) | T267–T269 | CLOSED |
+| VF-006 | Comportamiento correcto, sin cambios | — | CLOSED |
+| VF-007 | Cambio de requisito implementado (RF-082) | T243–T266 | CLOSED |
+| VF-008 | Conforme a RF-011; eliminación de perfiles fuera de alcance | — | CLOSED |
+| VF-009 | Comportamiento correcto (RF-072), sin cambios | — | CLOSED |
+| VF-010 | Corregido (alineación de radios de rol) | T270–T272 | CLOSED |
+| VF-011 | Corregido (nombre de compañía, incluida la extensión) | T273–T278 | CLOSED |
+
+- **Validación**: pruebas automatizadas (unitarias 155, integración 593, contrato 252, Vitest 203, Playwright 9)
+  y validación funcional **manual** de la interfaz.
+- **Integración**: el trabajo post-Baseline se consolidó en la rama `feature/post-baseline-validation`, commit
+  `244fa09` (*feat: complete post-baseline functional validation*), PR #5, fusionado en `main` con el merge
+  `6a72260`. Este registro de cierre se añadió después, en un commit documental propio.
+- **Historial**: T001–T242 (Baseline) y los bloques T243–T312 no se reescribieron. VF-006, VF-008 y VF-009 se
+  cierran sin tareas nuevas.
+- **Fuera del alcance del proyecto cerrado**: las consultas transversales de auditoría e históricos y el
+  dashboard (RF-067 a RF-069, diferidos por la decisión D8) y la eliminación de perfiles (§21.2).
+- **Observaciones independientes registradas durante la validación**: la §15.8 quedó resuelta con la extensión de
+  VF-011 (T276–T278). Las §9.9 (un permiso PERSONA sobre una persona inexistente responde `400`, lo que revela
+  su existencia), §17.8 (búsqueda y breadcrumb del árbol) y §19.6 (día UTC en las vigencias diarias ajenas al
+  permiso) no se abrieron como hallazgos y quedan documentadas como **limitaciones conocidas, fuera del alcance
+  del proyecto cerrado**.
+
